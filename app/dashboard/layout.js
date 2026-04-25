@@ -20,7 +20,15 @@ function SidebarAndContent({ children }) {
     router.push('/login')
   }
 
-  // Sidebar influencer (pages /dashboard/*)
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ADMIN : on court-circuite tout le layout — pas de sidebar influencer/creator
+  // La sidebar admin est gérée directement dans app/dashboard/admin/page.js
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (pathname.startsWith('/dashboard/admin')) {
+    return <>{children}</>
+  }
+
+  // Sidebar influencer
   const influencerItems = [
     { icon: '🏠', label: 'Accueil',               route: '/dashboard/influencer' },
     { icon: '📋', label: 'Gestion des campagnes', route: '/dashboard/campaigns' },
@@ -35,7 +43,7 @@ function SidebarAndContent({ children }) {
     { icon: '⚙️', label: 'Paramètres',            route: '/dashboard/parametres' },
   ]
 
-  // Sidebar creator (pages /dashboard/creator/*)
+  // Sidebar creator
   const creatorItems = [
     { icon: '🏠', label: 'Accueil',               route: '/dashboard/creator' },
     { icon: '🔍', label: 'Opportunités',           route: '/dashboard/creator/opportunites' },
@@ -51,7 +59,6 @@ function SidebarAndContent({ children }) {
     { icon: '⚙️', label: 'Paramètres',            route: '/dashboard/creator/parametres' },
   ]
 
-  // Choisir la bonne sidebar selon le pathname
   const isCreator = pathname.startsWith('/dashboard/creator')
   const navItems = isCreator ? creatorItems : influencerItems
 

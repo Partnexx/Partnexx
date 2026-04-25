@@ -6,6 +6,7 @@ import supabase from '@/lib/supabase'
 
 export default function Login() {
   const router = useRouter()
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -16,26 +17,50 @@ export default function Login() {
     if (!email || !password) return setError('Veuillez remplir tous les champs')
     setLoading(true)
     setError('')
-    try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
-      if (authError) throw authError
 
-      // Lire le rôle depuis la table profiles
-      const { data: profile } = await supabase
+    try {
+      // 1. Connexion Supabase
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (authError) throw authError
+      if (!data?.user) throw new Error('Utilisateur introuvable')
+
+      // 2. Récupérer le rôle dans profiles
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', data.user.id)
         .single()
 
-      const role = profile?.role || 'influencer'
+      if (profileError) {
+        console.error('Erreur profil:', profileError)
+        router.push('/dashboard/influencer')
+        return
+      }
 
-      if (role === 'brand') {
+      // 3. Normaliser le rôle (minuscules, sans espaces)
+      const role = (profile?.role || 'influencer').toLowerCase().trim()
+      console.log('✅ Role détecté:', role)
+
+      // 4. Redirection selon le rôle
+      if (role === 'admin') {
+        router.push('/dashboard/admin')
+      } else if (role === 'brand') {
         router.push('/dashboard/creator')
       } else {
         router.push('/dashboard/influencer')
       }
+
     } catch (err) {
-      setError('Email ou mot de passe incorrect')
+      console.error('Erreur login:', err)
+      if (err.message === 'Invalid login credentials') {
+        setError('Email ou mot de passe incorrect')
+      } else {
+        setError(err.message || 'Une erreur est survenue')
+      }
     } finally {
       setLoading(false)
     }
@@ -147,7 +172,7 @@ export default function Login() {
             width: '100%', padding: '0.9rem',
             background: 'linear-gradient(135deg,#a855f7,#ec4899)',
             color: '#fff', border: 'none', borderRadius: '10px',
-            fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer',
+            fontSize: '0.95rem', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
             fontFamily: 'inherit', marginBottom: '1.5rem',
             boxShadow: '0 4px 15px rgba(168,85,247,0.35)',
             opacity: loading ? 0.7 : 1, transition: 'all 0.2s',
