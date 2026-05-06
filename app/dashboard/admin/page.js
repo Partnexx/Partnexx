@@ -2,6 +2,193 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAdminData } from '@/lib/hook/useAdminData'
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// FONCTIONS D'EXPORT PDF
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const exportToPDF = (title, headers, rows, filename) => {
+  const date = new Date().toLocaleDateString('fr-FR')
+  const time = new Date().toLocaleTimeString('fr-FR')
+
+  const tableRows = rows.map(row =>
+    `<tr>${row.map((cell, i) => `<td style="padding:8px 12px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#374151;${i === 0 ? 'font-weight:600;' : ''}">${cell ?? '—'}</td>`).join('')}</tr>`
+  ).join('')
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>${title}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; color: #0f1624; padding: 40px; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 2px solid #3b6ef6; }
+        .logo { display: flex; align-items: center; gap: 10px; }
+        .logo-icon { width: 36px; height: 36px; background: #3b6ef6; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+        .logo-text { font-size: 20px; font-weight: 800; color: #0f1624; letter-spacing: -0.02em; }
+        .logo-sub { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+        .meta { text-align: right; font-size: 11px; color: #9ca3af; line-height: 1.6; }
+        .title { font-size: 22px; font-weight: 700; color: #0f1624; margin-bottom: 6px; }
+        .subtitle { font-size: 13px; color: #6b7280; margin-bottom: 28px; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; background: #eff3ff; color: #3b6ef6; font-size: 11px; font-weight: 600; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        thead tr { background: #f8f9fc; }
+        thead th { padding: 10px 12px; text-align: left; font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 2px solid #e8ecf0; }
+        tbody tr:hover { background: #f8f9fc; }
+        .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e8ecf0; display: flex; justify-content: space-between; font-size: 10px; color: #9ca3af; }
+        .empty { text-align: center; padding: 40px; color: #9ca3af; font-size: 14px; }
+        @media print { body { padding: 20px; } }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="logo">
+          <div class="logo-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5"/>
+              <path d="M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <div>
+            <div class="logo-text">Partnexx</div>
+            <div class="logo-sub">Interface Admin</div>
+          </div>
+        </div>
+        <div class="meta">
+          <div>Exporté le ${date} à ${time}</div>
+          <div>Rapport confidentiel — usage interne</div>
+          <div>${rows.length} entrée${rows.length > 1 ? 's' : ''}</div>
+        </div>
+      </div>
+
+      <div class="title">${title}</div>
+      <div class="subtitle">Données extraites en temps réel depuis la base Partnexx</div>
+      <span class="badge">📊 ${rows.length} résultat${rows.length > 1 ? 's' : ''}</span>
+
+      ${rows.length === 0 ? '<div class="empty">Aucune donnée à exporter</div>' : `
+      <table>
+        <thead>
+          <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+      `}
+
+      <div class="footer">
+        <span>© ${new Date().getFullYear()} Partnexx — Confidentiel</span>
+        <span>Généré automatiquement · ${date}</span>
+      </div>
+    </body>
+    </html>
+  `
+
+  const blob = new Blob([html], { type: 'text/html' })
+  const url = URL.createObjectURL(blob)
+  const win = window.open(url, '_blank')
+  if (win) {
+    win.onload = () => {
+      win.print()
+      URL.revokeObjectURL(url)
+    }
+  }
+}
+
+// Export Utilisateurs
+const exportUsers = (users) => {
+  const headers = ['Nom', 'Email', 'Rôle', 'Statut', 'Pays', 'Revenus', 'Score', 'Inscrit le']
+  const rows = users.map(u => [
+    u.full_name || u.email || 'Inconnu',
+    u.email || '—',
+    u.role === 'influencer' ? 'Créateur' : u.role === 'brand' ? 'Marque' : u.role === 'admin' ? 'Admin' : u.role,
+    u.status === 'active' ? 'Actif' : u.status === 'suspended' ? 'Suspendu' : 'En attente',
+    u.country || 'France',
+    `${(u.total_revenue || 0).toLocaleString()} €`,
+    u.score_confiance || '—',
+    u.created_at ? new Date(u.created_at).toLocaleDateString('fr-FR') : '—',
+  ])
+  exportToPDF('Rapport Utilisateurs', headers, rows, 'partnexx-utilisateurs')
+}
+
+// Export Campagnes
+const exportCampaigns = (campaigns) => {
+  const headers = ['Nom', 'Type', 'Statut', 'Budget', 'Créateurs max', 'ROI', 'Créée le']
+  const rows = campaigns.map(c => [
+    c.name || 'Sans nom',
+    c.type || 'UGC',
+    c.status === 'active' ? 'Active' : c.status === 'blocked' ? 'Bloquée' : c.status === 'completed' ? 'Terminée' : 'Brouillon',
+    `${(c.budget || 0).toLocaleString()} €`,
+    c.max_creators || 0,
+    c.roi ? `${c.roi}x` : '—',
+    c.created_at ? new Date(c.created_at).toLocaleDateString('fr-FR') : '—',
+  ])
+  exportToPDF('Rapport Campagnes', headers, rows, 'partnexx-campagnes')
+}
+
+// Export Transactions
+const exportTransactions = (transactions) => {
+  const headers = ['ID', 'Type', 'Statut', 'Montant', 'Commission', 'Risque', 'Date']
+  const rows = transactions.map(tx => [
+    (tx.id || '').slice(0, 8) + '...',
+    tx.type === 'deposit' ? 'Dépôt' : tx.type === 'payout' ? 'Reversement' : tx.type === 'refund' ? 'Remboursement' : tx.type,
+    tx.status === 'in_escrow' ? 'En escrow' : tx.status === 'released' ? 'Libéré' : tx.status === 'pending' ? 'En attente' : tx.status === 'failed' ? 'Échoué' : tx.status,
+    `${(tx.amount || 0).toLocaleString()} €`,
+    `${(tx.commission || 0).toLocaleString()} €`,
+    tx.risk_level === 'low' ? 'Faible' : tx.risk_level === 'medium' ? 'Moyen' : 'Élevé',
+    tx.created_at ? new Date(tx.created_at).toLocaleDateString('fr-FR') : '—',
+  ])
+  exportToPDF('Rapport Transactions', headers, rows, 'partnexx-transactions')
+}
+
+// Export Litiges
+const exportDisputes = (disputes) => {
+  const headers = ['ID', 'Plaignant', 'Défendeur', 'Type', 'Priorité', 'Statut', 'Montant', 'Date']
+  const rows = disputes.map(d => [
+    (d.id || '').slice(0, 8) + '...',
+    d.reporter_id || '—',
+    d.reported_id || '—',
+    d.type || d.category || 'Litige',
+    d.priority === 'critical' ? 'Critique' : d.priority === 'high' ? 'Haute' : 'Moyenne',
+    d.status === 'open' ? 'Ouvert' : d.status === 'resolved' ? 'Résolu' : d.status === 'investigating' ? 'En analyse' : 'Clos',
+    d.amount ? `${d.amount.toLocaleString()} €` : '—',
+    d.created_at ? new Date(d.created_at).toLocaleDateString('fr-FR') : '—',
+  ])
+  exportToPDF('Rapport Litiges & Arbitrage', headers, rows, 'partnexx-litiges')
+}
+
+// Export Support Tickets
+const exportTickets = (tickets) => {
+  const headers = ['Titre', 'Utilisateur', 'Catégorie', 'Priorité', 'Statut', 'Date']
+  const rows = tickets.map(tk => [
+    tk.title || tk.subject || 'Sans titre',
+    tk.user_id || '—',
+    tk.category || '—',
+    tk.priority || 'Normale',
+    tk.status === 'open' ? 'Ouvert' : tk.status === 'closed' ? 'Fermé' : tk.status === 'escalated' ? 'Escaladé' : tk.status,
+    tk.created_at ? new Date(tk.created_at).toLocaleDateString('fr-FR') : '—',
+  ])
+  exportToPDF('Rapport Support & Tickets', headers, rows, 'partnexx-support')
+}
+
+// Export Dashboard (rapport général)
+const exportDashboard = (stats, users, campaigns, transactions, disputes) => {
+  const headers = ['Indicateur', 'Valeur', 'Détail']
+  const rows = [
+    ['Total utilisateurs', stats.total_users || 0, `${stats.total_creators || 0} créateurs · ${stats.total_brands || 0} marques`],
+    ['Campagnes actives', stats.active_campaigns || 0, `${campaigns.length} campagnes au total`],
+    ['Volume traité', `${((stats.total_volume || 0) / 1000).toFixed(1)}K €`, 'Total des transactions'],
+    ['Revenus Partnexx', `${((stats.total_revenue || 0) / 1000).toFixed(1)}K €`, 'Commissions collectées'],
+    ['Fonds en escrow', `${((stats.escrow_amount || 0) / 1000).toFixed(1)}K €`, 'Fonds bloqués en attente'],
+    ['Litiges ouverts', stats.open_disputes || 0, `${disputes.filter(d => d.status === 'resolved').length} résolus`],
+    ['Tickets support', stats.open_tickets || 0, 'Tickets actifs'],
+    ['KYC en attente', stats.pending_kyc || 0, 'Vérifications à traiter'],
+    ['Paiements échoués', transactions.filter(t => t.status === 'failed').length, 'Ce mois'],
+    ['Taux de commission', '15%', 'Taux actuel Partnexx'],
+  ]
+  exportToPDF('Rapport Général Dashboard', headers, rows, 'partnexx-dashboard')
+}
+
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const themes = {
   light: {
@@ -177,8 +364,9 @@ const ProgressBar = ({ value, color = '#3b82f6', theme: t }) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // PAGE: DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
-const PageDashboard = ({ theme: t, dbStats = {}, dbLoading = false }) => {
+const PageDashboard = ({ theme: t, dbStats = {}, dbUsers = [], dbCampaigns = [], dbTransactions = [], dbDisputes = [], dbLoading = false }) => {
   const th = themes[t]
+
   const stats = [
     { label: 'Total utilisateurs', value: dbLoading ? '...' : String(dbStats.total_users || 0), sub: '↗ +124 ce mois', icon: <Icon name="users" size={18} color="#3b6ef6" />, iconBg: th.accentLight },
     { label: 'Créateurs actifs', value: dbLoading ? '...' : String(dbStats.total_creators || 0), sub: '↗ +67 cette semaine', icon: <Icon name="score" size={18} color="#10b981" />, iconBg: t === 'dark' ? '#052e16' : '#dcfce7' },
@@ -189,27 +377,103 @@ const PageDashboard = ({ theme: t, dbStats = {}, dbLoading = false }) => {
     { label: 'Revenus Partnexx', value: dbLoading ? '...' : `${((dbStats.total_revenue || 0) / 1000).toFixed(0)}K €`, sub: '↗ +22% MoM', icon: <Icon name="trend" size={18} color="#10b981" />, iconBg: t === 'dark' ? '#052e16' : '#dcfce7' },
     { label: 'Litiges ouverts', value: dbLoading ? '...' : String(dbStats.open_disputes || 0), icon: <Icon name="warning" size={18} color="#ef4444" />, iconBg: t === 'dark' ? '#2d1515' : '#fee2e2' },
   ]
-  const recentActivity = [
-    { type: 'Nouvelle inscription', detail: 'alex@email.com · Créateur', time: '2min', color: '#3b6ef6' },
-    { type: 'Campagne créée', detail: 'Summer Glow — BeautyLab', time: '8min', color: '#10b981' },
-    { type: 'Paiement bloqué', detail: 'Nike France → @alexstyle', time: '15min', color: '#ef4444' },
-    { type: 'Litige ouvert', detail: 'Sephora vs @foodjulie', time: '1h', color: '#f59e0b' },
-    { type: 'Nouveau litige', detail: 'Décathlon vs @fake_bot_23', time: '2h', color: '#ef4444' },
-    { type: 'RTC validé', detail: 'Treaty 21 — signé et livré', time: '3h', color: '#10b981' },
+
+  // ── Activité récente depuis Supabase ──────────────────────────────────────
+  const recentActivity = dbLoading ? [] : [
+    ...dbUsers.slice(0, 2).map(u => ({
+      type: 'Nouvelle inscription',
+      detail: `${u.email || u.full_name || 'Utilisateur'} · ${u.role === 'influencer' ? 'Créateur' : u.role === 'brand' ? 'Marque' : 'Admin'}`,
+      time: u.created_at ? `${Math.floor((Date.now() - new Date(u.created_at)) / 60000)}min` : '—',
+      color: '#3b6ef6',
+    })),
+    ...dbCampaigns.slice(0, 2).map(c => ({
+      type: 'Campagne créée',
+      detail: `${c.name || 'Sans nom'} — ${c.brand_id || 'Marque'}`,
+      time: c.created_at ? `${Math.floor((Date.now() - new Date(c.created_at)) / 60000)}min` : '—',
+      color: '#10b981',
+    })),
+    ...dbTransactions.filter(tx => tx.status === 'frozen' || tx.status === 'failed').slice(0, 1).map(tx => ({
+      type: 'Paiement bloqué',
+      detail: `${tx.brand_id || 'Marque'} → ${tx.creator_id || 'Créateur'}`,
+      time: tx.created_at ? `${Math.floor((Date.now() - new Date(tx.created_at)) / 60000)}min` : '—',
+      color: '#ef4444',
+    })),
+    ...dbDisputes.slice(0, 1).map(d => ({
+      type: 'Litige ouvert',
+      detail: `${d.reporter_id || 'Marque'} vs ${d.reported_id || 'Créateur'}`,
+      time: d.created_at ? `${Math.floor((Date.now() - new Date(d.created_at)) / 3600000)}h` : '—',
+      color: '#f59e0b',
+    })),
+  ].filter(a => a.time !== '—').sort(() => Math.random() - 0.5).slice(0, 6)
+
+  // Fallback si base vide
+  const activity = recentActivity.length > 0 ? recentActivity : [
+    { type: 'Aucune activité récente', detail: 'Les événements apparaîtront ici en temps réel', time: '', color: '#9ca3af' },
   ]
-  const topPerformers = [
-    { name: 'Nike', handle: 'nikefrance', rev: '45 200 €', score: 98 },
-    { name: 'LOreal', handle: 'lorealoffi', rev: '38 100 €', score: 97 },
-    { name: 'Sephora', handle: 'sephora', rev: '32 800 €', score: 95 },
-    { name: 'Decathlon', handle: 'decathlon', rev: '28 500 €', score: 91 },
-    { name: 'EduPlus', handle: 'eduplus', rev: '18 200 €', score: 88 },
+
+  // ── Top Performances depuis Supabase ─────────────────────────────────────
+  const topPerformers = dbLoading ? [] : dbUsers
+    .filter(u => u.role === 'brand' || u.role === 'influencer')
+    .sort((a, b) => (b.total_revenue || 0) - (a.total_revenue || 0))
+    .slice(0, 5)
+    .map(u => ({
+      name: u.full_name || u.email || 'Utilisateur',
+      handle: u.email?.split('@')[0] || 'user',
+      rev: `${(u.total_revenue || 0).toLocaleString()} €`,
+      score: u.score_confiance || 0,
+    }))
+
+  const performers = topPerformers.length > 0 ? topPerformers : [
+    { name: 'Aucun utilisateur', handle: '—', rev: '0 €', score: 0 },
   ]
-  const alerts = [
-    { text: 'Compte suspendu en attente review', color: '#ef4444' },
-    { text: 'Paiement bloqué > 7j sans réponse marque', color: '#f59e0b' },
-    { text: 'Fraude détectée sur profil @fake_bot_23', color: '#ef4444' },
-    { text: 'Score fiabilité < 50% — Thomas Leroy', color: '#f59e0b' },
+
+  // ── Alertes depuis Supabase ───────────────────────────────────────────────
+  const alertes = dbLoading ? [] : [
+    ...dbDisputes.filter(d => ['open', 'investigating'].includes(d.status)).slice(0, 2).map(d => ({
+      text: `Litige ouvert — ${d.reporter_id || 'Marque'} vs ${d.reported_id || 'Créateur'}`,
+      color: '#ef4444',
+    })),
+    ...dbUsers.filter(u => u.score_confiance && u.score_confiance < 50).slice(0, 2).map(u => ({
+      text: `Score fiabilité < 50% — ${u.full_name || u.email || 'Utilisateur'}`,
+      color: '#f59e0b',
+    })),
+    ...dbTransactions.filter(tx => tx.status === 'frozen').slice(0, 1).map(tx => ({
+      text: `Paiement gelé — ${(tx.amount || 0).toLocaleString()} € bloqué`,
+      color: '#f59e0b',
+    })),
+    ...dbUsers.filter(u => u.status === 'suspended').slice(0, 1).map(u => ({
+      text: `Compte suspendu en attente review — ${u.full_name || u.email}`,
+      color: '#ef4444',
+    })),
   ]
+
+  const alerts = alertes.length > 0 ? alertes : [
+    { text: 'Aucune alerte active — Plateforme saine ✅', color: '#10b981' },
+  ]
+
+  // ── Campagnes donut depuis Supabase ───────────────────────────────────────
+  const totalCampaigns = dbCampaigns.length || 0
+  const activeCampaigns = dbCampaigns.filter(c => c.status === 'active').length
+  const completedCampaigns = dbCampaigns.filter(c => c.status === 'completed').length
+  const pendingCampaigns = dbCampaigns.filter(c => c.status === 'draft' || c.status === 'paused').length
+  const blockedCampaigns = dbCampaigns.filter(c => c.status === 'blocked').length
+
+  // ── Revenus par mois (depuis transactions) ────────────────────────────────
+  const revenueByMonth = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - (6 - i))
+    const month = d.getMonth()
+    const year = d.getFullYear()
+    const total = dbTransactions
+      .filter(tx => {
+        const txDate = new Date(tx.created_at)
+        return txDate.getMonth() === month && txDate.getFullYear() === year
+      })
+      .reduce((s, tx) => s + (Number(tx.platform_fee) || 0), 0)
+    return { label: d.toLocaleDateString('fr-FR', { month: 'short' }), value: total }
+  })
+
+  const maxRev = Math.max(...revenueByMonth.map(r => r.value), 1)
 
   return (
     <div style={{ padding: '32px 36px', display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -217,18 +481,20 @@ const PageDashboard = ({ theme: t, dbStats = {}, dbLoading = false }) => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: th.text, margin: 0 }}>Dashboard</h1>
-          <p style={{ color: th.textSecondary, fontSize: 13, margin: '4px 0 0' }}>Bienvenue sur Partnexx Admin · Données en temps réel · Août 2025</p>
+          <p style={{ color: th.textSecondary, fontSize: 13, margin: '4px 0 0' }}>
+            Bienvenue sur Partnexx Admin · Données en temps réel · {new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+          </p>
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-            <Badge label="↗ 12 847 utilisateurs" color="blue" t={t} />
-            <Badge label="↗ 8 campagnes actives" color="green" t={t} />
-            <Badge label="⚠ 4 litiges actifs" color="orange" t={t} />
+            <Badge label={`↗ ${dbStats.total_users || 0} utilisateurs`} color="blue" t={t} />
+            <Badge label={`↗ ${dbStats.active_campaigns || 0} campagnes actives`} color="green" t={t} />
+            <Badge label={`⚠ ${dbStats.open_disputes || 0} litiges actifs`} color="orange" t={t} />
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${th.cardBorder}`, background: th.card, color: th.text, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>Télécharger</button>
-          <button style={{ padding: '8px 16px', borderRadius: 8, background: th.accent, color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer' }}>↗ Rapport</button>
-        </div>
+          <button onClick={() => exportDashboard(dbStats, dbUsers, dbCampaigns, dbTransactions, dbDisputes)} style={{ padding: '8px 16px', borderRadius: 8, background: th.accent, color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer' }}>↗ Rapport PDF</button>
       </div>
+    </div>
 
       {/* Stats grid 4x2 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
@@ -237,46 +503,64 @@ const PageDashboard = ({ theme: t, dbStats = {}, dbLoading = false }) => {
 
       {/* Charts row */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
-        {/* Revenue chart */}
+        {/* Revenue chart — données réelles */}
         <div style={{ background: th.card, border: `1px solid ${th.cardBorder}`, borderRadius: 12, padding: 24, boxShadow: th.shadow }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
             <div>
               <div style={{ fontSize: 14, fontWeight: 600, color: th.text }}>Revenue & KPIs</div>
-              <div style={{ fontSize: 12, color: th.textMuted }}>Évolution mensuelle</div>
+              <div style={{ fontSize: 12, color: th.textMuted }}>
+                {dbLoading ? 'Chargement...' : `Total : ${((dbStats.total_revenue || 0) / 1000).toFixed(1)}K € de commissions`}
+              </div>
             </div>
             <button style={{ fontSize: 11, color: th.accent, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Voir tout</button>
           </div>
-          <svg viewBox="0 0 520 120" style={{ width: '100%', height: 120 }}>
-            <defs>
-              <linearGradient id="revGrad" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path d="M0,90 C40,85 80,70 130,65 C180,60 220,72 270,60 C320,48 370,55 420,42 C460,34 490,38 520,30" stroke="#10b981" strokeWidth="2.5" fill="none" />
-            <path d="M0,90 C40,85 80,70 130,65 C180,60 220,72 270,60 C320,48 370,55 420,42 C460,34 490,38 520,30 L520,120 L0,120 Z" fill="url(#revGrad)" />
-            {[0, 87, 174, 261, 348, 435, 520].map((x, i) => (
-              <text key={i} x={x} y={116} fontSize="9" fill={th.textMuted} textAnchor="middle">{['Jan','Fev','Mar','Avr','Mai','Jun','Jui'][i]}</text>
-            ))}
-          </svg>
+          {dbLoading ? (
+            <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: th.textMuted, fontSize: 13 }}>Chargement des données...</div>
+          ) : dbTransactions.length === 0 ? (
+            <div style={{ height: 120, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: th.textMuted, gap: 8 }}>
+              <Icon name="analytics" size={32} color={th.textMuted} />
+              <span style={{ fontSize: 13 }}>Aucune transaction — le graphe s'affichera ici</span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 120 }}>
+              {revenueByMonth.map((r, i) => (
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <div style={{ width: '100%', height: Math.max(4, (r.value / maxRev) * 90), background: r.value > 0 ? '#3b6ef6' : (t === 'dark' ? '#2d3748' : '#e9ecef'), borderRadius: '4px 4px 0 0', transition: 'height 0.3s' }} />
+                  <span style={{ fontSize: 9, color: th.textMuted }}>{r.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Campagnes donut */}
+        {/* Campagnes donut — données réelles */}
         <div style={{ background: th.card, border: `1px solid ${th.cardBorder}`, borderRadius: 12, padding: 24, boxShadow: th.shadow, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: th.text }}>Campagnes</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg viewBox="0 0 100 100" width="90" height="90">
-              <circle cx="50" cy="50" r="35" fill="none" stroke={t === 'dark' ? '#2d3748' : '#e9ecef'} strokeWidth="12" />
-              <circle cx="50" cy="50" r="35" fill="none" stroke="#3b6ef6" strokeWidth="12" strokeDasharray="88 132" strokeDashoffset="-33" strokeLinecap="round" />
-              <circle cx="50" cy="50" r="35" fill="none" stroke="#10b981" strokeWidth="12" strokeDasharray="44 176" strokeDashoffset="-121" strokeLinecap="round" />
-              <circle cx="50" cy="50" r="35" fill="none" stroke="#f59e0b" strokeWidth="12" strokeDasharray="22 198" strokeDashoffset="-165" strokeLinecap="round" />
-              <circle cx="50" cy="50" r="35" fill="none" stroke="#ef4444" strokeWidth="12" strokeDasharray="22 198" strokeDashoffset="-187" strokeLinecap="round" />
-              <text x="50" y="46" textAnchor="middle" fontSize="11" fontWeight="700" fill={th.text}>342</text>
-              <text x="50" y="57" textAnchor="middle" fontSize="7" fill={th.textMuted}>campagnes</text>
-            </svg>
+            {totalCampaigns === 0 ? (
+              <div style={{ width: 90, height: 90, borderRadius: '50%', border: `12px solid ${t === 'dark' ? '#2d3748' : '#e9ecef'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: th.textMuted }}>0</span>
+                <span style={{ fontSize: 8, color: th.textMuted }}>campagnes</span>
+              </div>
+            ) : (
+              <svg viewBox="0 0 100 100" width="90" height="90">
+                <circle cx="50" cy="50" r="35" fill="none" stroke={t === 'dark' ? '#2d3748' : '#e9ecef'} strokeWidth="12" />
+                {activeCampaigns > 0 && <circle cx="50" cy="50" r="35" fill="none" stroke="#3b6ef6" strokeWidth="12" strokeDasharray={`${(activeCampaigns / totalCampaigns) * 220} 220`} strokeDashoffset="-33" strokeLinecap="round" />}
+                {completedCampaigns > 0 && <circle cx="50" cy="50" r="35" fill="none" stroke="#10b981" strokeWidth="12" strokeDasharray={`${(completedCampaigns / totalCampaigns) * 220} 220`} strokeDashoffset={`-${33 + (activeCampaigns / totalCampaigns) * 220}`} strokeLinecap="round" />}
+                {pendingCampaigns > 0 && <circle cx="50" cy="50" r="35" fill="none" stroke="#f59e0b" strokeWidth="12" strokeDasharray={`${(pendingCampaigns / totalCampaigns) * 220} 220`} strokeDashoffset={`-${33 + ((activeCampaigns + completedCampaigns) / totalCampaigns) * 220}`} strokeLinecap="round" />}
+                {blockedCampaigns > 0 && <circle cx="50" cy="50" r="35" fill="none" stroke="#ef4444" strokeWidth="12" strokeDasharray={`${(blockedCampaigns / totalCampaigns) * 220} 220`} strokeDashoffset={`-${33 + ((activeCampaigns + completedCampaigns + pendingCampaigns) / totalCampaigns) * 220}`} strokeLinecap="round" />}
+                <text x="50" y="46" textAnchor="middle" fontSize="11" fontWeight="700" fill={th.text}>{totalCampaigns}</text>
+                <text x="50" y="57" textAnchor="middle" fontSize="7" fill={th.textMuted}>campagnes</text>
+              </svg>
+            )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {[['En cours', '#3b6ef6', '40%'], ['Terminées', '#10b981', '20%'], ['En attente', '#f59e0b', '10%'], ['Bloquées', '#ef4444', '10%']].map(([l, c, v]) => (
+            {[
+              ['En cours', '#3b6ef6', activeCampaigns],
+              ['Terminées', '#10b981', completedCampaigns],
+              ['En attente', '#f59e0b', pendingCampaigns],
+              ['Bloquées', '#ef4444', blockedCampaigns],
+            ].map(([l, c, v]) => (
               <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0 }} />
                 <span style={{ fontSize: 12, color: th.textSecondary, flex: 1 }}>{l}</span>
@@ -289,49 +573,54 @@ const PageDashboard = ({ theme: t, dbStats = {}, dbLoading = false }) => {
 
       {/* Bottom 3 cols */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>
-        {/* Recent Activity */}
+        {/* Activité récente — données réelles */}
         <div style={{ background: th.card, border: `1px solid ${th.cardBorder}`, borderRadius: 12, padding: 20, boxShadow: th.shadow }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: th.text, marginBottom: 16 }}>Activité récente</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: th.text }}>Activité récente</div>
+            {dbLoading && <span style={{ fontSize: 11, color: th.textMuted }}>Chargement...</span>}
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {recentActivity.map((a, i) => (
-              <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 0', borderBottom: i < recentActivity.length - 1 ? `1px solid ${th.tableBorder}` : 'none' }}>
+            {activity.map((a, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 0', borderBottom: i < activity.length - 1 ? `1px solid ${th.tableBorder}` : 'none' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: a.color, marginTop: 4, flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: th.text }}>{a.type}</div>
                   <div style={{ fontSize: 11, color: th.textMuted, marginTop: 2 }}>{a.detail}</div>
                 </div>
-                <div style={{ fontSize: 10, color: th.textMuted, flexShrink: 0 }}>{a.time}</div>
+                {a.time && <div style={{ fontSize: 10, color: th.textMuted, flexShrink: 0 }}>{a.time}</div>}
               </div>
             ))}
           </div>
         </div>
 
-        {/* Top Performers */}
+        {/* Top Performers — données réelles */}
         <div style={{ background: th.card, border: `1px solid ${th.cardBorder}`, borderRadius: 12, padding: 20, boxShadow: th.shadow }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: th.text, marginBottom: 16 }}>Top Performances</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {topPerformers.map((p, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < topPerformers.length - 1 ? `1px solid ${th.tableBorder}` : 'none' }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: th.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{p.name.slice(0, 2).toUpperCase()}</div>
+            {performers.map((p, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < performers.length - 1 ? `1px solid ${th.tableBorder}` : 'none' }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: p.score > 0 ? th.accent : th.barBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                  {p.name.slice(0, 2).toUpperCase()}
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: th.text }}>{p.name}</div>
                   <div style={{ fontSize: 10, color: th.textMuted }}>@{p.handle}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: th.text }}>{p.rev}</div>
-                  <div style={{ fontSize: 10, color: '#10b981' }}>{p.score}</div>
+                  {p.score > 0 && <div style={{ fontSize: 10, color: '#10b981' }}>Score: {p.score}</div>}
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Alerts */}
+        {/* Alertes — données réelles */}
         <div style={{ background: th.card, border: `1px solid ${th.cardBorder}`, borderRadius: 12, padding: 20, boxShadow: th.shadow }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: th.text, marginBottom: 16 }}>Alertes</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {alerts.map((a, i) => (
-              <div key={i} style={{ display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 8, background: a.color === '#ef4444' ? (t === 'dark' ? '#2d1515' : '#fff1f2') : (t === 'dark' ? '#2a1f05' : '#fff7ed'), border: `1px solid ${a.color}22` }}>
+              <div key={i} style={{ display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 8, background: a.color === '#ef4444' ? (t === 'dark' ? '#2d1515' : '#fff1f2') : a.color === '#10b981' ? (t === 'dark' ? '#052e16' : '#f0fdf4') : (t === 'dark' ? '#2a1f05' : '#fff7ed'), border: `1px solid ${a.color}22` }}>
                 <Icon name="warning" size={14} color={a.color} />
                 <span style={{ fontSize: 12, color: th.text }}>{a.text}</span>
               </div>
@@ -384,7 +673,7 @@ const PageUsers = ({ theme: t, dbUsers = [], dbLoading = false, onSuspend, onAct
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <span style={{ fontSize: 12, color: '#10b981', fontWeight: 600 }}>● 4 en ligne</span>
-          <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1px solid ${th.cardBorder}`, background: th.card, color: th.text, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+          <button onClick={() => exportUsers(dbUsers)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1px solid ${th.cardBorder}`, background: th.card, color: th.text, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
             <Icon name="download" size={14} color={th.text} /> Exporter CSV
           </button>
         </div>
@@ -466,21 +755,21 @@ const PageUsers = ({ theme: t, dbUsers = [], dbLoading = false, onSuspend, onAct
 // ═══════════════════════════════════════════════════════════════════════════════
 // PAGE: CAMPAGNES
 // ═══════════════════════════════════════════════════════════════════════════════
-const PageCampaigns = ({ theme: t, dbCampaigns = [], dbLoading = false, onBlock, onUnblock }) => {
+const PageCampaigns = ({ theme: t, dbCampaigns = [], dbLoading = false }) => {
   const th = themes[t]
   const [tab, setTab] = useState('dashboard')
 
-  const campaigns = dbCampaigns.length > 0 ? dbCampaigns.map(c => ({
-  initials: (c.name || 'CA').slice(0, 2).toUpperCase(),
-  name: c.name || 'Sans nom',
+const campaigns = dbCampaigns.length > 0 ? dbCampaigns.map(c => ({
+  initials: (c.title || 'CA').slice(0, 2).toUpperCase(),
+  name: c.title || 'Sans nom',
   brand: c.brand_id || '—',
-  type: c.type || 'UGC',
-  typeColor: c.type === 'UGC' ? 'blue' : c.type === 'Influence' ? 'green' : c.type === 'Affiliation' ? 'orange' : 'purple',
-  progress: c.progress || 0,
-  budget: `${(c.budget || 0).toLocaleString()} €`,
-  creators: c.max_creators || 0,
-  roi: c.roi ? `${c.roi}x` : '—',
-  response: c.response_rate ? `${c.response_rate}%` : '0%',
+  type: c.target_platforms?.[0] || 'UGC',
+  typeColor: 'blue',
+  progress: c.budget_spent && c.budget_total ? Math.round((c.budget_spent / c.budget_total) * 100) : 0,
+  budget: `${(c.budget_total || 0).toLocaleString()} €`,
+  creators: c.influencers_needed || 0,
+  roi: '—',
+  response: '0%',
   status: c.status === 'active' ? 'En Cours' : c.status === 'blocked' ? 'Bloquée' : c.status === 'completed' ? 'Terminée' : c.status === 'paused' ? 'En Pause' : 'Brouillon',
   statusColor: c.status === 'active' ? 'blue' : c.status === 'blocked' ? 'red' : c.status === 'completed' ? 'teal' : c.status === 'paused' ? 'yellow' : 'gray',
   perf: 'Moyen',
@@ -512,10 +801,13 @@ const PageCampaigns = ({ theme: t, dbCampaigns = [], dbLoading = false, onBlock,
           </h1>
           <p style={{ color: th.textSecondary, fontSize: 13, margin: '4px 0 0' }}>6 campagnes · 71 500 € budget total</p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <span style={{ fontSize: 12, color: '#10b981', fontWeight: 600 }}>● 2 actives</span>
           <span style={{ fontSize: 12, color: '#ef4444', fontWeight: 600 }}>⚠ 1 bloquée</span>
-        </div>
+          <button onClick={() => exportCampaigns(dbCampaigns)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1px solid ${th.cardBorder}`, background: th.card, color: th.text, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+            <Icon name="download" size={14} color={th.text} /> Exporter PDF
+          </button>
+    </div>
       </div>
 
       {/* Tabs */}
@@ -538,10 +830,10 @@ const PageCampaigns = ({ theme: t, dbCampaigns = [], dbLoading = false, onBlock,
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             {[
-              { label: 'Campagnes actives', value: '2', sub: '↗ +3 cette semaine', icon: <Icon name="campaign" size={18} color="#3b6ef6" />, iconBg: th.accentLight },
-              { label: 'Budget utilisé', value: '28 500 €', sub: 'sur 71 500 €', icon: <Icon name="dollar" size={18} color="#10b981" />, iconBg: t === 'dark' ? '#052e16' : '#dcfce7' },
-              { label: 'Créateurs impliqués', value: '18', sub: '↗ +12 ce mois', icon: <Icon name="users" size={18} color="#f59e0b" />, iconBg: t === 'dark' ? '#2a1f05' : '#fef3c7' },
-              { label: 'ROI moyen', value: '2.9x', sub: '↗ +0.3 vs mois dernier', icon: <Icon name="trend" size={18} color="#10b981" />, iconBg: t === 'dark' ? '#052e16' : '#dcfce7' },
+              { label: 'Campagnes actives', value: dbLoading ? '...' : String(dbCampaigns.filter(c => c.status === 'active').length), sub: '↗ +3 cette semaine', icon: <Icon name="campaign" size={18} color="#3b6ef6" />, iconBg: th.accentLight },
+              { label: 'Budget utilisé', value: dbLoading ? '...' : `${dbCampaigns.reduce((s,c) => s + (Number(c.budget_used)||0), 0).toLocaleString()} €`, sub: 'sur 71 500 €', icon: <Icon name="dollar" size={18} color="#10b981" />, iconBg: t === 'dark' ? '#052e16' : '#dcfce7' },
+              { label: 'Créateurs impliqués', value: '0', sub: '↗ +12 ce mois', icon: <Icon name="users" size={18} color="#f59e0b" />, iconBg: t === 'dark' ? '#2a1f05' : '#fef3c7' },
+              { label: 'ROI moyen', value: '—', sub: '', icon: <Icon name="trend" size={18} color="#10b981" />, iconBg: t === 'dark' ? '#052e16' : '#dcfce7' },
             ].map((s, i) => <StatCard key={i} {...s} theme={t} />)}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
@@ -770,24 +1062,25 @@ const PagePayments = ({ theme: t, dbTransactions = [], dbLoading = false, onRele
   const [selectedTx, setSelectedTx] = useState(null)
 
   const tabs = [
-    { id: 'overview', label: 'Vue d\'ensemble' },
-    { id: 'transactions', label: 'Transactions' },
-    { id: 'escrow', label: 'Escrow' },
-    { id: 'reversements', label: 'Reversements' },
-    { id: 'remboursements', label: 'Remboursements' },
-  ]
+  { id: 'overview', label: 'Vue d\'ensemble' },
+  { id: 'transactions', label: 'Transactions' },
+  { id: 'escrow', label: 'Escrow' },
+  { id: 'reversements', label: 'Reversements' },
+  { id: 'remboursements', label: 'Remboursements' },
+  { id: 'comptabilite', label: 'Comptabilité' },
+]
 
- const transactions = dbTransactions.length > 0 ? dbTransactions.map(tx => ({
+const transactions = dbTransactions.length > 0 ? dbTransactions.map(tx => ({
   brand: tx.brand_id || 'Marque',
-  creator: tx.creator_id || '—',
-  type: tx.type === 'deposit' ? 'Dépôt campagne' : tx.type === 'payout' ? 'Reversement créateur' : tx.type === 'refund' ? 'Remboursement' : tx.type,
-  status: tx.status === 'pending' ? 'En attente de validation' : tx.status === 'in_escrow' ? 'Bloqué en escrow' : tx.status === 'released' ? 'Libéré' : tx.status === 'frozen' ? 'Gelé' : tx.status === 'failed' ? 'Échoué' : tx.status,
-  statusColor: tx.status === 'released' ? 'green' : tx.status === 'in_escrow' ? 'yellow' : tx.status === 'frozen' ? 'purple' : tx.status === 'failed' ? 'red' : 'blue',
-  risk: tx.risk_level === 'low' ? 'Faible' : tx.risk_level === 'medium' ? 'Moyen' : tx.risk_level === 'high' ? 'Élevé' : 'Critique',
-  riskColor: tx.risk_level === 'low' ? 'green' : tx.risk_level === 'medium' ? 'yellow' : 'red',
-  campaign: tx.campaign_id || '—',
+  creator: tx.influencer_id || '—',  // ← influencer_id pas creator_id
+  type: tx.type === 'payment' ? 'Paiement campagne' : tx.type,
+  status: tx.status === 'pending' ? 'En attente' : tx.status === 'in_escrow' ? 'Bloqué en escrow' : tx.status === 'released' ? 'Libéré' : tx.status,
+  statusColor: tx.status === 'released' ? 'green' : tx.status === 'in_escrow' ? 'yellow' : 'blue',
+  risk: 'Faible',
+  riskColor: 'green',
+  campaign: tx.description || '—',
   amount: `${(tx.amount || 0).toLocaleString()} €`,
-  commission: tx.commission ? `${tx.commission.toLocaleString()} €` : '—',
+  commission: tx.platform_fee ? `${tx.platform_fee.toLocaleString()} €` : '—',  // ← platform_fee
   id: tx.id,
 })) : []
 
@@ -804,8 +1097,8 @@ const PagePayments = ({ theme: t, dbTransactions = [], dbLoading = false, onRele
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <span style={{ fontSize: 12, color: th.text }}>● 10 transactions</span>
-          <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1px solid ${th.cardBorder}`, background: th.card, color: th.text, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
-            <Icon name="download" size={14} color={th.text} /> Exporter
+          <button onClick={() => exportTransactions(dbTransactions)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1px solid ${th.cardBorder}`, background: th.card, color: th.text, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+           <Icon name="download" size={14} color={th.text} /> Exporter
           </button>
         </div>
       </div>
@@ -829,7 +1122,7 @@ const PagePayments = ({ theme: t, dbTransactions = [], dbLoading = false, onRele
               { label: 'Volume total traité', value: dbLoading ? '...' : `${(dbTransactions.reduce((s,t) => s+(Number(t.amount)||0),0)/1000).toFixed(0)}K €`, sub: '↗ +18% ce mois', icon: <Icon name="dollar" size={18} color="#3b6ef6" />, iconBg: th.accentLight },
 { label: 'En escrow', value: dbLoading ? '...' : `${dbTransactions.filter(t=>t.status==='in_escrow').reduce((s,t)=>s+(Number(t.amount)||0),0).toLocaleString()} €`, sub: '5 contrats', icon: <Icon name="lock" size={18} color="#f59e0b" />, iconBg: t === 'dark' ? '#2a1f05' : '#fef3c7' },
 { label: 'Libéré ce mois', value: dbLoading ? '...' : `${(dbTransactions.filter(t=>t.status==='released').reduce((s,t)=>s+(Number(t.amount)||0),0)/1000).toFixed(0)}K €`, sub: '42 transactions', icon: <Icon name="unlock" size={18} color="#10b981" />, iconBg: t === 'dark' ? '#052e16' : '#dcfce7' },
-{ label: 'Revenus Partnexx', value: dbLoading ? '...' : `${(dbTransactions.reduce((s,t)=>s+(Number(t.commission)||0),0)/1000).toFixed(0)}K €`, sub: '↗ +22% MoM', icon: <Icon name="trend" size={18} color="#10b981" />, iconBg: t === 'dark' ? '#052e16' : '#dcfce7' },
+{ label: 'Revenus Partnexx', value: dbLoading ? '...' : `${(dbTransactions.reduce((s,t)=>s+(Number(t.platform_fee)||0),0)/1000).toFixed(0)}K €`, sub: '↗ +22% MoM', icon: <Icon name="trend" size={18} color="#10b981" />, iconBg: t === 'dark' ? '#052e16' : '#dcfce7' },
             ].map((s, i) => <StatCard key={i} {...s} theme={t} />)}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
@@ -928,16 +1221,58 @@ const PagePayments = ({ theme: t, dbTransactions = [], dbLoading = false, onRele
 
               <div style={{ fontSize: 12, fontWeight: 600, color: th.textMuted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Actions rapides</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
-                {[
-                  ['Rembourser', 'red', 'refresh'], ['Remb. partiel', 'orange', 'refresh'],
-                  ['Bloquer', 'red', 'lock'], ['Débloquer', 'green', 'unlock'],
-                  ['Suspendre', 'orange', 'warning'], ['Libérer', 'green', 'check'],
-                  ['Ouvrir litige', 'red', 'dispute'], ['Forcer paiement', 'blue', 'dollar'],
-                ].map(([l, c, ico]) => (
-                  <button key={l} style={{ padding: '10px 8px', borderRadius: 8, background: t === 'dark' ? th.inputBg : (c === 'red' ? '#fff1f2' : c === 'orange' ? '#fff7ed' : c === 'green' ? '#f0fdf4' : '#eff3ff'), color: c === 'red' ? '#ef4444' : c === 'orange' ? '#f59e0b' : c === 'green' ? '#10b981' : '#3b6ef6', border: '1px solid transparent', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                    <Icon name={ico} size={13} color={c === 'red' ? '#ef4444' : c === 'orange' ? '#f59e0b' : c === 'green' ? '#10b981' : '#3b6ef6'} /> {l}
-                  </button>
-                ))}
+              <button onClick={async () => {
+  if (!confirm('Confirmer le remboursement total ?')) return
+  const res = await fetch('/api/stripe/refund', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transactionId: txPanel.id })
+  })
+  const data = await res.json()
+  if (data.success) alert(`✅ Remboursé — ${data.amount}€ — ID: ${data.refundId}`)
+  else alert(`❌ Erreur: ${data.error}`)
+}} style={{ padding: '10px 8px', borderRadius: 8, background: t === 'dark' ? th.inputBg : '#fff1f2', color: '#ef4444', border: '1px solid #fecaca', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, gridColumn: 'span 2' }}>
+  <Icon name="refresh" size={13} color="#ef4444"/> Rembourser totalement
+</button>
+
+<button onClick={async () => {
+  const montant = prompt('Montant à rembourser (€) :')
+  if (!montant) return
+  const res = await fetch('/api/stripe/refund', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transactionId: txPanel.id, amount: Number(montant) })
+  })
+  const data = await res.json()
+  if (data.success) alert(`✅ Remboursé — ${data.amount}€ — ID: ${data.refundId}`)
+  else alert(`❌ Erreur: ${data.error}`)
+}} style={{ padding: '10px 8px', borderRadius: 8, background: t === 'dark' ? th.inputBg : '#fff7ed', color: '#f59e0b', border: '1px solid #fed7aa', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, gridColumn: 'span 2' }}>
+  <Icon name="refresh" size={13} color="#f59e0b"/> Remboursement partiel
+</button>
+
+<button style={{ padding: '10px 8px', borderRadius: 8, background: t === 'dark' ? th.inputBg : '#fff1f2', color: '#ef4444', border: '1px solid #fecaca', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+  <Icon name="lock" size={13} color="#ef4444"/> Bloquer
+</button>
+
+<button style={{ padding: '10px 8px', borderRadius: 8, background: t === 'dark' ? th.inputBg : '#f0fdf4', color: '#10b981', border: '1px solid #bbf7d0', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+  <Icon name="unlock" size={13} color="#10b981"/> Débloquer
+</button>
+
+<button style={{ padding: '10px 8px', borderRadius: 8, background: t === 'dark' ? th.inputBg : '#fff7ed', color: '#f59e0b', border: '1px solid #fed7aa', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+  <Icon name="warning" size={13} color="#f59e0b"/> Suspendre
+</button>
+
+<button style={{ padding: '10px 8px', borderRadius: 8, background: t === 'dark' ? th.inputBg : '#f0fdf4', color: '#10b981', border: '1px solid #bbf7d0', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+  <Icon name="check" size={13} color="#10b981"/> Libérer
+</button>
+
+<button style={{ padding: '10px 8px', borderRadius: 8, background: t === 'dark' ? th.inputBg : '#fff1f2', color: '#ef4444', border: '1px solid #fecaca', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+  <Icon name="dispute" size={13} color="#ef4444"/> Ouvrir litige
+</button>
+
+<button style={{ padding: '10px 8px', borderRadius: 8, background: t === 'dark' ? th.inputBg : '#eff3ff', color: '#3b6ef6', border: '1px solid #bfdbfe', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+  <Icon name="dollar" size={13} color="#3b6ef6"/> Forcer paiement
+</button>
               </div>
 
               <div style={{ fontSize: 12, fontWeight: 600, color: th.textMuted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Parties liées</div>
@@ -1084,6 +1419,145 @@ const PagePayments = ({ theme: t, dbTransactions = [], dbLoading = false, onRele
           </div>
         </div>
       )}
+      {/* Comptabilité */}
+
+{tab === 'comptabilite' && (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    
+    {/* Stats compta */}
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      {[
+        { label: 'Chiffre d\'affaires', value: `${dbTransactions.reduce((s,t) => s+(Number(t.amount)||0), 0).toLocaleString()} €`, sub: 'Total encaissé', icon: <Icon name="dollar" size={18} color="#3b6ef6"/>, iconBg: th.accentLight },
+        { label: 'Commissions Partnexx', value: `${dbTransactions.reduce((s,t) => s+(Number(t.platform_fee)||0), 0).toLocaleString()} €`, sub: '15% du CA', icon: <Icon name="trend" size={18} color="#10b981"/>, iconBg: t==='dark'?'#052e16':'#dcfce7' },
+        { label: 'Versé aux influenceurs', value: `${dbTransactions.filter(tx=>tx.status==='released').reduce((s,t) => s+(Number(t.influencer_amount)||0), 0).toLocaleString()} €`, sub: '85% du CA libéré', icon: <Icon name="users" size={18} color="#f59e0b"/>, iconBg: t==='dark'?'#2a1f05':'#fef3c7' },
+        { label: 'En attente de libération', value: `${dbTransactions.filter(tx=>tx.status==='pending'||tx.status==='in_escrow').reduce((s,t) => s+(Number(t.amount)||0), 0).toLocaleString()} €`, sub: 'Escrow actif', icon: <Icon name="lock" size={18} color="#ef4444"/>, iconBg: t==='dark'?'#2d1515':'#fee2e2' },
+      ].map((s, i) => <StatCard key={i} {...s} theme={t}/>)}
+    </div>
+
+    {/* Tableau comptable */}
+    <div style={{ background: th.card, border: `1px solid ${th.cardBorder}`, borderRadius: 12, overflow: 'hidden', boxShadow: th.shadow }}>
+      <div style={{ padding: '16px 20px', borderBottom: `1px solid ${th.tableBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: th.text }}>Journal des transactions</div>
+        <button onClick={() => exportTransactions(dbTransactions)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: `1px solid ${th.cardBorder}`, background: th.inputBg, color: th.text, fontSize: 12, cursor: 'pointer' }}>
+          <Icon name="download" size={13} color={th.text}/> Exporter PDF
+        </button>
+      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ background: th.inputBg }}>
+            {['Date', 'ID', 'Type', 'Statut', 'Montant brut', 'Commission (15%)', 'Net influenceur (85%)', 'Stripe PI'].map(h => (
+              <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: th.textMuted, whiteSpace: 'nowrap' }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {dbTransactions.length === 0 ? (
+            <tr>
+              <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: th.textMuted, fontSize: 13 }}>
+                Aucune transaction
+              </td>
+            </tr>
+          ) : dbTransactions.map((tx, i) => (
+            <tr key={i} style={{ borderBottom: `1px solid ${th.tableBorder}` }}
+              onMouseEnter={e => e.currentTarget.style.background = th.sidebarHover}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <td style={{ padding: '12px 16px', fontSize: 12, color: th.textSecondary, whiteSpace: 'nowrap' }}>
+                {tx.created_at ? new Date(tx.created_at).toLocaleDateString('fr-FR') : '—'}
+              </td>
+              <td style={{ padding: '12px 16px', fontSize: 11, color: th.textMuted, fontFamily: 'monospace' }}>
+                {(tx.id || '').slice(0, 8)}...
+              </td>
+              <td style={{ padding: '12px 16px' }}>
+                <Badge label={tx.type === 'payment' ? 'Paiement' : tx.type || '—'} color="blue" t={t}/>
+              </td>
+              <td style={{ padding: '12px 16px' }}>
+                <Badge 
+                  label={tx.status === 'released' ? 'Libéré' : tx.status === 'pending' ? 'En attente' : tx.status === 'in_escrow' ? 'Escrow' : tx.status || '—'} 
+                  color={tx.status === 'released' ? 'green' : tx.status === 'in_escrow' ? 'yellow' : 'blue'} 
+                  t={t}
+                />
+              </td>
+              <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 700, color: th.text }}>
+                {(tx.amount || 0).toLocaleString()} €
+              </td>
+              <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: '#8b5cf6' }}>
+                {(tx.platform_fee || 0).toLocaleString()} €
+              </td>
+              <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: '#10b981' }}>
+                {(tx.influencer_amount || 0).toLocaleString()} €
+              </td>
+              <td style={{ padding: '12px 16px', fontSize: 11, color: th.textMuted, fontFamily: 'monospace' }}>
+                {tx.stripe_payment_intent_id ? tx.stripe_payment_intent_id.slice(0, 16) + '...' : '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        {dbTransactions.length > 0 && (
+          <tfoot>
+            <tr style={{ background: th.inputBg, borderTop: `2px solid ${th.cardBorder}` }}>
+              <td colSpan={4} style={{ padding: '12px 16px', fontSize: 12, fontWeight: 700, color: th.text }}>TOTAL</td>
+              <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 700, color: th.text }}>
+                {dbTransactions.reduce((s,t) => s+(Number(t.amount)||0), 0).toLocaleString()} €
+              </td>
+              <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 700, color: '#8b5cf6' }}>
+                {dbTransactions.reduce((s,t) => s+(Number(t.platform_fee)||0), 0).toLocaleString()} €
+              </td>
+              <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 700, color: '#10b981' }}>
+                {dbTransactions.filter(t=>t.status==='released').reduce((s,t) => s+(Number(t.influencer_amount)||0), 0).toLocaleString()} €
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+        )}
+      </table>
+    </div>
+
+    {/* Répartition visuelle */}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div style={{ background: th.card, border: `1px solid ${th.cardBorder}`, borderRadius: 12, padding: 24, boxShadow: th.shadow }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: th.text, marginBottom: 16 }}>Répartition des revenus</div>
+        {[
+          ['Net influenceurs (85%)', dbTransactions.filter(t=>t.status==='released').reduce((s,t)=>s+(Number(t.influencer_amount)||0),0), '#10b981'],
+          ['Commission Partnexx (15%)', dbTransactions.reduce((s,t)=>s+(Number(t.platform_fee)||0),0), '#8b5cf6'],
+          ['En escrow / pending', dbTransactions.filter(t=>t.status!=='released').reduce((s,t)=>s+(Number(t.amount)||0),0), '#f59e0b'],
+        ].map(([label, value, color]) => {
+          const total = dbTransactions.reduce((s,t)=>s+(Number(t.amount)||0),0)
+          const pct = total > 0 ? Math.round(value/total*100) : 0
+          return (
+            <div key={label} style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: th.textSecondary }}>{label}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color }}>{value.toLocaleString()} € ({pct}%)</span>
+              </div>
+              <div style={{ height: 8, background: th.barBg, borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 4 }}/>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div style={{ background: th.card, border: `1px solid ${th.cardBorder}`, borderRadius: 12, padding: 24, boxShadow: th.shadow }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: th.text, marginBottom: 16 }}>Statuts des transactions</div>
+        {[
+          ['Libérées', dbTransactions.filter(t=>t.status==='released').length, '#10b981'],
+          ['En attente', dbTransactions.filter(t=>t.status==='pending').length, '#f59e0b'],
+          ['En escrow', dbTransactions.filter(t=>t.status==='in_escrow').length, '#3b6ef6'],
+          ['Remboursées', dbTransactions.filter(t=>t.status==='refunded').length, '#ef4444'],
+        ].map(([label, count, color]) => (
+          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${th.tableBorder}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: color }}/>
+              <span style={{ fontSize: 13, color: th.textSecondary }}>{label}</span>
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 700, color: th.text }}>{count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+
+  </div>
+)}
     </div>
   )
 }
@@ -1128,7 +1602,7 @@ const PageLitiges = ({ theme: t, dbDisputes = [], dbLoading = false, onResolve }
         <div style={{ display: 'flex', gap: 10 }}>
           <span style={{ fontSize: 12, color: '#ef4444', fontWeight: 600 }}>⚠ 2 critiques</span>
           <span style={{ fontSize: 12, color: th.accent, fontWeight: 600 }}>● 4 en cours</span>
-          <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1px solid ${th.cardBorder}`, background: th.card, color: th.text, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+          <button onClick={() => exportDisputes(dbDisputes)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1px solid ${th.cardBorder}`, background: th.card, color: th.text, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
             <Icon name="download" size={14} color={th.text} /> Exporter
           </button>
         </div>
@@ -1384,7 +1858,7 @@ const PageSupport = ({ theme: t, dbTickets = [], dbLoading = false, onClose }) =
         <div style={{ display: 'flex', gap: 10 }}>
           <span style={{ fontSize: 12, color: '#ef4444', fontWeight: 600 }}>↗ 1 escaladé</span>
           <span style={{ fontSize: 12, color: th.accent, fontWeight: 600 }}>● 1 nouveau</span>
-          <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1px solid ${th.cardBorder}`, background: th.card, color: th.text, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+          <button onClick={() => exportTickets(dbTickets)}style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1px solid ${th.cardBorder}`, background: th.card, color: th.text, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
             <Icon name="download" size={14} color={th.text} /> Exporter
           </button>
         </div>
@@ -4598,12 +5072,16 @@ export default function AdminDashboard() {
   const renderPage = () => {
     switch (page) {
       case 'dashboard': return (
-        <PageDashboard
-          theme={theme}
-          dbStats={stats}
-          dbLoading={loading}
-        />
-      )
+  <PageDashboard
+    theme={theme}
+    dbStats={stats}
+    dbUsers={users}
+    dbCampaigns={campaigns}
+    dbTransactions={transactions}
+    dbDisputes={disputes}
+    dbLoading={loading}
+  />
+)
       case 'users': return (
         <PageUsers
           theme={theme}
