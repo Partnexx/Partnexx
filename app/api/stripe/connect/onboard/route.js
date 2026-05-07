@@ -29,11 +29,11 @@ export async function POST(req) {
 
     // 3. Créer le lien d'onboarding Stripe
     const accountLink = await stripe.accountLinks.create({
-      account: account.id,
-      refresh_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/influencer?stripe=refresh`,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/influencer?stripe=success`,
-      type: 'account_onboarding',
-    })
+  account: account.id,
+  refresh_url: `https://partnexx-three.vercel.app/dashboard/influencer?stripe=refresh`,
+  return_url: `https://partnexx-three.vercel.app/dashboard/influencer?stripe=success`,
+  type: 'account_onboarding',
+})
 
     return NextResponse.json({ url: accountLink.url })
 
