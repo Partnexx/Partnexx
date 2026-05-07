@@ -1262,7 +1262,17 @@ const transactions = dbTransactions.length > 0 ? dbTransactions.map(tx => ({
   <Icon name="warning" size={13} color="#f59e0b"/> Suspendre
 </button>
 
-<button style={{ padding: '10px 8px', borderRadius: 8, background: t === 'dark' ? th.inputBg : '#f0fdf4', color: '#10b981', border: '1px solid #bbf7d0', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+<button onClick={async () => {
+  if (!confirm('Confirmer le virement à l\'influenceur ?')) return
+  const res = await fetch('/api/stripe/transfer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transactionId: txPanel.id })
+  })
+  const data = await res.json()
+  if (data.success) alert(`✅ Virement effectué — ${data.amount}€ — ID: ${data.transferId}`)
+  else alert(`❌ Erreur: ${data.error}`)
+}} style={{ padding: '10px 8px', borderRadius: 8, background: t === 'dark' ? th.inputBg : '#f0fdf4', color: '#10b981', border: '1px solid #bbf7d0', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
   <Icon name="check" size={13} color="#10b981"/> Libérer
 </button>
 
