@@ -20,9 +20,9 @@ export async function POST(req) {
       .single()
 
     if (!tx) return NextResponse.json({ error: 'Transaction introuvable' }, { status: 404 })
-    if (tx.status !== 'in_escrow' && tx.status !== 'released') {
-      return NextResponse.json({ error: 'Transaction pas encore en escrow' }, { status: 400 })
-    }
+    if (tx.status !== 'in_escrow' && tx.status !== 'released' && tx.status !== 'pending') {
+  return NextResponse.json({ error: 'Transaction pas encore en escrow' }, { status: 400 })
+}
 
     // 2. Récupérer le stripe_account_id de l'influenceur
     const { data: influencer } = await supabaseAdmin
@@ -38,13 +38,12 @@ export async function POST(req) {
     // 3. Créer le transfer Stripe (85% du montant)
     const transferAmount = Math.round((tx.influencer_amount || tx.amount * 0.85) * 100)
 
-    const transfer = await stripe.transfers.create({
-      amount: transferAmount,
-      currency: 'eur',
-      destination: influencer.stripe_account_id,
-      source_transaction: tx.stripe_payment_intent_id,
-      description: `Virement Partnexx — Transaction ${tx.id}`,
-    })
+const transfer = await stripe.transfers.create({
+  amount: transferAmount,
+  currency: 'eur',
+  destination: influencer.stripe_account_id,
+  description: `Virement Partnexx — Transaction ${tx.id}`,
+})
 
     // 4. Mettre à jour la transaction
     await supabaseAdmin
