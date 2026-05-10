@@ -29,7 +29,7 @@ export default function DashboardInfluencer() {
 
   const { collaborations, transactions, contracts, metrics, loading } = useInfluencerData(user?.id)
 
-  const firstName = profile?.full_name?.split(' ')[0] || 'Influenceur'
+  const firstName = profile?.full_name?.split(' ')[0] || profile?.username || 'toi'
   const hour = time.getHours()
   const greeting = hour < 18 ? 'Bonjour' : 'Bonsoir'
   const dateStr = time.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -99,7 +99,7 @@ export default function DashboardInfluencer() {
               {[
                 { label: `💰 ${fmt(metrics?.totalGains)} reçus`,     bg: 'rgba(34,197,94,0.2)',   border: 'rgba(34,197,94,0.4)' },
                 { label: `🔒 ${fmt(metrics?.enEscrow)} en escrow`,  bg: 'rgba(59,130,246,0.2)',  border: 'rgba(59,130,246,0.4)' },
-                { label: `📋 ${metrics?.contratsSignes} contrat${metrics?.contratsSignes > 1 ? 's' : ''} signé${metrics?.contratsSignes > 1 ? 's' : ''}`, bg: 'rgba(255,255,255,0.15)', border: 'rgba(255,255,255,0.3)' },
+                { label: `📋 ${metrics?.contratsSignes ?? 0} contrat${(metrics?.contratsSignes ?? 0) > 1 ? 's' : ''} signé${(metrics?.contratsSignes ?? 0) > 1 ? 's' : ''}`, bg: 'rgba(255,255,255,0.15)', border: 'rgba(255,255,255,0.3)' },
               ].map((tag, i) => (
                 <span key={i} style={{ background: tag.bg, color: '#fff', fontSize: '0.78rem', padding: '0.35rem 0.85rem', borderRadius: '100px', fontWeight: 600, border: `1px solid ${tag.border}` }}>
                   {tag.label}
