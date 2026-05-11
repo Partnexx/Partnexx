@@ -30,7 +30,7 @@ export async function POST(req) {
 
       case 'payment_intent.succeeded': {
         const pi = event.data.object
-        await handlePaymentSucceeded(pi)
+        await handlePaymentSucceeded(pi, req)
         break
       }
 
@@ -63,7 +63,7 @@ export async function POST(req) {
   return NextResponse.json({ received: true })
 }
 
-async function handlePaymentSucceeded(pi) {
+async function handlePaymentSucceeded(pi, req) {
   console.log(`💰 PaymentIntent réussi: ${pi.id} — ${pi.amount / 100}€`)
 
   const { data, error } = await supabase
@@ -89,6 +89,7 @@ async function handlePaymentSucceeded(pi) {
 
   console.log(`✅ Transaction ${row.id} → in_escrow`)
 
+  // Passe la collaboration en in_progress
   if (row.collaboration_id) {
     const { error: collabError } = await supabase
       .from('collaborations')
@@ -101,6 +102,27 @@ async function handlePaymentSucceeded(pi) {
 
     if (collabError) console.error('❌ Erreur update collaboration:', collabError.message)
     else console.log(`✅ Collaboration ${row.collaboration_id} → in_progress`)
+  }
+
+  // Génère les factures PDF automatiquement
+  try {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://partnexx-three.vercel.app'
+    const invoiceRes = await fetch(`${appUrl}/api/stripe/invoices`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transactionId: row.id }),
+    })
+
+    if (invoiceRes.ok) {
+      const { brandUrl, influencerUrl } = await invoiceRes.json()
+      console.log(`✅ Factures générées — Brand: ${brandUrl}`)
+      console.log(`✅ Reçu influenceur: ${influencerUrl}`)
+    } else {
+      console.error('❌ Erreur génération factures:', await invoiceRes.text())
+    }
+  } catch (invoiceErr) {
+    console.error('❌ Erreur appel /api/stripe/invoices:', invoiceErr.message)
+    // Non bloquant — la transaction est déjà en escrow
   }
 }
 
