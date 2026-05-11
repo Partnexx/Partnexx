@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import PDFDocument from 'pdfkit/js/pdfkit.standalone.js'
+import Stripe from 'stripe'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -239,6 +240,16 @@ export async function POST(req) {
       uploadToStorage(influencerPDF, `influencer/REC-${transaction.id.slice(0, 8)}-${timestamp}.pdf`),
     ])
 
+    // Attache les URLs aux métadonnées Stripe
+if (transaction.stripe_payment_intent_id) {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+  await stripe.paymentIntents.update(transaction.stripe_payment_intent_id, {
+    metadata: {
+      invoice_brand_url: brandUrl,
+      invoice_influencer_url: influencerUrl,
+    }
+  })
+}
     // Sauvegarde les URLs dans la transaction
     await supabaseAdmin
       .from('transactions')
