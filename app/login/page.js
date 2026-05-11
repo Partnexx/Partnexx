@@ -49,7 +49,7 @@ export default function Login() {
       if (role === 'admin') {
         router.push('/dashboard/admin')
       } else if (role === 'brand') {
-        router.push('/dashboard/creator')
+        router.push('/dashboard/brand')
       } else {
         router.push('/dashboard/influencer')
       }
