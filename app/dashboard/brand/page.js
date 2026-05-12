@@ -91,6 +91,31 @@ export default function DashboardBrand() {
     </div>
   )
 
+  const openDispute = async (collab) => {
+  const reason = prompt('Raison du litige :')
+  if (!reason) return
+  const description = prompt('Description (optionnel) :')
+
+  const res = await fetch('/api/disputes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      collaborationId: collab.id,
+      openedBy: user.id,
+      openedByRole: 'brand',
+      reason,
+      description,
+    }),
+  })
+
+  const data = await res.json()
+  if (data.success) {
+    alert('✅ Litige ouvert avec succès')
+  } else {
+    alert('❌ Erreur : ' + data.error)
+  }
+}
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8f9ff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -298,15 +323,20 @@ export default function DashboardBrand() {
                       </div>
                     </div>
                     {c.status === 'in_progress' && (
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button style={{ padding: '0.5rem 1rem', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                          ✅ Valider le livrable
-                        </button>
-                        <button style={{ padding: '0.5rem 1rem', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                          💬 Demander une révision
-                        </button>
-                      </div>
-                    )}
+  <div style={{ display: 'flex', gap: '0.5rem' }}>
+    <button style={{ padding: '0.5rem 1rem', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+      ✅ Valider le livrable
+    </button>
+    <button style={{ padding: '0.5rem 1rem', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+      💬 Demander une révision
+    </button>
+    <button
+      onClick={() => openDispute(c)}
+      style={{ padding: '0.5rem 1rem', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+      ⚠️ Ouvrir un litige
+    </button>
+  </div>
+)}
                   </div>
                 )
               })}
