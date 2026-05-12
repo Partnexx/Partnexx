@@ -1769,8 +1769,31 @@ const PageLitiges = ({ theme: t, dbDisputes = [], dbLoading = false, onResolve }
               ))}
 
               <div style={{ fontSize: 12, fontWeight: 600, color: th.textMuted, marginBottom: 8, marginTop: 16 }}>DÉCISION D'ARBITRAGE</div>
-              <textarea placeholder="Rédiger la décision motivée..." style={{ width: '100%', height: 80, padding: '10px 12px', borderRadius: 8, border: `1px solid ${th.inputBorder}`, background: th.inputBg, color: th.text, fontSize: 12, resize: 'none', outline: 'none', boxSizing: 'border-box' }} />
-            </div>
+<textarea
+  id="admin-note"
+  placeholder="Rédiger la décision motivée..."
+  style={{ width: '100%', height: 80, padding: '10px 12px', borderRadius: 8, border: `1px solid ${th.inputBorder}`, background: th.inputBg, color: th.text, fontSize: 12, resize: 'none', outline: 'none', boxSizing: 'border-box' }}
+></textarea>
+
+<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+  <button
+    onClick={() => {
+      const note = document.getElementById('admin-note').value
+      onResolve(selected.id, 'resolved_brand', note)
+    }}
+    style={{ padding: '10px 0', borderRadius: 8, background: '#3b82f6', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+    ✅ Faveur marque
+  </button>
+  <button
+    onClick={() => {
+      const note = document.getElementById('admin-note').value
+      onResolve(selected.id, 'resolved_influencer', note)
+    }}
+    style={{ padding: '10px 0', borderRadius: 8, background: '#a855f7', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+    ✅ Faveur influenceur
+</button>
+  </div>
+</div>
           )}
         </div>
       )}
