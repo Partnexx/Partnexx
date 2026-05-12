@@ -74,6 +74,31 @@ export default function DashboardInfluencer() {
     </span>
   )
 
+const openDispute = async (collab) => {
+  const reason = prompt('Raison du litige :')
+  if (!reason) return
+  const description = prompt('Description (optionnel) :')
+
+  const res = await fetch('/api/disputes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      collaborationId: collab.id,
+      openedBy: user.id,
+      openedByRole: 'influencer',
+      reason,
+      description,
+    }),
+  })
+
+  const data = await res.json()
+  if (data.success) {
+    alert('✅ Litige ouvert avec succès')
+  } else {
+    alert('❌ Erreur : ' + data.error)
+  }
+}
+
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: colors.bg }}>
       <div style={{ color: colors.textSecondary, fontSize: '0.9rem' }}>Chargement...</div>
@@ -223,20 +248,24 @@ export default function DashboardInfluencer() {
                     {badge(s.label, s.color)}
                   </div>
                 </div>
-                {c.deadline && (
+{c.deadline && (
                   <div style={{ fontSize: '0.78rem', color: colors.textSecondary, marginBottom: '0.5rem' }}>
                     📅 Deadline : {new Date(c.deadline).toLocaleDateString('fr-FR')}
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   {c.status === 'in_progress' && (
-                    <button style={{ padding: '0.5rem 1rem', background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      📤 Livrer le contenu
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button style={{ padding: '0.5rem 1rem', background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        📤 Livrer le contenu
+                      </button>
+                      <button
+                        onClick={() => openDispute(c)}
+                        style={{ padding: '0.5rem 1rem', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        ⚠️ Ouvrir un litige
+                      </button>
+                    </div>
                   )}
-                  <button onClick={() => setActiveTab('contracts')} style={{ padding: '0.5rem 1rem', background: colors.surface, color: colors.textSecondary, border: `1px solid ${colors.cardBorder}`, borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}>
-                    📋 Voir le contrat
-                  </button>
                 </div>
               </div>
             )
