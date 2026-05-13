@@ -66,6 +66,37 @@ export async function POST(req) {
 async function handlePaymentSucceeded(pi, req) {
   console.log(`💰 PaymentIntent réussi: ${pi.id} — ${pi.amount / 100}€`)
 
+  // Envoie email de notification escrow
+try {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://partnexx-three.vercel.app'
+  
+  // Récupère les emails de la marque et de l'influenceur
+  const [brandUser, influencerUser] = await Promise.all([
+    supabase.from('profiles').select('full_name').eq('id', row.brand_id).single(),
+    supabase.from('profiles').select('full_name').eq('id', row.influencer_id).single(),
+  ])
+
+  // Email à la marque
+  if (brandUser.data) {
+    await fetch(`${appUrl}/api/emails`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'payment_escrow',
+        to: 'perquindylan.fr@gmail.com', // remplacer par l'email réel de la marque
+        data: {
+          name: brandUser.data.full_name || 'Marque',
+          amount: pi.amount / 100,
+          campaignTitle: row.description || 'Campagne Partnexx',
+        }
+      })
+    })
+  }
+} catch (emailErr) {
+  console.error('❌ Erreur envoi email escrow:', emailErr.message)
+  // Non bloquant
+}
+
   const { data, error } = await supabase
     .from('transactions')
     .update({

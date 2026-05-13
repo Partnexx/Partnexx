@@ -20,6 +20,27 @@ export async function POST(req) {
       return NextResponse.json({ error: 'transactionId ou collaborationId requis' }, { status: 400 })
     }
 
+    // Envoie email notification litige
+try {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://partnexx-three.vercel.app'
+  await fetch(`${appUrl}/api/emails`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'dispute_opened',
+      to: 'perquindylan.fr@gmail.com', // remplacer par l'email réel
+      data: {
+        name: 'Utilisateur',
+        reason,
+        collaborationTitle: 'Collaboration Partnexx',
+        openedByRole,
+      }
+    })
+  })
+} catch (emailErr) {
+  console.error('❌ Erreur envoi email litige:', emailErr.message)
+}
+
     // Vérifie qu'il n'y a pas déjà un litige ouvert pour cette transaction
     if (transactionId) {
       const { data: existing } = await supabaseAdmin
