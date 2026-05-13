@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import supabase from '@/lib/supabase'
 import { useTheme } from '../ThemeContext'
 import { useInfluencerData } from '@/lib/hook/useInfluencerData'
+import { useNotifications } from '@/lib/hook/useNotifications'
 
 export default function DashboardInfluencer() {
   const router = useRouter()
@@ -28,6 +29,7 @@ export default function DashboardInfluencer() {
   }, [])
 
   const { collaborations, transactions, contracts, metrics, loading } = useInfluencerData(user?.id)
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications(user?.id)
 
   const firstName = profile?.full_name?.split(' ')[0] || profile?.username || 'toi'
   const hour = time.getHours()
@@ -74,30 +76,30 @@ export default function DashboardInfluencer() {
     </span>
   )
 
-const openDispute = async (collab) => {
-  const reason = prompt('Raison du litige :')
-  if (!reason) return
-  const description = prompt('Description (optionnel) :')
+  const openDispute = async (collab) => {
+    const reason = prompt('Raison du litige :')
+    if (!reason) return
+    const description = prompt('Description (optionnel) :')
 
-  const res = await fetch('/api/disputes', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      collaborationId: collab.id,
-      openedBy: user.id,
-      openedByRole: 'influencer',
-      reason,
-      description,
-    }),
-  })
+    const res = await fetch('/api/disputes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        collaborationId: collab.id,
+        openedBy: user.id,
+        openedByRole: 'influencer',
+        reason,
+        description,
+      }),
+    })
 
-  const data = await res.json()
-  if (data.success) {
-    alert('✅ Litige ouvert avec succès')
-  } else {
-    alert('❌ Erreur : ' + data.error)
+    const data = await res.json()
+    if (data.success) {
+      alert('✅ Litige ouvert avec succès')
+    } else {
+      alert('❌ Erreur : ' + data.error)
+    }
   }
-}
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: colors.bg }}>
@@ -132,11 +134,71 @@ const openDispute = async (collab) => {
               ))}
             </div>
           </div>
+
+          {/* Droite : heure + notifications */}
           <div style={{ textAlign: 'right', color: '#fff', flexShrink: 0, marginLeft: '1rem' }}>
             <div style={{ fontSize: '0.78rem', opacity: 0.8, marginBottom: '0.2rem' }}>{dateStr}</div>
             <div style={{ fontSize: '2rem', fontWeight: 800, lineHeight: 1 }}>{timeStr.slice(0, 5)}</div>
-            <div style={{ fontSize: '0.72rem', marginTop: '0.3rem' }}>
+            <div style={{ fontSize: '0.72rem', marginTop: '0.3rem', marginBottom: '0.5rem' }}>
               <span style={{ background: 'rgba(34,197,94,0.3)', color: '#86efac', padding: '0.15rem 0.5rem', borderRadius: '100px' }}>● En ligne</span>
+            </div>
+
+            {/* Bouton notifications */}
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <button
+                onClick={() => setShowNotifs(!showNotifs)}
+                style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', fontSize: '1.1rem', color: '#fff', position: 'relative' }}
+              >
+                🔔
+                {unreadCount > 0 && (
+                  <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '18px', height: '18px', background: '#ef4444', borderRadius: '50%', fontSize: '0.65rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {showNotifs && (
+                <>
+                  <div onClick={() => setShowNotifs(false)} style={{ position: 'fixed', inset: 0, zIndex: 998 }} />
+                  <div style={{ position: 'fixed', right: 20, top: '80px', width: '340px', background: colors.cardBg, borderRadius: '16px', boxShadow: '0 8px 40px rgba(0,0,0,0.2)', border: `1px solid ${colors.cardBorder}`, zIndex: 999, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', borderBottom: `1px solid ${colors.cardBorder}` }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: colors.text }}>Notifications</div>
+                      {unreadCount > 0 && (
+                        <span style={{ background: '#a855f7', color: '#fff', fontSize: '0.7rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '100px' }}>{unreadCount} nouvelles</span>
+                      )}
+                    </div>
+                    <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: colors.textSecondary, fontSize: '0.85rem' }}>Aucune notification</div>
+                      ) : notifications.map(n => (
+                        <div key={n.id}
+                          onClick={() => markAsRead(n.id)}
+                          style={{ display: 'flex', gap: '0.75rem', padding: '0.9rem 1.25rem', borderBottom: `1px solid ${colors.cardBorder}`, cursor: 'pointer', background: !n.is_read ? (isDark ? 'rgba(168,85,247,0.06)' : 'rgba(168,85,247,0.04)') : 'transparent' }}
+                        >
+                          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(168,85,247,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
+                            {n.type === 'payment' ? '💰' : n.type === 'dispute' ? '⚠️' : n.type === 'welcome' ? '🎉' : '🔔'}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: colors.text }}>{n.title}</div>
+                              {!n.is_read && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#a855f7', flexShrink: 0 }} />}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: colors.textSecondary, marginTop: '0.15rem' }}>{n.body}</div>
+                            <div style={{ fontSize: '0.68rem', color: colors.textSecondary, marginTop: '0.25rem' }}>
+                              {new Date(n.created_at).toLocaleDateString('fr-FR')}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ padding: '0.75rem 1.25rem', borderTop: `1px solid ${colors.cardBorder}` }}>
+                      <button onClick={markAllAsRead} style={{ width: '100%', padding: '0.65rem', background: 'transparent', border: `1px solid ${colors.cardBorder}`, borderRadius: '10px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: colors.textSecondary, fontFamily: 'inherit' }}>
+                        Tout marquer comme lu
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -154,7 +216,6 @@ const openDispute = async (collab) => {
       {/* VUE D'ENSEMBLE */}
       {activeTab === 'overview' && (
         <div>
-          {/* Métriques */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
             {[
               { label: 'Gains reçus',           value: fmt(metrics?.totalGains),             sub: 'Transactions released',      icon: '💰', color: '#22c55e' },
@@ -175,7 +236,6 @@ const openDispute = async (collab) => {
             ))}
           </div>
 
-          {/* Dernières collaborations + transactions */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             <div style={cardStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
@@ -248,7 +308,7 @@ const openDispute = async (collab) => {
                     {badge(s.label, s.color)}
                   </div>
                 </div>
-{c.deadline && (
+                {c.deadline && (
                   <div style={{ fontSize: '0.78rem', color: colors.textSecondary, marginBottom: '0.5rem' }}>
                     📅 Deadline : {new Date(c.deadline).toLocaleDateString('fr-FR')}
                   </div>
@@ -276,12 +336,11 @@ const openDispute = async (collab) => {
       {/* GAINS */}
       {activeTab === 'gains' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* Résumé */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1rem' }}>
             {[
-              { label: 'Total reçu',    value: fmt(metrics?.totalGains), color: '#22c55e', icon: '✅' },
-              { label: 'En escrow',     value: fmt(metrics?.enEscrow),   color: '#3b82f6', icon: '🔒' },
-              { label: 'Nb transactions', value: transactions.length,   color: '#a855f7', icon: '📊' },
+              { label: 'Total reçu',      value: fmt(metrics?.totalGains), color: '#22c55e', icon: '✅' },
+              { label: 'En escrow',       value: fmt(metrics?.enEscrow),   color: '#3b82f6', icon: '🔒' },
+              { label: 'Nb transactions', value: transactions.length,       color: '#a855f7', icon: '📊' },
             ].map((m, i) => (
               <div key={i} style={{ ...cardStyle, textAlign: 'center' }}>
                 <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>{m.icon}</div>
@@ -291,7 +350,6 @@ const openDispute = async (collab) => {
             ))}
           </div>
 
-          {/* Liste transactions */}
           <div style={cardStyle}>
             <div style={{ fontWeight: 700, fontSize: '1rem', color: colors.text, marginBottom: '1.25rem' }}>💰 Historique des paiements</div>
             {transactions.length === 0 ? (
