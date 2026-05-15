@@ -24,9 +24,9 @@ function SidebarAndContent({ children }) {
   // ADMIN : on court-circuite tout le layout — pas de sidebar influencer/creator
   // La sidebar admin est gérée directement dans app/dashboard/admin/page.js
   // ─────────────────────────────────────────────────────────────────────────────
-  if (pathname.startsWith('/dashboard/admin')) {
-    return <>{children}</>
-  }
+if (pathname.startsWith('/dashboard/admin') || pathname.startsWith('/dashboard/brand')) {
+  return <>{children}</>
+}
 
   // Sidebar influencer
   const influencerItems = [
