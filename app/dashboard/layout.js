@@ -30,7 +30,7 @@ if (pathname.startsWith('/dashboard/admin') || pathname.startsWith('/dashboard/b
 
   // Sidebar influencer
   const influencerItems = [
-    { icon: '🏠', label: 'Accueil',               route: '/dashboard/influencer' },
+    { icon: '🏠', label: 'Accueil',               route: '/dashboard/brand' },
     { icon: '📋', label: 'Gestion des campagnes', route: '/dashboard/campaigns' },
     { icon: '🤝', label: 'Partenaires',            route: '/dashboard/partenaires' },
     { icon: '💬', label: 'Messagerie',             route: '/dashboard/messagerie' },
