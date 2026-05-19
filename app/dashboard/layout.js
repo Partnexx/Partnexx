@@ -24,13 +24,13 @@ function SidebarAndContent({ children }) {
   // ADMIN : on court-circuite tout le layout — pas de sidebar influencer/creator
   // La sidebar admin est gérée directement dans app/dashboard/admin/page.js
   // ─────────────────────────────────────────────────────────────────────────────
-  if (pathname.startsWith('/dashboard/admin')) {
-    return <>{children}</>
-  }
+if (pathname.startsWith('/dashboard/admin') || pathname.startsWith('/dashboard/brand') || pathname.startsWith('/dashboard/influencer')) {
+  return <>{children}</>
+}
 
   // Sidebar influencer
   const influencerItems = [
-    { icon: '🏠', label: 'Accueil',               route: '/dashboard/influencer' },
+    { icon: '🏠', label: 'Accueil',               route: '/dashboard/brand' },
     { icon: '📋', label: 'Gestion des campagnes', route: '/dashboard/campaigns' },
     { icon: '🤝', label: 'Partenaires',            route: '/dashboard/partenaires' },
     { icon: '💬', label: 'Messagerie',             route: '/dashboard/messagerie' },
