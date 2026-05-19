@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import HeroDashboard from "./HeroDashboard";
 
@@ -25,10 +26,10 @@ export default function Hero() {
           </p>
 
           <div className="flex flex-col items-start gap-3">
-            <a href="#" className="group relative inline-flex items-center gap-4 rounded-2xl bg-gradient-brand px-9 py-5 text-lg font-semibold text-white shadow-glow animate-pulse-glow transition-all duration-300 hover:scale-105">
+            <Link href="/marques/inscription" className="group relative inline-flex items-center gap-4 rounded-2xl bg-gradient-brand px-9 py-5 text-lg font-semibold text-white shadow-glow animate-pulse-glow transition-all duration-300 hover:scale-105">
               <span>Lancer ma première campagne gratuitement</span>
               <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1.5" />
-            </a>
+            </Link>
 
             <div className="inline-flex items-center gap-2 rounded-full bg-cyan-50 border border-cyan-200 px-3 py-1.5 shadow-sm">
               <span style={{ color: "#00B8E6" }} className="text-base leading-none">✓</span>

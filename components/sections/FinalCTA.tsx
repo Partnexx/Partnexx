@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 export default function FinalCTA() {
@@ -15,10 +16,10 @@ export default function FinalCTA() {
             <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-10">
               Brief en 2 minutes. Premiers résultats en quelques jours. Sans carte bancaire.
             </p>
-            <a href="#" className="group inline-flex items-center gap-3 rounded-2xl bg-gradient-brand px-9 py-5 text-lg font-semibold text-white shadow-glow animate-pulse-glow hover:scale-105 transition-transform">
+            <Link href="/marques/inscription" className="group inline-flex items-center gap-3 rounded-2xl bg-gradient-brand px-9 py-5 text-lg font-semibold text-white shadow-glow animate-pulse-glow hover:scale-105 transition-transform">
               Lancer gratuitement
               <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1.5" />
-            </a>
+            </Link>
             <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-pink-50 border border-pink-200 px-3 py-1.5">
               <span className="text-base">🔥</span>
               <span className="text-xs font-semibold text-foreground">

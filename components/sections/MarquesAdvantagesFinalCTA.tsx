@@ -15,7 +15,7 @@ export default function MarquesAdvantagesFinalCTA() {
               Trouve les bons créateurs, mesure ton ROI et <span className="underline decoration-white/60 underline-offset-4">scale ta marque</span>.
             </p>
             <Link
-              href="/marques"
+              href="/marques/inscription"
               className="group inline-flex items-center gap-3 rounded-2xl bg-white px-8 py-4 text-base font-semibold text-pink-500 shadow-card hover:scale-[1.04] transition-transform"
             >
               Lancer ma première campagne
