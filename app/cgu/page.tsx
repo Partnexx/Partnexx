@@ -159,8 +159,8 @@ export default function CGUPage() {
         <li><strong>Or</strong> → accès aux Missions premium</li>
         <li><strong>Platine</strong> → invitations privées</li>
         <li><strong>Diamant</strong> → coaching dédié</li>
-        <li><strong>Champion</strong> → événements exclusifs</li>
-        <li><strong>Élite</strong> → partenariats long terme</li>
+        <li><strong>Élite</strong> → événements exclusifs</li>
+        <li><strong>Champion</strong> → partenariats long terme</li>
         <li><strong>Légende</strong> → ambassadeur Partnexx</li>
       </ul>
       <p>Partnexx se réserve le droit d&apos;ajuster la formule de calcul, les seuils et les avantages associés à chaque niveau, sans que cela puisse être considéré comme une modification substantielle des présentes CGU.</p>
