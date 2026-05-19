@@ -4,19 +4,20 @@ import { useRouter } from 'next/navigation'
 import supabase from '@/lib/supabase'
 import { useInfluencerData } from '@/lib/hook/useInfluencerData'
 import { useNotifications } from '@/lib/hook/useNotifications'
+import dynamic from 'next/dynamic'
 
-// Sections
-import AccueilSection from './sections/AccueilSection'
-import OpportunitesSection from './sections/OpportunitesSection'
-import CollaborationsSection from './sections/CollaborationsSection'
-import StatistiquesSection from './sections/StatistiquesSection'
-import MessagerieSection from './sections/MessagerieSection'
-import ContratsSection from './sections/ContratsSection'
-import RessourcesSection from './sections/RessourcesSection'
-import ProfilSection from './sections/ProfilSection'
-import FeedbackSection from './sections/FeedbackSection'
-import ParametresSection from './sections/ParametresSection'
-import PartnextScoreSection from './sections/PartnextScoreSection'
+const AccueilSection = dynamic(() => import('./sections/AccueilSection'), { ssr: false })
+const OpportunitesSection = dynamic(() => import('./sections/OpportunitesSection'), { ssr: false })
+const CollaborationsSection = dynamic(() => import('./sections/CollaborationsSection'), { ssr: false })
+const MessagerieSection = dynamic(() => import('./sections/MessagerieSection'), { ssr: false })
+const UGCCreatorSection = dynamic(() => import('./sections/UGCCreatorSection'), { ssr: false })
+const ContratsSection = dynamic(() => import('./sections/ContratsSection'), { ssr: false })
+const RessourcesSection = dynamic(() => import('./sections/RessourcesSection'), { ssr: false })
+const ProfilSection = dynamic(() => import('./sections/ProfilSection'), { ssr: false })
+const FeedbackSection = dynamic(() => import('./sections/FeedbackSection'), { ssr: false })
+const ParametresSection = dynamic(() => import('./sections/ParametresSection'), { ssr: false })
+const PartnextScoreSection = dynamic(() => import('./sections/PartnextScoreSection'), { ssr: false })
+const StatistiquesSection = dynamic(() => import('./sections/StatistiquesSection'), { ssr: false })
 
 const menuItems = [
   { id: 'accueil', label: 'Accueil', icon: '🏠' },
@@ -62,25 +63,26 @@ export default function DashboardInfluencer() {
   const firstName = profile?.full_name?.split(' ')[0] || profile?.username || 'toi'
 
   const renderSection = () => {
-    const props = { user, profile, collaborations, transactions, contracts, metrics, notifications, unreadCount, markAsRead, markAllAsRead, loading }
-    switch (activeSection) {
-      case 'accueil': return <AccueilSection {...props} />
-      case 'opportunites': return <OpportunitesSection {...props} />
-      case 'collaborations': return <CollaborationsSection {...props} />
-      case 'statistiques': return <StatistiquesSection {...props} />
-      case 'messagerie': return <MessagerieSection {...props} />
-      case 'contrats': return <ContratsSection {...props} />
-      case 'ressources': return <RessourcesSection {...props} />
-      case 'profil': return <ProfilSection {...props} />
-      case 'feedback': return <FeedbackSection {...props} />
-      case 'parametres': return <ParametresSection {...props} />
-      case 'partnexx-score': return <PartnextScoreSection {...props} />
-      default: return <AccueilSection {...props} />
-    }
+  const props = { user, profile, collaborations, transactions, contracts, metrics, notifications, unreadCount, markAsRead, markAllAsRead, loading }
+  switch (activeSection) {
+    case 'accueil': return <AccueilSection key="accueil" {...props} />
+    case 'opportunites': return <OpportunitesSection key="opportunites" {...props} />
+    case 'collaborations': return <CollaborationsSection key="collaborations" {...props} />
+    case 'statistiques': return <StatistiquesSection key="statistiques" {...props} />
+    case 'messagerie': return <MessagerieSection key="messagerie" {...props} />
+    case 'ugc': return <UGCCreatorSection key="ugc" {...props} />
+    case 'contrats': return <ContratsSection key="contrats" {...props} />
+    case 'ressources': return <RessourcesSection key="ressources" {...props} />
+    case 'profil': return <ProfilSection key="profil" {...props} />
+    case 'feedback': return <FeedbackSection key="feedback" {...props} />
+    case 'parametres': return <ParametresSection key="parametres" {...props} />
+    case 'partnexx-score': return <PartnextScoreSection key="partnexx-score" {...props} />
+    default: return <AccueilSection key="accueil" {...props} />
   }
+}
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex w-screen">
       {/* SIDEBAR */}
       <aside className={`fixed left-0 top-0 h-screen bg-card border-r border-border transition-all duration-300 flex flex-col z-50 overflow-y-auto ${sidebarCollapsed ? 'w-16' : 'w-64'}`}>
         {/* Header */}
@@ -147,11 +149,11 @@ export default function DashboardInfluencer() {
       </aside>
 
       {/* MAIN */}
-      <main className={`flex-1 transition-all duration-300 min-h-screen ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
-        <div className="p-6">
-          {renderSection()}
-        </div>
-      </main>
+      <main className={`flex-1 transition-all duration-300 min-h-screen min-w-0 overflow-hidden ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
+  <div className="p-6 max-w-full overflow-hidden">
+    {renderSection()}
+  </div>
+</main>
     </div>
   )
 }
