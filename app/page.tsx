@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, Megaphone, Sparkles } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { Bell } from 'lucide-react'
 
 export default function LandingPage() {
   return (

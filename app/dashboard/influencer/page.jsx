@@ -5,6 +5,7 @@ import supabase from '@/lib/supabase'
 import { useInfluencerData } from '@/lib/hook/useInfluencerData'
 import { useNotifications } from '@/lib/hook/useNotifications'
 import dynamic from 'next/dynamic'
+import { Bell } from 'lucide-react'
 
 const AccueilSection = dynamic(() => import('./sections/AccueilSection'), { ssr: false })
 const OpportunitesSection = dynamic(() => import('./sections/OpportunitesSection'), { ssr: false })
@@ -40,6 +41,7 @@ export default function DashboardInfluencer() {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
 
   useEffect(() => {
     const getUser = async () => {

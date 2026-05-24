@@ -6,21 +6,44 @@ import { ArrowRight, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/sections/Footer";
+import supabase from '@/lib/supabase'
 
 export default function LoginPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      toast.success("Connexion réussie 🎉", {
-        description: "Bienvenue sur Partnexx",
-      });
-    }, 800);
-  };
+  const handleSubmit = async (e) => {
+  e.preventDefault()
+  setLoading(true)
+
+  const email = e.target.email.value
+  const password = e.target.password.value
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
+  if (error) {
+    toast.error("Identifiants incorrects")
+    setLoading(false)
+    return
+  }
+
+  // Récupérer le rôle depuis profiles
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', data.user.id)
+    .single()
+
+  toast.success("Connexion réussie 🎉", { description: "Bienvenue sur Partnexx" })
+
+  if (profile?.role === 'influencer') {
+    window.location.href = '/dashboard/influencer'
+  } else if (profile?.role === 'brand') {
+    window.location.href = '/dashboard/brand'
+  } else {
+    window.location.href = '/'
+  }
+}
 
   return (
     <main className="relative min-h-screen overflow-hidden flex flex-col">

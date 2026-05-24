@@ -4,18 +4,14 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useState } from 'react'
 import { Search, DollarSign, Users, Target, Briefcase, Eye, TrendingUp, Globe, MessageCircle, Phone, FileText, Download, Brain, Crown, Award, Zap, AlertCircle, CheckCircle, Mail, BookOpen } from 'lucide-react'
+import { toast } from 'sonner'
 
-const YoutubeIcon = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58a2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/>
-    <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/>
-  </svg>
-)
+const YoutubeIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58a2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/></svg>
 const Wand2 = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 4-1 1"/><path d="m4 15 1-1"/><path d="m8.5 8.5-5 13 13-5-8-8Z"/><path d="m12 12 4.5 4.5"/></svg>
 const Hash = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></svg>
 const Lightbulb = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
@@ -25,25 +21,46 @@ const Play = ({ className }) => <svg className={className} viewBox="0 0 24 24" f
 const ArrowRight = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
 const Megaphone = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
 const Film = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" x2="7" y1="2" y2="22"/><line x1="17" x2="17" y1="2" y2="22"/><line x1="2" x2="22" y1="12" y2="12"/><line x1="2" x2="7" y1="7" y2="7"/><line x1="2" x2="7" y1="17" y2="17"/><line x1="17" x2="22" y1="17" y2="17"/><line x1="17" x2="22" y1="7" y2="7"/></svg>
-const Image = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+const ImageIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
 const Smartphone = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
 const Palette = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
 const Video = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect width="15" height="14" x="1" y="5" rx="2" ry="2"/></svg>
-const MessageSquare = MessageCircle
+
+// Template download links (à remplacer plus tard par de vrais liens)
+const TEMPLATE_LINKS = {
+  "Template Post Instagram": "https://partnexx.fr/templates/instagram-post.zip",
+  "Stories Templates Pack": "https://partnexx.fr/templates/stories-pack.zip",
+  "Kit Branding Complet": "https://partnexx.fr/templates/branding-kit.zip",
+  "Templates Reels/TikTok": "https://partnexx.fr/templates/reels-tiktok.zip",
+  "Media Kit Influenceur": "https://partnexx.fr/templates/media-kit.zip",
+  "Calendrier Éditorial": "https://partnexx.fr/templates/calendrier-editorial.zip",
+}
+
+// Guide links (à remplacer plus tard)
+const GUIDE_LINKS = {
+  "Guide Complet Instagram 2024": "https://partnexx.fr/guides/instagram-2024",
+  "Monétiser avec TikTok": "https://partnexx.fr/guides/monetiser-tiktok",
+  "Négociation & Tarification": "https://partnexx.fr/guides/negociation-tarification",
+  "Créer du Contenu UGC": "https://partnexx.fr/guides/ugc-content",
+  "YouTube pour Créateurs": "https://partnexx.fr/guides/youtube-createurs",
+  "LinkedIn pour Influenceurs": "https://partnexx.fr/guides/linkedin-influenceurs",
+  "Photographier comme un Pro": "https://partnexx.fr/guides/photo-pro",
+  "Community Management": "https://partnexx.fr/guides/community-management",
+}
 
 const aiTools = [
-  { title: "Générateur de Captions IA", description: "Créez des légendes engageantes optimisées pour chaque plateforme", icon: Wand2, color: "from-purple-500 to-pink-500", features: ["Multilingue", "Émojis intelligents", "Hashtags suggérés"], isPremium: false },
-  { title: "Recherche Hashtags Intelligente", description: "Trouvez les hashtags les plus performants selon votre niche", icon: Hash, color: "from-blue-500 to-cyan-500", features: ["Analyse tendances", "Score popularité", "Éviter shadowban"], isPremium: false },
-  { title: "Analyseur de Tendances", description: "Découvrez les sujets viraux en temps réel", icon: Target, color: "from-orange-500 to-red-500", features: ["Alertes temps réel", "Analyse prédictive", "Multi-plateformes"], isPremium: true },
-  { title: "Générateur d'Idées Contenu", description: "Des suggestions personnalisées basées sur vos statistiques", icon: Lightbulb, color: "from-yellow-500 to-orange-500", features: ["Calendrier éditorial", "Formats variés", "Suggestions saison"], isPremium: false },
-  { title: "Optimiseur d'Images IA", description: "Redimensionnez et améliorez vos visuels automatiquement", icon: Image, color: "from-green-500 to-emerald-500", features: ["Multi-formats", "Compression intelligente", "Filtres IA"], isPremium: false },
-  { title: "Générateur Scripts Vidéo", description: "Scripts personnalisés pour TikTok, Reels et Shorts", icon: Video, color: "from-pink-500 to-rose-500", features: ["Templates prêts", "Hooks accrocheurs", "CTA optimisés"], isPremium: true },
-  { title: "Assistant Planification Stories", description: "Planifiez et créez des stories captivantes avec IA", icon: Smartphone, color: "from-indigo-500 to-purple-500", features: ["Stickers suggérés", "Meilleur timing", "CTA intelligents"], isPremium: false },
-  { title: "Analyseur d'Audience", description: "Comprenez votre audience et adaptez votre contenu", icon: Users, color: "from-teal-500 to-cyan-500", features: ["Démographie", "Comportements", "Préférences contenu"], isPremium: true },
-  { title: "Générateur de Bio Instagram", description: "Créez une bio percutante qui convertit", icon: FileText, color: "from-violet-500 to-fuchsia-500", features: ["Call-to-action", "Emojis optimisés", "Mots-clés SEO"], isPremium: false },
-  { title: "Traducteur Multilingue", description: "Traduisez votre contenu pour toucher une audience internationale", icon: Globe, color: "from-sky-500 to-blue-500", features: ["30+ langues", "Ton adapté", "Contexte culturel"], isPremium: false },
-  { title: "Générateur de Réponses", description: "Répondez à vos commentaires avec l'aide de l'IA", icon: MessageSquare, color: "from-emerald-500 to-teal-500", features: ["Ton personnalisé", "Réponses rapides", "Engagement optimisé"], isPremium: false },
-  { title: "Palette de Couleurs IA", description: "Trouvez la palette parfaite pour votre marque", icon: Palette, color: "from-rose-500 to-pink-500", features: ["Harmonies couleurs", "Accessibilité", "Export formats"], isPremium: true },
+  { title: "Générateur de Captions IA", description: "Créez des légendes engageantes optimisées pour chaque plateforme", icon: Wand2, color: "from-purple-500 to-pink-500", features: ["Multilingue", "Émojis intelligents", "Hashtags suggérés"], isPremium: false, prompt: "Génère 3 captions Instagram engageantes pour un influenceur lifestyle. Inclus des émojis et 5 hashtags pertinents pour chaque caption. Format: Caption 1: [texte]\nHashtags: [hashtags]" },
+  { title: "Recherche Hashtags Intelligente", description: "Trouvez les hashtags les plus performants selon votre niche", icon: Hash, color: "from-blue-500 to-cyan-500", features: ["Analyse tendances", "Score popularité", "Éviter shadowban"], isPremium: false, prompt: "Génère une liste de 20 hashtags performants pour un influenceur lifestyle/mode en France. Classe-les par catégorie: Populaires (1M+), Moyens (100K-1M), Niche (<100K). Explique pourquoi chaque groupe est utile." },
+  { title: "Analyseur de Tendances", description: "Découvrez les sujets viraux en temps réel", icon: Target, color: "from-orange-500 to-red-500", features: ["Alertes temps réel", "Analyse prédictive", "Multi-plateformes"], isPremium: true, prompt: "Analyse les tendances actuelles sur Instagram et TikTok pour les influenceurs lifestyle en France. Donne 5 tendances avec: le sujet, pourquoi c'est viral, comment l'adapter, et le format idéal." },
+  { title: "Générateur d'Idées Contenu", description: "Des suggestions personnalisées basées sur vos statistiques", icon: Lightbulb, color: "from-yellow-500 to-orange-500", features: ["Calendrier éditorial", "Formats variés", "Suggestions saison"], isPremium: false, prompt: "Génère 10 idées de contenu créatif pour un influenceur lifestyle sur Instagram et TikTok. Pour chaque idée: titre accrocheur, format recommandé (reel/post/story/carrousel), description courte, et pourquoi ça va performer." },
+  { title: "Optimiseur d'Images IA", description: "Conseils pour améliorer vos visuels automatiquement", icon: ImageIcon, color: "from-green-500 to-emerald-500", features: ["Multi-formats", "Composition", "Filtres IA"], isPremium: false, prompt: "Donne 10 conseils professionnels pour optimiser les photos Instagram d'un influenceur lifestyle. Couvre: composition, lumière, couleurs, retouche, et cohérence du feed." },
+  { title: "Générateur Scripts Vidéo", description: "Scripts personnalisés pour TikTok, Reels et Shorts", icon: Video, color: "from-pink-500 to-rose-500", features: ["Templates prêts", "Hooks accrocheurs", "CTA optimisés"], isPremium: true, prompt: "Écris un script complet pour une vidéo TikTok/Reel de 60 secondes sur le thème 'Ma routine matinale'. Structure: Hook (0-3s), Développement (3-50s), CTA (50-60s). Inclus les indications de timing et les transitions." },
+  { title: "Assistant Planification Stories", description: "Planifiez et créez des stories captivantes avec IA", icon: Smartphone, color: "from-indigo-500 to-purple-500", features: ["Stickers suggérés", "Meilleur timing", "CTA intelligents"], isPremium: false, prompt: "Crée un plan de 7 stories Instagram pour une semaine pour un influenceur lifestyle. Pour chaque jour: heure optimale, type de story, contenu suggéré, stickers recommandés, et CTA." },
+  { title: "Analyseur d'Audience", description: "Comprenez votre audience et adaptez votre contenu", icon: Users, color: "from-teal-500 to-cyan-500", features: ["Démographie", "Comportements", "Préférences contenu"], isPremium: true, prompt: "Analyse le profil type d'audience d'un influenceur lifestyle français avec 50K followers sur Instagram. Donne: démographie, centres d'intérêt, heures d'activité, types de contenu préférés, et recommandations." },
+  { title: "Générateur de Bio Instagram", description: "Créez une bio percutante qui convertit", icon: FileText, color: "from-violet-500 to-fuchsia-500", features: ["Call-to-action", "Emojis optimisés", "Mots-clés SEO"], isPremium: false, prompt: "Génère 3 versions de bio Instagram pour un influenceur lifestyle/mode français. Chaque bio doit: faire max 150 caractères, inclure des emojis, un CTA clair, et les mots-clés importants. Explique le choix de chaque version." },
+  { title: "Traducteur Multilingue", description: "Traduisez votre contenu pour toucher une audience internationale", icon: Globe, color: "from-sky-500 to-blue-500", features: ["30+ langues", "Ton adapté", "Contexte culturel"], isPremium: false, prompt: "Traduis ce message en anglais, espagnol et allemand en adaptant le ton pour chaque culture: 'Bonjour à tous ! Nouvelle vidéo disponible sur ma chaîne YouTube. N'oubliez pas de vous abonner et d'activer les notifications ! 🔔✨'" },
+  { title: "Générateur de Réponses", description: "Répondez à vos commentaires avec l'aide de l'IA", icon: MessageCircle, color: "from-emerald-500 to-teal-500", features: ["Ton personnalisé", "Réponses rapides", "Engagement optimisé"], isPremium: false, prompt: "Génère 10 réponses types pour les commentaires les plus fréquents d'un influenceur lifestyle: commentaires positifs, questions sur les produits, demandes de collaboration, commentaires négatifs, et emojis. Ton: chaleureux et authentique." },
+  { title: "Palette de Couleurs IA", description: "Trouvez la palette parfaite pour votre marque", icon: Palette, color: "from-rose-500 to-pink-500", features: ["Harmonies couleurs", "Accessibilité", "Export formats"], isPremium: true, prompt: "Propose 3 palettes de couleurs pour un influenceur lifestyle/mode sur Instagram. Pour chaque palette: 5 couleurs avec codes HEX, nom de la palette, mood/ambiance, et conseils d'utilisation pour les posts, stories et highlights." },
 ]
 
 const templates = [
@@ -62,7 +79,7 @@ const guides = [
   { title: "Créer du Contenu UGC", description: "Maîtrisez l'art du User Generated Content", icon: Film, duration: "35 min de lecture", topics: ["Types de UGC", "Équipement", "Techniques"], color: "from-orange-500 to-red-500" },
   { title: "YouTube pour Créateurs", description: "Démarrer et monétiser sa chaîne YouTube", icon: YoutubeIcon, duration: "50 min de lecture", topics: ["Optimisation SEO", "Monétisation", "Thumbnails"], color: "from-red-500 to-pink-500" },
   { title: "LinkedIn pour Influenceurs", description: "Développer votre présence professionnelle", icon: Briefcase, duration: "40 min de lecture", topics: ["Personal Branding", "Networking", "B2B Partnerships"], color: "from-blue-600 to-indigo-600" },
-  { title: "Photographier comme un Pro", description: "Techniques photo pour créateurs de contenu", icon: Image, duration: "30 min de lecture", topics: ["Lumière", "Composition", "Édition mobile"], color: "from-emerald-500 to-teal-500" },
+  { title: "Photographier comme un Pro", description: "Techniques photo pour créateurs de contenu", icon: ImageIcon, duration: "30 min de lecture", topics: ["Lumière", "Composition", "Édition mobile"], color: "from-emerald-500 to-teal-500" },
   { title: "Community Management", description: "Engager et fidéliser votre communauté", icon: Users, duration: "35 min de lecture", topics: ["Engagement", "Modération", "Croissance"], color: "from-violet-500 to-purple-500" },
 ]
 
@@ -86,11 +103,77 @@ const faqs = [
 
 export default function RessourcesSection() {
   const [searchQuery, setSearchQuery] = useState("")
+  const [activeTool, setActiveTool] = useState(null)
+  const [toolInput, setToolInput] = useState("")
+  const [toolResult, setToolResult] = useState("")
+  const [toolLoading, setToolLoading] = useState(false)
 
   const filterBySearch = (items) => items.filter(item =>
     item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.description.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  const handleDownload = (title) => {
+    const link = TEMPLATE_LINKS[title]
+    if (link) {
+      toast.info(`Téléchargement de "${title}" en cours... Le lien sera disponible prochainement.`)
+    } else {
+      toast.error("Lien non disponible pour l'instant")
+    }
+  }
+
+  const handlePreview = (title) => {
+    toast.info(`Aperçu de "${title}" — Disponible prochainement`)
+  }
+
+  const handleReadGuide = (title) => {
+    const link = GUIDE_LINKS[title]
+    if (link) {
+      toast.info(`Guide "${title}" — Disponible prochainement`)
+    }
+  }
+
+  const handleOpenTool = (tool) => {
+    setActiveTool(tool)
+    setToolInput("")
+    setToolResult("")
+  }
+
+  const handleRunTool = async () => {
+    if (!activeTool) return
+    setToolLoading(true)
+    setToolResult("")
+
+    try {
+      const userPrompt = toolInput.trim()
+        ? `${activeTool.prompt}\n\nInformations supplémentaires de l'utilisateur: ${toolInput}`
+        : activeTool.prompt
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: userPrompt }],
+        }),
+      })
+
+      const data = await response.json()
+      const text = data.content?.map(c => c.text || "").join("") || "Aucun résultat"
+      setToolResult(text)
+    } catch (err) {
+      setToolResult("Erreur lors de la génération. Veuillez réessayer.")
+    }
+    setToolLoading(false)
+  }
+
+  const handleCopyResult = () => {
+    if (toolResult) {
+      navigator.clipboard.writeText(toolResult)
+      toast.success("Copié dans le presse-papiers !")
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -125,6 +208,7 @@ export default function RessourcesSection() {
           ))}
         </TabsList>
 
+        {/* OUTILS IA */}
         <TabsContent value="outils" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filterBySearch(aiTools).map((tool, index) => {
@@ -146,7 +230,9 @@ export default function RessourcesSection() {
                         <div key={i} className="flex items-center gap-2 text-sm"><CheckCircle className="h-4 w-4 text-green-600 shrink-0" /><span>{feature}</span></div>
                       ))}
                     </div>
-                    <Button className="w-full"><Play className="h-4 w-4 mr-2" />Essayer maintenant</Button>
+                    <Button className="w-full" onClick={() => handleOpenTool(tool)}>
+                      <Play className="h-4 w-4 mr-2" />Essayer maintenant
+                    </Button>
                   </CardContent>
                 </Card>
               )
@@ -154,6 +240,7 @@ export default function RessourcesSection() {
           </div>
         </TabsContent>
 
+        {/* TEMPLATES */}
         <TabsContent value="templates" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filterBySearch(templates).map((template, index) => (
@@ -171,8 +258,12 @@ export default function RessourcesSection() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex gap-2">
-                    <Button variant="outline" className="flex-1"><Eye className="h-4 w-4 mr-2" />Aperçu</Button>
-                    <Button className="flex-1"><Download className="h-4 w-4 mr-2" />Télécharger</Button>
+                    <Button variant="outline" className="flex-1" onClick={() => handlePreview(template.title)}>
+                      <Eye className="h-4 w-4 mr-2" />Aperçu
+                    </Button>
+                    <Button className="flex-1" onClick={() => handleDownload(template.title)}>
+                      <Download className="h-4 w-4 mr-2" />Télécharger
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -180,6 +271,7 @@ export default function RessourcesSection() {
           </div>
         </TabsContent>
 
+        {/* GUIDES */}
         <TabsContent value="guides" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filterBySearch(guides).map((guide, index) => {
@@ -199,7 +291,9 @@ export default function RessourcesSection() {
                   </CardHeader>
                   <CardContent className="relative">
                     <div className="flex flex-wrap gap-2 mb-4">{guide.topics.map((topic, i) => <Badge key={i} variant="secondary" className="text-xs">{topic}</Badge>)}</div>
-                    <Button className="w-full group">Lire le guide<ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" /></Button>
+                    <Button className="w-full group" onClick={() => handleReadGuide(guide.title)}>
+                      Lire le guide<ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                    </Button>
                   </CardContent>
                 </Card>
               )
@@ -207,6 +301,7 @@ export default function RessourcesSection() {
           </div>
         </TabsContent>
 
+        {/* FAQ */}
         <TabsContent value="faq" className="space-y-6">
           <Card className="border-2 border-primary/20">
             <CardHeader>
@@ -240,24 +335,23 @@ export default function RessourcesSection() {
           </div>
 
           <Card className="relative overflow-hidden border-2 border-blue-500/30 bg-gradient-to-br from-blue-500/5 to-cyan-500/5">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
             <CardContent className="relative p-8">
               <div className="text-center mb-6">
-                <h3 className="text-2xl font-bold mb-2 flex items-center justify-center gap-2"><MessageSquare className="h-6 w-6 text-blue-500" />Vous ne trouvez pas votre réponse ?</h3>
-                <p className="text-muted-foreground">Notre équipe support est là pour vous aider 7j/7. Temps de réponse moyen : 2h</p>
+                <h3 className="text-2xl font-bold mb-2 flex items-center justify-center gap-2"><MessageCircle className="h-6 w-6 text-blue-500" />Vous ne trouvez pas votre réponse ?</h3>
+                <p className="text-muted-foreground">Notre équipe support est là pour vous aider 7j/7.</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { label: "Chat en Direct", sub: "Réponse immédiate", icon: MessageSquare, color: "from-blue-500 to-cyan-500", badge: "En ligne", badgeColor: "bg-green-500/10 text-green-600 border-green-500/20" },
-                  { label: "Email", sub: "support@partnexx.com", icon: Mail, color: "from-purple-500 to-pink-500", badge: "~ 2h", badgeColor: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
-                  { label: "Téléphone", sub: "+33 1 23 45 67 89", icon: Phone, color: "from-green-500 to-emerald-500", badge: "9h-18h", badgeColor: "bg-orange-500/10 text-orange-600 border-orange-500/20" },
-                  { label: "Centre d'Aide", sub: "Guides et tutoriels", icon: BookOpen, color: "from-orange-500 to-red-500", badge: "24/7", badgeColor: "bg-purple-500/10 text-purple-600 border-purple-500/20" },
-                ].map(({ label, sub, icon: Icon, color, badge, badgeColor }) => (
-                  <Card key={label} className="border-2 hover:border-primary/50 transition-all hover:shadow-lg group cursor-pointer">
+                  { label: "Chat en Direct", sub: "Réponse immédiate", icon: MessageCircle, color: "from-blue-500 to-cyan-500", badge: "En ligne", onClick: () => toast.info("Chat disponible prochainement") },
+                  { label: "Email", sub: "support@partnexx.fr", icon: Mail, color: "from-purple-500 to-pink-500", badge: "~ 2h", onClick: () => window.location.href = "mailto:support@partnexx.fr" },
+                  { label: "Téléphone", sub: "+33 1 23 45 67 89", icon: Phone, color: "from-green-500 to-emerald-500", badge: "9h-18h", onClick: () => window.location.href = "tel:+33123456789" },
+                  { label: "Centre d'Aide", sub: "Guides et tutoriels", icon: BookOpen, color: "from-orange-500 to-red-500", badge: "24/7", onClick: () => toast.info("Centre d'aide disponible prochainement") },
+                ].map(({ label, sub, icon: Icon, color, badge, onClick }) => (
+                  <Card key={label} className="border-2 hover:border-primary/50 transition-all hover:shadow-lg group cursor-pointer" onClick={onClick}>
                     <CardContent className="p-6 text-center space-y-3">
                       <div className={`mx-auto w-12 h-12 rounded-full bg-gradient-to-br ${color} flex items-center justify-center group-hover:scale-110 transition-transform`}><Icon className="h-6 w-6 text-white" /></div>
                       <div><h4 className="font-semibold mb-1">{label}</h4><p className="text-xs text-muted-foreground">{sub}</p></div>
-                      <Badge variant="secondary" className={badgeColor}>{badge}</Badge>
+                      <Badge variant="secondary">{badge}</Badge>
                     </CardContent>
                   </Card>
                 ))}
@@ -266,6 +360,63 @@ export default function RessourcesSection() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Dialog Outil IA */}
+      <Dialog open={!!activeTool} onOpenChange={(open) => { if (!open) setActiveTool(null) }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3 text-xl">
+              {activeTool && (() => { const Icon = activeTool.icon; return <div className={`p-2 rounded-lg bg-gradient-to-br ${activeTool.color}`}><Icon className="h-5 w-5 text-white" /></div> })()}
+              {activeTool?.title}
+            </DialogTitle>
+          </DialogHeader>
+
+          {activeTool && (
+            <div className="space-y-4 mt-2">
+              <p className="text-sm text-muted-foreground">{activeTool.description}</p>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Personnaliser (optionnel)
+                </label>
+                <Textarea
+                  placeholder="Ajoutez des informations spécifiques à votre profil, niche, ou ce que vous voulez générer..."
+                  value={toolInput}
+                  onChange={(e) => setToolInput(e.target.value)}
+                  rows={3}
+                  className="resize-none"
+                />
+              </div>
+
+              <Button
+                className={`w-full bg-gradient-to-r ${activeTool.color} text-white`}
+                onClick={handleRunTool}
+                disabled={toolLoading}
+              >
+                {toolLoading ? (
+                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Génération en cours...</>
+                ) : (
+                  <><Brain className="h-4 w-4 mr-2" />Générer avec l&apos;IA</>
+                )}
+              </Button>
+
+              {toolResult && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Résultat</label>
+                    <Button variant="outline" size="sm" onClick={handleCopyResult}>
+                      Copier
+                    </Button>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg border whitespace-pre-wrap text-sm leading-relaxed max-h-64 overflow-y-auto">
+                    {toolResult}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

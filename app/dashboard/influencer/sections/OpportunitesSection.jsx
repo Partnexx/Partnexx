@@ -41,18 +41,18 @@ const motivationSchema = z.object({
 })
 
 const campaignsData = [
-  { id: "g1", title: "Placement Produit - Skincare Bio", company: "GreenGlow Beauty", logo: "GG", category: "Beauté", budget: { min: 2500, max: 4000, currency: "€" }, location: "Paris, France", timeline: "2 semaines", description: "Placement de nos produits skincare bio dans vos contenus quotidiens. Nous recherchons des influenceurs beauté pour intégrer naturellement nos produits.", requirements: ["25K+ followers sur Instagram", "Engagement rate > 4%", "Audience féminine 18-35 ans", "Contenu beauté régulier"], platforms: ["Instagram", "TikTok"], contentTypes: ["Placement produit"], deliverables: 8, followers: { min: 25000, platform: "Instagram" }, deadline: "2024-02-15", applicants: 47, tags: ["Bio", "Skincare", "Naturel"], featured: true, verified: true, type: "general" },
-  { id: "g2", title: "Ambassadeur de Marque - Mode", company: "StyleHub", logo: "SH", category: "Mode", budget: { min: 3500, max: 6000, currency: "€" }, location: "Lyon, France", timeline: "6 mois", description: "Nous recherchons un ambassadeur de marque pour représenter StyleHub sur le long terme. Contrat de 6 mois renouvelable avec avantages exclusifs.", requirements: ["30K+ followers", "Style mode affirmé", "Engagement élevé", "Disponible pour événements"], platforms: ["Instagram", "TikTok"], contentTypes: ["Ambassadeur"], deliverables: 24, followers: { min: 30000, platform: "Instagram" }, deadline: "2024-02-20", applicants: 32, tags: ["Mode", "Ambassadeur", "Long terme"], verified: true, type: "general" },
-  { id: "g3", title: "Campagne de Notoriété - Lancement App", company: "TechNova", logo: "TN", category: "Tech", budget: { min: 4000, max: 7000, currency: "€" }, location: "À distance", timeline: "1 mois", description: "Campagne de notoriété pour le lancement de notre nouvelle application mobile. Objectif : générer du buzz et accroître la visibilité de la marque.", requirements: ["50K+ followers", "Audience tech-savvy", "Fort taux d'engagement", "Capacité de créer du viral"], platforms: ["YouTube", "Instagram", "TikTok"], contentTypes: ["Notoriété"], deliverables: 10, followers: { min: 50000, platform: "Instagram" }, deadline: "2024-03-01", applicants: 28, tags: ["Tech", "Lancement", "Notoriété"], featured: true, type: "general" },
-  { id: "g4", title: "Collaboration One-Shot - Sneakers", company: "UrbanKicks", logo: "UK", category: "Mode", budget: { min: 1500, max: 2500, currency: "€" }, location: "Paris, France", timeline: "1 semaine", description: "Collaboration ponctuelle pour promouvoir notre nouvelle collection de sneakers limitée. Contrat one-shot avec livraison rapide.", requirements: ["20K+ followers", "Style streetwear", "Audience 16-30 ans"], platforms: ["Instagram", "TikTok"], contentTypes: ["One-shot"], deliverables: 3, followers: { min: 20000, platform: "Instagram" }, deadline: "2024-02-10", applicants: 65, tags: ["Sneakers", "Streetwear", "Limité"], urgent: true, verified: true, type: "general" },
-  { id: "g5", title: "Placement Produit - Compléments Alimentaires", company: "VitalBoost", logo: "VB", category: "Sport", budget: { min: 2000, max: 3500, currency: "€" }, location: "À distance", timeline: "3 semaines", description: "Intégration naturelle de nos compléments alimentaires dans vos routines fitness et nutrition.", requirements: ["15K+ followers", "Contenu sport/wellness", "Crédibilité santé"], platforms: ["Instagram", "YouTube"], contentTypes: ["Placement produit"], deliverables: 6, followers: { min: 15000, platform: "Instagram" }, deadline: "2024-02-25", applicants: 41, tags: ["Sport", "Nutrition", "Wellness"], verified: true, type: "general" },
-  { id: "g6", title: "One-Shot Événement - Festival Mode", company: "ParisStyleWeek", logo: "PSW", category: "Mode", budget: { min: 3000, max: 4500, currency: "€" }, location: "Paris, France", timeline: "3 jours", description: "Couverture one-shot de notre festival de mode. Présence sur place requise pour créer du contenu en temps réel.", requirements: ["40K+ followers", "Expérience événements", "Disponibilité 15-17 mars", "Basé à Paris ou mobilité"], platforms: ["Instagram", "TikTok"], contentTypes: ["One-shot"], deliverables: 15, followers: { min: 40000, platform: "Instagram" }, deadline: "2024-03-10", applicants: 22, tags: ["Événement", "Mode", "Festival"], featured: true, verified: true, type: "general" },
-  { id: "a1", title: "Programme Affiliation - Fitness", company: "FitLife Pro", logo: "FL", category: "Sport", commission: 15, budget: { min: 0, max: 0, currency: "€" }, location: "En ligne", timeline: "Programme continu", description: "Rejoignez notre programme d'affiliation et gagnez 15% de commission sur chaque vente générée via votre code promo unique.", requirements: ["5K+ followers", "Contenu sport/fitness", "Engagement actif"], platforms: ["Instagram", "TikTok", "YouTube"], contentTypes: ["Post", "Story", "Video"], deliverables: 0, followers: { min: 5000, platform: "Instagram" }, deadline: "Programme permanent", applicants: 156, tags: ["Affiliation", "Fitness", "Commission"], type: "affiliation" },
-  { id: "a2", title: "Affiliation Beauté - Cosmétiques", company: "BeautyBox", logo: "BB", category: "Beauté", commission: 20, budget: { min: 0, max: 0, currency: "€" }, location: "En ligne", timeline: "Programme continu", description: "Programme d'affiliation beauté avec 20% de commission. Recevez des produits gratuits et générez des revenus passifs.", requirements: ["10K+ followers", "Contenu beauté", "Audience engagée"], platforms: ["Instagram", "TikTok"], contentTypes: ["Post", "Story", "Reel"], deliverables: 0, followers: { min: 10000, platform: "Instagram" }, deadline: "Programme permanent", applicants: 203, tags: ["Affiliation", "Beauté", "Cosmétiques"], type: "affiliation" },
-  { id: "a3", title: "Affiliation Mode - E-commerce", company: "TrendyWear", logo: "TW", category: "Mode", commission: 12, budget: { min: 0, max: 0, currency: "€" }, location: "En ligne", timeline: "Programme continu", description: "Gagnez 12% sur chaque vente + bonus mensuels selon vos performances. Code promo exclusif inclus.", requirements: ["8K+ followers", "Style mode", "Publications régulières"], platforms: ["Instagram", "TikTok"], contentTypes: ["Post", "Story"], deliverables: 0, followers: { min: 8000, platform: "Instagram" }, deadline: "Programme permanent", applicants: 178, tags: ["Affiliation", "Mode", "E-commerce"], type: "affiliation" },
-  { id: "t1", title: "Campagne Exclusive Luxe", company: "Prestige Parfums", logo: "PP", category: "Beauté", budget: { min: 5000, max: 8000, currency: "€" }, location: "Paris, France", timeline: "1 mois", description: "Campagne exclusive pour notre nouvelle ligne de parfums de luxe. Vous avez été sélectionné(e) en fonction de votre profil et de votre audience.", requirements: ["50K+ followers", "Audience premium", "Taux d'engagement > 5%", "Historique collaborations luxe"], platforms: ["Instagram"], contentTypes: ["Post", "Story", "Reel"], deliverables: 10, followers: { min: 50000, platform: "Instagram" }, deadline: "2024-02-25", applicants: 12, tags: ["Luxe", "Beauté", "Exclusif"], featured: true, urgent: true, verified: true, type: "targeted", matchScore: 96 },
-  { id: "t2", title: "Ambassadeur Tech - Gaming", company: "GamersHub", logo: "GH", category: "Tech", budget: { min: 4000, max: 7000, currency: "€" }, location: "À distance", timeline: "6 mois", description: "Nous vous avons identifié comme ambassadeur potentiel pour notre marque gaming. Partenariat long terme avec avantages exclusifs.", requirements: ["30K+ followers", "Contenu gaming régulier", "Audience 16-30 ans", "Streaming actif"], platforms: ["YouTube", "Instagram", "Twitter"], contentTypes: ["Video", "Post", "Story"], deliverables: 15, followers: { min: 30000, platform: "YouTube" }, deadline: "2024-03-10", applicants: 8, tags: ["Gaming", "Tech", "Long terme"], verified: true, type: "targeted", matchScore: 92 },
-  { id: "t3", title: "Campagne Lifestyle Premium", company: "LifeLux", logo: "LL", category: "Lifestyle", budget: { min: 3500, max: 6000, currency: "€" }, location: "Multiple", timeline: "2 mois", description: "Votre profil correspond parfaitement à notre recherche d'influenceur lifestyle premium. Campagne multi-plateforme avec voyages inclus.", requirements: ["40K+ followers", "Contenu lifestyle haut de gamme", "Audience internationale", "Disponibilité voyages"], platforms: ["Instagram", "YouTube"], contentTypes: ["Post", "Story", "Video"], deliverables: 12, followers: { min: 40000, platform: "Instagram" }, deadline: "2024-02-28", applicants: 15, tags: ["Lifestyle", "Premium", "Voyage"], featured: true, verified: true, type: "targeted", matchScore: 89 },
+  { id: "4b47f5ff-4abe-475f-b75b-dfdb4d132537", title: "Placement Produit - Skincare Bio", company: "GreenGlow Beauty", logo: "GG", category: "Beauté", budget: { min: 2500, max: 4000, currency: "€" }, location: "Paris, France", timeline: "2 semaines", description: "Placement de nos produits skincare bio dans vos contenus quotidiens. Nous recherchons des influenceurs beauté pour intégrer naturellement nos produits.", requirements: ["25K+ followers sur Instagram", "Engagement rate > 4%", "Audience féminine 18-35 ans", "Contenu beauté régulier"], platforms: ["Instagram", "TikTok"], contentTypes: ["Placement produit"], deliverables: 8, followers: { min: 25000, platform: "Instagram" }, deadline: "2024-02-15", applicants: 47, tags: ["Bio", "Skincare", "Naturel"], featured: true, verified: true, type: "general" },
+  { id: "5c55d390-cff2-41dd-9753-729986ad47fa", title: "Ambassadeur de Marque - Mode", company: "StyleHub", logo: "SH", category: "Mode", budget: { min: 3500, max: 6000, currency: "€" }, location: "Lyon, France", timeline: "6 mois", description: "Nous recherchons un ambassadeur de marque pour représenter StyleHub sur le long terme. Contrat de 6 mois renouvelable avec avantages exclusifs.", requirements: ["30K+ followers", "Style mode affirmé", "Engagement élevé", "Disponible pour événements"], platforms: ["Instagram", "TikTok"], contentTypes: ["Ambassadeur"], deliverables: 24, followers: { min: 30000, platform: "Instagram" }, deadline: "2024-02-20", applicants: 32, tags: ["Mode", "Ambassadeur", "Long terme"], verified: true, type: "general" },
+  { id: "2da8f38a-dbc7-4104-b4a9-753e43959818", title: "Campagne de Notoriété - Lancement App", company: "TechNova", logo: "TN", category: "Tech", budget: { min: 4000, max: 7000, currency: "€" }, location: "À distance", timeline: "1 mois", description: "Campagne de notoriété pour le lancement de notre nouvelle application mobile. Objectif : générer du buzz et accroître la visibilité de la marque.", requirements: ["50K+ followers", "Audience tech-savvy", "Fort taux d'engagement", "Capacité de créer du viral"], platforms: ["YouTube", "Instagram", "TikTok"], contentTypes: ["Notoriété"], deliverables: 10, followers: { min: 50000, platform: "Instagram" }, deadline: "2024-03-01", applicants: 28, tags: ["Tech", "Lancement", "Notoriété"], featured: true, type: "general" },
+  { id: "a380061d-5f06-486f-885a-441ae4a4d20d", title: "Collaboration One-Shot - Sneakers", company: "UrbanKicks", logo: "UK", category: "Mode", budget: { min: 1500, max: 2500, currency: "€" }, location: "Paris, France", timeline: "1 semaine", description: "Collaboration ponctuelle pour promouvoir notre nouvelle collection de sneakers limitée. Contrat one-shot avec livraison rapide.", requirements: ["20K+ followers", "Style streetwear", "Audience 16-30 ans"], platforms: ["Instagram", "TikTok"], contentTypes: ["One-shot"], deliverables: 3, followers: { min: 20000, platform: "Instagram" }, deadline: "2024-02-10", applicants: 65, tags: ["Sneakers", "Streetwear", "Limité"], urgent: true, verified: true, type: "general" },
+  { id: "57b67733-310c-4a51-b6fe-fe9ad9472300", title: "Placement Produit - Compléments Alimentaires", company: "VitalBoost", logo: "VB", category: "Sport", budget: { min: 2000, max: 3500, currency: "€" }, location: "À distance", timeline: "3 semaines", description: "Intégration naturelle de nos compléments alimentaires dans vos routines fitness et nutrition.", requirements: ["15K+ followers", "Contenu sport/wellness", "Crédibilité santé"], platforms: ["Instagram", "YouTube"], contentTypes: ["Placement produit"], deliverables: 6, followers: { min: 15000, platform: "Instagram" }, deadline: "2024-02-25", applicants: 41, tags: ["Sport", "Nutrition", "Wellness"], verified: true, type: "general" },
+  { id: "700785b7-5699-4b45-9330-f53ae74151c7", title: "One-Shot Événement - Festival Mode", company: "ParisStyleWeek", logo: "PSW", category: "Mode", budget: { min: 3000, max: 4500, currency: "€" }, location: "Paris, France", timeline: "3 jours", description: "Couverture one-shot de notre festival de mode. Présence sur place requise pour créer du contenu en temps réel.", requirements: ["40K+ followers", "Expérience événements", "Disponibilité 15-17 mars", "Basé à Paris ou mobilité"], platforms: ["Instagram", "TikTok"], contentTypes: ["One-shot"], deliverables: 15, followers: { min: 40000, platform: "Instagram" }, deadline: "2024-03-10", applicants: 22, tags: ["Événement", "Mode", "Festival"], featured: true, verified: true, type: "general" },
+  { id: "cfbf99ce-3cae-4da1-a401-f0daaf91fec7", title: "Programme Affiliation - Fitness", company: "FitLife Pro", logo: "FL", category: "Sport", commission: 15, budget: { min: 0, max: 0, currency: "€" }, location: "En ligne", timeline: "Programme continu", description: "Rejoignez notre programme d'affiliation et gagnez 15% de commission sur chaque vente générée via votre code promo unique.", requirements: ["5K+ followers", "Contenu sport/fitness", "Engagement actif"], platforms: ["Instagram", "TikTok", "YouTube"], contentTypes: ["Post", "Story", "Video"], deliverables: 0, followers: { min: 5000, platform: "Instagram" }, deadline: "Programme permanent", applicants: 156, tags: ["Affiliation", "Fitness", "Commission"], type: "affiliation" },
+  { id: "57f467f1-ad41-4047-8baa-5451cae15473", title: "Affiliation Beauté - Cosmétiques", company: "BeautyBox", logo: "BB", category: "Beauté", commission: 20, budget: { min: 0, max: 0, currency: "€" }, location: "En ligne", timeline: "Programme continu", description: "Programme d'affiliation beauté avec 20% de commission. Recevez des produits gratuits et générez des revenus passifs.", requirements: ["10K+ followers", "Contenu beauté", "Audience engagée"], platforms: ["Instagram", "TikTok"], contentTypes: ["Post", "Story", "Reel"], deliverables: 0, followers: { min: 10000, platform: "Instagram" }, deadline: "Programme permanent", applicants: 203, tags: ["Affiliation", "Beauté", "Cosmétiques"], type: "affiliation" },
+  { id: "1223cf6e-7519-465f-831a-bcc24bb515a7", title: "Affiliation Mode - E-commerce", company: "TrendyWear", logo: "TW", category: "Mode", commission: 12, budget: { min: 0, max: 0, currency: "€" }, location: "En ligne", timeline: "Programme continu", description: "Gagnez 12% sur chaque vente + bonus mensuels selon vos performances. Code promo exclusif inclus.", requirements: ["8K+ followers", "Style mode", "Publications régulières"], platforms: ["Instagram", "TikTok"], contentTypes: ["Post", "Story"], deliverables: 0, followers: { min: 8000, platform: "Instagram" }, deadline: "Programme permanent", applicants: 178, tags: ["Affiliation", "Mode", "E-commerce"], type: "affiliation" },
+  { id: "30b265f9-40e8-44ee-ab7e-b8f59b31e1f5", title: "Campagne Exclusive Luxe", company: "Prestige Parfums", logo: "PP", category: "Beauté", budget: { min: 5000, max: 8000, currency: "€" }, location: "Paris, France", timeline: "1 mois", description: "Campagne exclusive pour notre nouvelle ligne de parfums de luxe. Vous avez été sélectionné(e) en fonction de votre profil et de votre audience.", requirements: ["50K+ followers", "Audience premium", "Taux d'engagement > 5%", "Historique collaborations luxe"], platforms: ["Instagram"], contentTypes: ["Post", "Story", "Reel"], deliverables: 10, followers: { min: 50000, platform: "Instagram" }, deadline: "2024-02-25", applicants: 12, tags: ["Luxe", "Beauté", "Exclusif"], featured: true, urgent: true, verified: true, type: "targeted", matchScore: 96 },
+  { id: "05cbffdd-726e-47df-b326-1368c9d971d8", title: "Ambassadeur Tech - Gaming", company: "GamersHub", logo: "GH", category: "Tech", budget: { min: 4000, max: 7000, currency: "€" }, location: "À distance", timeline: "6 mois", description: "Nous vous avons identifié comme ambassadeur potentiel pour notre marque gaming. Partenariat long terme avec avantages exclusifs.", requirements: ["30K+ followers", "Contenu gaming régulier", "Audience 16-30 ans", "Streaming actif"], platforms: ["YouTube", "Instagram", "Twitter"], contentTypes: ["Video", "Post", "Story"], deliverables: 15, followers: { min: 30000, platform: "YouTube" }, deadline: "2024-03-10", applicants: 8, tags: ["Gaming", "Tech", "Long terme"], verified: true, type: "targeted", matchScore: 92 },
+  { id: "af66a54b-9c84-4510-a8b1-ea46cba4d211", title: "Campagne Lifestyle Premium", company: "LifeLux", logo: "LL", category: "Lifestyle", budget: { min: 3500, max: 6000, currency: "€" }, location: "Multiple", timeline: "2 mois", description: "Votre profil correspond parfaitement à notre recherche d'influenceur lifestyle premium. Campagne multi-plateforme avec voyages inclus.", requirements: ["40K+ followers", "Contenu lifestyle haut de gamme", "Audience internationale", "Disponibilité voyages"], platforms: ["Instagram", "YouTube"], contentTypes: ["Post", "Story", "Video"], deliverables: 12, followers: { min: 40000, platform: "Instagram" }, deadline: "2024-02-28", applicants: 15, tags: ["Lifestyle", "Premium", "Voyage"], featured: true, verified: true, type: "targeted", matchScore: 89 },
 ]
 
 export default function OpportunitesSection() {
@@ -75,54 +75,50 @@ export default function OpportunitesSection() {
     setIsSheetOpen(true)
   }
 
-const handleApply = async () => {
-  if (!selectedCampaign) return
-  try {
-    motivationSchema.parse({ motivation: motivationMessage })
+  const handleApply = async () => {
+    if (!selectedCampaign) return
+    try {
+      motivationSchema.parse({ motivation: motivationMessage })
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { toast.error("Vous devez être connecté"); return }
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { toast.error("Vous devez être connecté"); return }
 
-    // Récupérer l'id influenceur depuis la table influencers
-    const { data: influencer, error: infError } = await supabase
-      .from('influencers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
+      const { data: influencer } = await supabase
+        .from('influencers')
+        .select('id')
+        .eq('user_id', user.id)
+        .single()
 
-    if (infError || !influencer) {
-      toast.error("Profil influenceur introuvable")
-      return
+      if (!influencer) { toast.error("Profil influenceur introuvable"); return }
+
+      const { error } = await supabase.from('applications').insert({
+        influencer_id: influencer.id,
+        campaign_id: selectedCampaign.id,
+        brand_id: '46f965ec-479f-4777-af26-c8f23aca149e',
+        cover_letter: `[${selectedCampaign.title}] ${motivationMessage}`,
+        status: 'pending',
+        applied_at: new Date().toISOString(),
+      })
+
+      if (error) {
+        if (error.code === '23505') {
+          toast.error("Vous avez déjà postulé à cette campagne !")
+          setIsSheetOpen(false)
+        } else {
+          toast.error("Erreur lors de l'envoi")
+          console.error(error)
+        }
+        return
+      }
+
+      toast.success(`Candidature pour "${selectedCampaign.title}" envoyée !`)
+      setMotivationMessage("")
+      setSelectedCampaign(null)
+      setIsSheetOpen(false)
+    } catch (error) {
+      if (error instanceof z.ZodError) toast.error(error.errors[0].message)
     }
-
-    const { error } = await supabase.from('applications').insert({
-      influencer_id: influencer.id,
-      campaign_id: 'fdcf0caa-1dfa-4461-a1d9-302df8cc5b00',
-      brand_id: '46f965ec-479f-4777-af26-c8f23aca149e',
-      cover_letter: `[${selectedCampaign.title}] ${motivationMessage}`,
-      status: 'pending',
-      applied_at: new Date().toISOString(),
-    })
-
-    if (error) {
-  if (error.code === '23505') {
-    toast.error("Vous avez déjà postulé à cette campagne !")
-    setIsSheetOpen(false)
-  } else {
-    toast.error("Erreur lors de l'envoi")
-    console.error(error)
   }
-  return
-}
-
-    toast.success(`Candidature pour "${selectedCampaign.title}" envoyée !`)
-    setMotivationMessage("")
-    setSelectedCampaign(null)
-    setIsSheetOpen(false)
-  } catch (error) {
-    if (error instanceof z.ZodError) toast.error(error.errors[0].message)
-  }
-}
 
   const getPlatformIcon = (platform) => {
     switch (platform) {
@@ -139,9 +135,7 @@ const handleApply = async () => {
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <Avatar className="h-12 w-12">
-              <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white font-bold">
-                {campaign.logo}
-              </AvatarFallback>
+              <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white font-bold">{campaign.logo}</AvatarFallback>
             </Avatar>
             <div>
               <CardTitle className="text-lg group-hover:text-primary transition-colors">{campaign.title}</CardTitle>
@@ -179,10 +173,7 @@ const handleApply = async () => {
         {campaign.matchScore && (
           <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-lg">
             <Brain className="h-5 w-5 text-primary" />
-            <div className="flex-1">
-              <p className="text-sm font-medium">Compatibilité IA</p>
-              <p className="text-xs text-muted-foreground">{campaign.matchScore}% de match</p>
-            </div>
+            <div className="flex-1"><p className="text-sm font-medium">Compatibilité IA</p><p className="text-xs text-muted-foreground">{campaign.matchScore}% de match</p></div>
             <Badge className="bg-primary text-white">{campaign.matchScore}%</Badge>
           </div>
         )}
@@ -199,7 +190,7 @@ const handleApply = async () => {
       <div>
         <div className="flex items-center gap-3 mb-2">
           <h1 className="text-3xl font-bold text-foreground">Opportunités</h1>
-          <Badge variant="outline" className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 border-purple-400 text-white shadow-lg hover:shadow-xl transition-shadow">
+          <Badge variant="outline" className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 border-purple-400 text-white shadow-lg">
             <Brain className="h-4 w-4 text-white" /><span className="text-sm font-semibold">IA activé</span>
           </Badge>
         </div>
@@ -274,11 +265,11 @@ const handleApply = async () => {
               <TabsTrigger value="notoriete" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-600 data-[state=active]:to-indigo-700 data-[state=active]:text-white data-[state=active]:shadow-lg hover:scale-[1.02] transition-all duration-300 rounded-xl border-2 border-border/50 bg-card h-auto py-3 px-4">Notoriété</TabsTrigger>
               <TabsTrigger value="oneshot" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-indigo-600 data-[state=active]:to-indigo-800 data-[state=active]:text-white data-[state=active]:shadow-lg hover:scale-[1.02] transition-all duration-300 rounded-xl border-2 border-border/50 bg-card h-auto py-3 px-4">One-shot</TabsTrigger>
             </TabsList>
-            <TabsContent value="all" className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{filterCampaigns("general").map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)}</div></TabsContent>
-            <TabsContent value="placement" className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{filterCampaigns("general").filter(c => c.contentTypes.includes("Placement produit")).map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)}</div></TabsContent>
-            <TabsContent value="ambassadeur" className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{filterCampaigns("general").filter(c => c.contentTypes.includes("Ambassadeur")).map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)}</div></TabsContent>
-            <TabsContent value="notoriete" className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{filterCampaigns("general").filter(c => c.contentTypes.includes("Notoriété")).map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)}</div></TabsContent>
-            <TabsContent value="oneshot" className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{filterCampaigns("general").filter(c => c.contentTypes.includes("One-shot")).map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)}</div></TabsContent>
+            <TabsContent value="all"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{filterCampaigns("general").map((c) => <CampaignCard key={c.id} campaign={c} />)}</div></TabsContent>
+            <TabsContent value="placement"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{filterCampaigns("general").filter(c => c.contentTypes.includes("Placement produit")).map((c) => <CampaignCard key={c.id} campaign={c} />)}</div></TabsContent>
+            <TabsContent value="ambassadeur"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{filterCampaigns("general").filter(c => c.contentTypes.includes("Ambassadeur")).map((c) => <CampaignCard key={c.id} campaign={c} />)}</div></TabsContent>
+            <TabsContent value="notoriete"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{filterCampaigns("general").filter(c => c.contentTypes.includes("Notoriété")).map((c) => <CampaignCard key={c.id} campaign={c} />)}</div></TabsContent>
+            <TabsContent value="oneshot"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{filterCampaigns("general").filter(c => c.contentTypes.includes("One-shot")).map((c) => <CampaignCard key={c.id} campaign={c} />)}</div></TabsContent>
           </Tabs>
         </TabsContent>
 
@@ -290,7 +281,7 @@ const handleApply = async () => {
             </CardHeader>
           </Card>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filterCampaigns("affiliation").map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)}
+            {filterCampaigns("affiliation").map((c) => <CampaignCard key={c.id} campaign={c} />)}
           </div>
         </TabsContent>
       </Tabs>
@@ -304,29 +295,19 @@ const handleApply = async () => {
                 <SheetDescription>{selectedCampaign.company}</SheetDescription>
               </SheetHeader>
               <div className="px-4 pb-6 space-y-6 mt-6">
-                <div>
-                  <h3 className="font-semibold mb-2">Description de la campagne</h3>
-                  <p className="text-sm text-muted-foreground">{selectedCampaign.description}</p>
-                </div>
+                <div><h3 className="font-semibold mb-2">Description de la campagne</h3><p className="text-sm text-muted-foreground">{selectedCampaign.description}</p></div>
                 <div>
                   <h3 className="font-semibold mb-2">Critères requis</h3>
                   <ul className="space-y-1">
                     {selectedCampaign.requirements.map((req, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" /><span>{req}</span>
-                      </li>
+                      <li key={i} className="flex items-start gap-2 text-sm"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" /><span>{req}</span></li>
                     ))}
                   </ul>
                 </div>
                 <div>
                   <h3 className="font-semibold mb-2">Détails</h3>
                   <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Budget</p>
-                      {selectedCampaign.type === "affiliation"
-                        ? <p className="font-semibold text-green-600">{selectedCampaign.commission}% commission</p>
-                        : <p className="font-semibold">{selectedCampaign.budget.min.toLocaleString()} - {selectedCampaign.budget.max.toLocaleString()} {selectedCampaign.budget.currency}</p>}
-                    </div>
+                    <div><p className="text-muted-foreground">Budget</p>{selectedCampaign.type === "affiliation" ? <p className="font-semibold text-green-600">{selectedCampaign.commission}% commission</p> : <p className="font-semibold">{selectedCampaign.budget.min.toLocaleString()} - {selectedCampaign.budget.max.toLocaleString()} {selectedCampaign.budget.currency}</p>}</div>
                     <div><p className="text-muted-foreground">Livrables</p><p className="font-semibold">{selectedCampaign.deliverables || "Variable"} contenus</p></div>
                     <div><p className="text-muted-foreground">Deadline</p><p className="font-semibold">{selectedCampaign.deadline}</p></div>
                     <div><p className="text-muted-foreground">Localisation</p><p className="font-semibold">{selectedCampaign.location}</p></div>
@@ -342,9 +323,7 @@ const handleApply = async () => {
                 </div>
                 <div>
                   <h3 className="font-semibold mb-2">Types de contenu</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedCampaign.contentTypes.map((type) => <Badge key={type} variant="secondary">{type}</Badge>)}
-                  </div>
+                  <div className="flex flex-wrap gap-2">{selectedCampaign.contentTypes.map((type) => <Badge key={type} variant="secondary">{type}</Badge>)}</div>
                 </div>
                 <Separator />
                 <div className="space-y-2">
@@ -352,11 +331,9 @@ const handleApply = async () => {
                   <Textarea id="motivation" placeholder="Expliquez pourquoi vous êtes le/la meilleur(e) candidat(e) pour cette campagne (minimum 50 caractères)..." value={motivationMessage} onChange={(e) => setMotivationMessage(e.target.value)} rows={6} maxLength={1000} className="resize-none" />
                   <p className="text-xs text-muted-foreground">{motivationMessage.length} / 1000 caractères (minimum 50)</p>
                 </div>
-                <div className="flex gap-3">
-                  <Button className="flex-1" onClick={handleApply} disabled={motivationMessage.trim().length < 50 || motivationMessage.length > 1000}>
-                    <Send className="h-4 w-4 mr-2" />Postuler
-                  </Button>
-                </div>
+                <Button className="w-full" onClick={handleApply} disabled={motivationMessage.trim().length < 50 || motivationMessage.length > 1000}>
+                  <Send className="h-4 w-4 mr-2" />Postuler
+                </Button>
               </div>
             </>
           )}
