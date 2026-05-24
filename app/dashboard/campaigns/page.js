@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import supabase from '@/lib/supabase'
+import { usePlan } from '@/lib/hook/usePlan'
 
 export default function Campaigns() {
   const router = useRouter()
@@ -15,6 +16,8 @@ export default function Campaigns() {
   const [selectedCampaign, setSelectedCampaign] = useState('')
   const [iaLoading, setIaLoading] = useState(false)
   const [iaAnalyzed, setIaAnalyzed] = useState(false)
+
+  const { plan, canAccess, canCreateCampaign, loading: planLoading } = usePlan()
 
   const [form, setForm] = useState({
     audience: '', categories: [], name: '', type: '', objectives: [],
@@ -43,6 +46,7 @@ export default function Campaigns() {
   const progress = ((step - 1) / 6) * 100
 
   const handleCreate = async () => {
+    if (!canCreateCampaign()) return
     setLoading(true)
     try {
       const { data: brand } = await supabase.from('brands').select('id').eq('user_id', profile?.id).single()
@@ -102,7 +106,12 @@ export default function Campaigns() {
       <div style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.4rem' }}>
           <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#1a202c', margin: 0 }}>Gestion des campagnes</h1>
-          <span style={{ background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.7rem', borderRadius: '100px' }}>⓪ IA Activée</span>
+          <span style={{ background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.7rem', borderRadius: '100px' }}>IA Activée</span>
+          {!planLoading && (
+            <span style={{ background: plan === 'trial' ? '#fef9c3' : plan === 'growth' ? '#dcfce7' : '#dbeafe', color: plan === 'trial' ? '#854d0e' : plan === 'growth' ? '#15803d' : '#1d4ed8', fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.7rem', borderRadius: '100px', textTransform: 'uppercase' }}>
+              Plan {plan}
+            </span>
+          )}
         </div>
         <p style={{ color: '#718096', margin: 0, fontSize: '0.875rem' }}>Créez et gérez vos campagnes marketing avec intelligence</p>
       </div>
@@ -110,19 +119,26 @@ export default function Campaigns() {
       {/* MAIN TABS */}
       <div style={{ display: 'flex', gap: '0', marginBottom: '2rem', background: '#fff', borderRadius: '12px', padding: '0.4rem', boxShadow: '0 1px 8px rgba(0,0,0,0.05)', width: 'fit-content' }}>
         {[
-          { id: 'create', icon: '✨', label: 'Créer une campagne', activeColor: '#22c55e' },
-          { id: 'recruit', icon: '⏱', label: 'Recrutement', activeColor: '#f97316' },
-          { id: 'suivi', icon: '📊', label: 'Suivi des opérations', activeColor: '#3b82f6' },
-          { id: 'ugc', icon: '👥', label: 'Créateurs UGC', activeColor: '#a855f7' },
+          { id: 'create', icon: '✨', label: 'Créer une campagne', activeColor: '#22c55e', locked: false },
+          { id: 'recruit', icon: '⏱', label: 'Recrutement', activeColor: '#f97316', locked: false },
+          { id: 'suivi', icon: '📊', label: 'Suivi des opérations', activeColor: '#3b82f6', locked: false },
+          { id: 'ugc', icon: '👥', label: 'Créateurs UGC', activeColor: '#a855f7', locked: !canAccess('matching_optimise') },
         ].map(tab => (
-          <button key={tab.id} onClick={() => { setMainTab(tab.id); setStep(1); setSuccess(false) }} style={{
-            padding: '0.65rem 1.4rem', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          <button key={tab.id} onClick={() => {
+            if (tab.locked) return
+            setMainTab(tab.id); setStep(1); setSuccess(false)
+          }} style={{
+            padding: '0.65rem 1.4rem', border: 'none',
+            cursor: tab.locked ? 'not-allowed' : 'pointer',
+            fontFamily: 'inherit',
             fontSize: '0.85rem', fontWeight: mainTab === tab.id ? 700 : 400,
             background: mainTab === tab.id ? tab.activeColor : 'transparent',
-            color: mainTab === tab.id ? '#fff' : '#718096',
+            color: mainTab === tab.id ? '#fff' : tab.locked ? '#cbd5e0' : '#718096',
             borderRadius: '8px', transition: 'all 0.2s',
+            opacity: tab.locked ? 0.6 : 1,
           }}>
-            {tab.icon} {tab.label}
+            {tab.locked ? '🔒' : tab.icon} {tab.label}
+            {tab.locked && <span style={{ fontSize: '0.65rem', display: 'block', color: '#a0aec0' }}>Growth+</span>}
           </button>
         ))}
       </div>
@@ -130,6 +146,22 @@ export default function Campaigns() {
       {/* =================== CREATE CAMPAIGN =================== */}
       {mainTab === 'create' && !success && (
         <div>
+          {/* BANNER TRIAL */}
+          {plan === 'trial' && (
+            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '12px', padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                <div>
+                  <div style={{ fontWeight: 700, color: '#c2410c', fontSize: '0.875rem' }}>Plan Trial — 1 campagne gratuite</div>
+                  <div style={{ color: '#9a3412', fontSize: '0.78rem' }}>Passez à Growth pour créer des campagnes illimitées</div>
+                </div>
+              </div>
+              <a href="/pricing" style={{ padding: '0.5rem 1rem', background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none' }}>
+                Passer à Growth
+              </a>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1a202c', margin: 0 }}>Créer une nouvelle campagne</h2>
             <span style={{ fontSize: '0.82rem', color: '#718096', background: '#f0f0f0', padding: '0.3rem 0.8rem', borderRadius: '100px' }}>Étape {step} sur 7</span>
@@ -337,11 +369,37 @@ export default function Campaigns() {
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem' }}>
-            <button onClick={() => step > 1 ? setStep(s => s - 1) : null} style={{ padding: '0.7rem 1.5rem', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', color: '#718096', fontWeight: 500 }}>← Précédent</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', gap: '1rem' }}>
+            <button onClick={() => step > 1 ? setStep(s => s - 1) : null} style={{ padding: '0.7rem 1.5rem', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', color: '#718096', fontWeight: 500 }}>
+              Precedent
+            </button>
+
             {step < 7
-              ? <button onClick={() => setStep(s => s + 1)} style={{ padding: '0.7rem 1.75rem', background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', fontWeight: 700 }}>Suivant →</button>
-              : <button onClick={handleCreate} disabled={loading} style={{ padding: '0.7rem 1.75rem', background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', fontWeight: 700, opacity: loading ? 0.7 : 1 }}>{loading ? 'Création...' : '✨ Créer la campagne'}</button>
+              ? <button onClick={() => setStep(s => s + 1)} style={{ padding: '0.7rem 1.75rem', background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', fontWeight: 700 }}>Suivant</button>
+              : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.75rem' }}>
+                  {!canCreateCampaign() && (
+                    <div style={{ padding: '0.75rem 1rem', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '10px', fontSize: '0.82rem', color: '#c2410c', fontWeight: 500 }}>
+                      🔒 Limite Trial atteinte (1 campagne max). <a href="/pricing" style={{ color: '#a855f7', fontWeight: 700 }}>Passer à Growth</a>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleCreate}
+                    disabled={loading || !canCreateCampaign()}
+                    style={{
+                      padding: '0.7rem 1.75rem',
+                      background: canCreateCampaign() ? 'linear-gradient(135deg,#22c55e,#16a34a)' : '#e2e8f0',
+                      color: canCreateCampaign() ? '#fff' : '#a0aec0',
+                      border: 'none', borderRadius: '10px',
+                      cursor: canCreateCampaign() ? 'pointer' : 'not-allowed',
+                      fontFamily: 'inherit', fontSize: '0.875rem', fontWeight: 700,
+                      opacity: loading ? 0.7 : 1
+                    }}
+                  >
+                    {loading ? 'Création...' : '✨ Créer la campagne'}
+                  </button>
+                </div>
+              )
             }
           </div>
         </div>
@@ -352,14 +410,16 @@ export default function Campaigns() {
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
           <div style={{ ...card, maxWidth: '600px', width: '100%', textAlign: 'center' }}>
             <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg,#22c55e,#16a34a)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', fontSize: '2rem' }}>✅</div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#22c55e', marginBottom: '1.5rem' }}>🚀 Campagne créée avec succès !</h2>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#22c55e', marginBottom: '1.5rem' }}>Campagne créée avec succès !</h2>
             <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '14px', padding: '1.5rem', marginBottom: '2rem' }}>
               <p style={{ color: '#4a5568', margin: '0 0 0.5rem' }}>Votre campagne <strong>"{form.name}"</strong> a été envoyée à</p>
               <div style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1a202c' }}>1 626 influenceurs</div>
               <p style={{ color: '#718096', margin: '0.25rem 0 0', fontSize: '0.875rem' }}>correspondant à vos critères</p>
             </div>
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-              <button onClick={() => { setSuccess(false); setStep(1) }} style={{ padding: '0.8rem 1.5rem', background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', fontWeight: 700 }}>Créer une nouvelle campagne</button>
+              {canCreateCampaign() && (
+                <button onClick={() => { setSuccess(false); setStep(1) }} style={{ padding: '0.8rem 1.5rem', background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', fontWeight: 700 }}>Créer une nouvelle campagne</button>
+              )}
               <button onClick={() => setMainTab('recruit')} style={{ padding: '0.8rem 1.5rem', background: '#fff', color: '#718096', border: '1.5px solid #e2e8f0', borderRadius: '10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem' }}>Voir mes campagnes</button>
             </div>
           </div>
@@ -408,12 +468,12 @@ export default function Campaigns() {
                   <span style={{ background: c.status === 'Accepté' ? '#dcfce7' : '#fef9c3', color: c.status === 'Accepté' ? '#16a34a' : '#854d0e', fontSize: '0.72rem', fontWeight: 600, padding: '0.25rem 0.6rem', borderRadius: '6px' }}>{c.status}</span>
                   {c.status === 'En attente' && (
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button style={{ padding: '0.4rem 0.9rem', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>✓ Accepter la candidature</button>
+                      <button style={{ padding: '0.4rem 0.9rem', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>✓ Accepter</button>
                       <button style={{ padding: '0.4rem 0.9rem', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>✕ Refuser</button>
-                      <button style={{ padding: '0.4rem 0.9rem', background: '#fff', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}>👁 Voir le profil complet</button>
+                      <button style={{ padding: '0.4rem 0.9rem', background: '#fff', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}>👁 Profil</button>
                     </div>
                   )}
-                  {c.status === 'Accepté' && <button style={{ padding: '0.4rem 0.9rem', background: '#fff', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}>👁 Voir le profil complet</button>}
+                  {c.status === 'Accepté' && <button style={{ padding: '0.4rem 0.9rem', background: '#fff', color: '#718096', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}>👁 Profil</button>}
                 </div>
               ))}
             </div>
@@ -437,7 +497,7 @@ export default function Campaigns() {
                 <div key={i} style={{ padding: '0.85rem 1.5rem', borderBottom: i === 0 ? '1px solid #f0f0f0' : 'none', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr', gap: '1rem', alignItems: 'center', fontSize: '0.875rem' }}>
                   <span style={{ fontWeight: 500 }}>{row.name}</span><span style={{ color: '#718096' }}>{row.amount}</span><span style={{ color: '#718096' }}>{row.deliverables}</span><span style={{ color: '#718096' }}>{row.date}</span>
                   <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.6rem', borderRadius: '6px', width: 'fit-content' }}>✅ Complet</span>
-                  <button style={{ padding: '0.4rem 0.8rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit', color: '#718096' }}>👁 Voir le contrat</button>
+                  <button style={{ padding: '0.4rem 0.8rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit', color: '#718096' }}>👁 Contrat</button>
                 </div>
               ))}
             </div>
@@ -462,10 +522,10 @@ export default function Campaigns() {
                 <div key={i} style={{ padding: '0.85rem 1.5rem', borderBottom: i === 0 ? '1px solid #f0f0f0' : 'none', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr', gap: '1rem', alignItems: 'center', fontSize: '0.875rem' }}>
                   <span style={{ fontWeight: 500 }}>{row.name}</span>
                   <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.6rem', borderRadius: '6px', width: 'fit-content' }}>✨ Affiliation</span>
-                  <span style={{ color: '#718096' }}>% {row.commission}</span>
+                  <span style={{ color: '#718096' }}>{row.commission}</span>
                   <span style={{ color: '#a0aec0' }}>—</span>
                   <span style={{ background: '#f4f4f5', color: '#71717a', fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.6rem', borderRadius: '6px', width: 'fit-content' }}>🔒 Non activé</span>
-                  <button style={{ padding: '0.4rem 0.8rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit', color: '#718096' }}>👁 Voir dans Gestion Financière</button>
+                  <button style={{ padding: '0.4rem 0.8rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit', color: '#718096' }}>👁 Finance</button>
                 </div>
               ))}
             </div>
@@ -487,13 +547,13 @@ export default function Campaigns() {
                       <button onClick={() => navigator.clipboard.writeText(camp.link)} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.3rem 0.6rem', cursor: 'pointer', fontSize: '0.75rem', color: '#718096' }}>📋</button>
                     </div>
                     <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
-                      <button style={{ flex: 1, padding: '0.6rem', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.82rem', color: '#718096' }}>📱 Afficher le QR Code</button>
-                      <button style={{ flex: 1, padding: '0.6rem', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.82rem', color: '#718096' }}>🔄 Régénérer le lien</button>
+                      <button style={{ flex: 1, padding: '0.6rem', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.82rem', color: '#718096' }}>📱 QR Code</button>
+                      <button style={{ flex: 1, padding: '0.6rem', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.82rem', color: '#718096' }}>🔄 Régénérer</button>
                     </div>
                     <div style={{ padding: '0.75rem', background: '#f8f9fa', borderRadius: '10px' }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.82rem', color: '#1a202c', marginBottom: '0.5rem' }}>📊 Statistiques du lien</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.82rem', color: '#1a202c', marginBottom: '0.5rem' }}>📊 Statistiques</div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                        {[['→ Vues', camp.visits], ['→ Candidatures', camp.candidates], ['→ Taux de conversion', camp.rate]].map(([label, val]) => (
+                        {[['Vues', camp.visits], ['Candidatures', camp.candidates], ['Conversion', camp.rate]].map(([label, val]) => (
                           <div key={label}><div style={{ fontSize: '0.7rem', color: '#a0aec0' }}>{label}</div><div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#1a202c' }}>{val}</div></div>
                         ))}
                       </div>
@@ -530,18 +590,15 @@ export default function Campaigns() {
             </div>
           ) : (
             <div>
-              {/* KPIs */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-                {[['Influenceurs actifs', '12', '↑ +2', '#a855f7'], ['Portée totale', '2.4M', '↑ +18%', '#22c55e'], ['Taux d\'engagement', '6.8%', '↑ +1.2%', '#3b82f6'], ['ROI estimé', '287%', '↑ +45%', '#f59e0b']].map(([label, val, delta, color]) => (
+                {[['Influenceurs actifs', '12', '+2', '#a855f7'], ['Portée totale', '2.4M', '+18%', '#22c55e'], ["Taux d'engagement", '6.8%', '+1.2%', '#3b82f6'], ['ROI estimé', '287%', '+45%', '#f59e0b']].map(([label, val, delta, color]) => (
                   <div key={label} style={{ background: '#fff', borderRadius: '14px', padding: '1.25rem', border: '1px solid #f0f0f0', boxShadow: '0 1px 8px rgba(0,0,0,0.04)' }}>
                     <div style={{ fontSize: '0.78rem', color: '#a0aec0', marginBottom: '0.4rem' }}>{label}</div>
                     <div style={{ fontSize: '1.7rem', fontWeight: 800, color: '#1a202c', marginBottom: '0.3rem' }}>{val}</div>
-                    <span style={{ background: `${color}18`, color, fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.5rem', borderRadius: '6px' }}>{delta}</span>
+                    <span style={{ background: `${color}18`, color, fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.5rem', borderRadius: '6px' }}>+{delta}</span>
                   </div>
                 ))}
               </div>
-
-              {/* Influenceurs */}
               <div style={{ ...card }}>
                 <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1a202c', marginBottom: '1rem' }}>👥 Influenceurs de la campagne</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr', gap: '1rem', padding: '0.5rem 0', borderBottom: '1px solid #f0f0f0', fontSize: '0.78rem', color: '#a0aec0', fontWeight: 600 }}>
@@ -554,7 +611,7 @@ export default function Campaigns() {
                     <span style={{ color: '#718096' }}>{inf.livrables}</span>
                     <span style={{ color: '#718096' }}>{inf.reach}</span>
                     <span style={{ color: '#22c55e', fontWeight: 600 }}>{inf.engagement}</span>
-                    <button style={{ padding: '0.35rem 0.7rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit', color: '#718096' }}>Voir détails</button>
+                    <button style={{ padding: '0.35rem 0.7rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit', color: '#718096' }}>Détails</button>
                   </div>
                 ))}
               </div>
@@ -566,7 +623,6 @@ export default function Campaigns() {
       {/* =================== CRÉATEURS UGC =================== */}
       {mainTab === 'ugc' && (
         <div>
-          {/* Métriques UGC */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
             {[['Créateurs Actifs', '1,247', '👥', '#ede9fe'], ['Contenus ce mois', '12,341', '▶', '#dbeafe'], ['Engagement Moyen', '7.2%', '❤️', '#dcfce7'], ['ROI Moyen', '342%', '📈', '#fef9c3']].map(([label, val, icon, bg]) => (
               <div key={label} style={{ background: '#fff', borderRadius: '14px', padding: '1.25rem', border: '1px solid #f0f0f0', boxShadow: '0 1px 8px rgba(0,0,0,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -576,25 +632,21 @@ export default function Campaigns() {
             ))}
           </div>
 
-          {/* Sous-onglets UGC */}
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', background: '#fff', padding: '0.4rem', borderRadius: '12px', width: 'fit-content', boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
-            {[{ id: 'feed', label: '⊞ Feed UGC' }, { id: 'analyse', label: '⓪ Analyse IA' }, { id: 'preselection', label: '🔖 Présélection' }].map(tab => (
+            {[{ id: 'feed', label: 'Feed UGC' }, { id: 'analyse', label: 'Analyse IA' }, { id: 'preselection', label: 'Présélection' }].map(tab => (
               <button key={tab.id} onClick={() => setUgcTab(tab.id)} style={{ padding: '0.55rem 1.1rem', borderRadius: '8px', border: 'none', cursor: 'pointer', background: ugcTab === tab.id ? 'linear-gradient(135deg,#a855f7,#ec4899)' : 'transparent', color: ugcTab === tab.id ? '#fff' : '#718096', fontSize: '0.82rem', fontWeight: ugcTab === tab.id ? 600 : 400, fontFamily: 'inherit' }}>
                 {tab.label}
               </button>
             ))}
           </div>
 
-          {/* FEED UGC */}
           {ugcTab === 'feed' && (
             <div>
-              {/* Filtres */}
-              <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                {['Contenu', 'Sélection des critères', 'Toutes catégories', 'Tous formats', 'Trier'].map((f, i) => (
+              <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                {['Contenu', 'Critères', 'Catégories', 'Formats', 'Trier'].map(f => (
                   <button key={f} style={{ padding: '0.5rem 1rem', border: '1.5px solid #e2e8f0', borderRadius: '8px', background: '#fff', color: '#718096', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}>{f}</button>
                 ))}
               </div>
-              {/* Grille masonry */}
               <div style={{ columns: '3', columnGap: '1rem' }}>
                 {ugcCreators.map((creator, i) => (
                   <div key={i} style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', border: '1px solid #f0f0f0', marginBottom: '1rem', breakInside: 'avoid', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
@@ -609,7 +661,7 @@ export default function Campaigns() {
                         <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: creator.gradient }} />
                         <div>
                           <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1a202c' }}>@{creator.name} ✓</div>
-                          <div style={{ fontSize: '0.68rem', color: '#a0aec0' }}>{creator.niche} · {creator.engagement} engagement</div>
+                          <div style={{ fontSize: '0.68rem', color: '#a0aec0' }}>{creator.niche} · {creator.engagement}</div>
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
@@ -628,23 +680,14 @@ export default function Campaigns() {
                   </div>
                 ))}
               </div>
-              <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-                <button style={{ padding: '0.75rem 2rem', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', color: '#718096', fontWeight: 500 }}>Charger plus de contenu</button>
-              </div>
             </div>
           )}
 
-          {/* ANALYSE IA */}
           {ugcTab === 'analyse' && (
             <div style={card}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
-                <span style={{ color: '#a855f7', fontSize: '1.2rem' }}>💡</span>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1a202c', margin: 0 }}>Analyse IA</h3>
-              </div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1a202c', marginBottom: '0.4rem' }}>💡 Analyse IA</h3>
               <p style={{ fontSize: '0.875rem', color: '#718096', marginBottom: '2rem' }}>Décrivez ce que vous recherchez et laissez notre IA trouver les créateurs UGC parfaits</p>
-
               <div style={{ marginBottom: '1.25rem' }}>
-                <div style={{ fontWeight: 600, color: '#1a202c', marginBottom: '1rem' }}>Décrivez vos besoins</div>
                 <label style={lbl}>Audience cible</label>
                 <input value={form.iaAudience} onChange={e => set('iaAudience', e.target.value)} placeholder="Ex: Femmes 25-35 ans, passionnées de mode, urbaines..." style={inp} />
               </div>
@@ -652,36 +695,21 @@ export default function Campaigns() {
                 <label style={lbl}>Type de contenu souhaité</label>
                 <select value={form.iaContentType} onChange={e => set('iaContentType', e.target.value)} style={{ ...inp, background: '#fff' }}>
                   <option value="">Choisir un type</option>
-                  <option>Vidéo lifestyle</option>
-                  <option>Photo produit</option>
-                  <option>Tutoriel</option>
-                  <option>Unboxing</option>
-                  <option>Review</option>
+                  <option>Vidéo lifestyle</option><option>Photo produit</option><option>Tutoriel</option><option>Unboxing</option><option>Review</option>
                 </select>
               </div>
               <div style={{ marginBottom: '1.25rem' }}>
                 <label style={lbl}>Valeurs de votre marque</label>
-                <textarea value={form.iaValues} onChange={e => set('iaValues', e.target.value)} placeholder="Décrivez les valeurs importantes pour votre marque..." rows={4} style={{ ...inp, resize: 'vertical' }} />
+                <textarea value={form.iaValues} onChange={e => set('iaValues', e.target.value)} placeholder="Décrivez les valeurs importantes..." rows={4} style={{ ...inp, resize: 'vertical' }} />
               </div>
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={lbl}>Type d'analyse</label>
                 <select value={form.iaAnalysisType} onChange={e => set('iaAnalysisType', e.target.value)} style={{ ...inp, background: '#fff' }}>
-                  <option value="matching">Matching Parfait...</option>
+                  <option value="matching">Matching Parfait</option>
                   <option value="predictive">Analyse Prédictive</option>
                   <option value="roi">Optimisation ROI</option>
                 </select>
               </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                {[{ icon: '👁', title: 'Analyse Prédictive', desc: 'ROI et performance estimés' }, { icon: '🎯', title: 'Matching Intelligent', desc: 'Créateurs alignés avec vos besoins' }].map(item => (
-                  <div key={item.title} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: '#a855f7' }}>{item.icon}</div>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#1a202c' }}>{item.title}</div>
-                    <div style={{ fontSize: '0.78rem', color: '#718096' }}>{item.desc}</div>
-                  </div>
-                ))}
-              </div>
-
               {iaAnalyzed && (
                 <div style={{ background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.5rem' }}>
                   <div style={{ fontWeight: 700, color: '#a855f7', marginBottom: '0.75rem' }}>✨ Résultats de l'analyse IA</div>
@@ -695,25 +723,20 @@ export default function Campaigns() {
                   </div>
                 </div>
               )}
-
-              <button onClick={handleIaAnalysis} disabled={iaLoading} style={{ width: '100%', padding: '1rem', background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '1rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', opacity: iaLoading ? 0.7 : 1 }}>
+              <button onClick={handleIaAnalysis} disabled={iaLoading} style={{ width: '100%', padding: '1rem', background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '1rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: iaLoading ? 0.7 : 1 }}>
                 {iaLoading ? '⏳ Analyse en cours...' : '✨ Lancer l\'Analyse IA'}
               </button>
             </div>
           )}
 
-          {/* PRÉSÉLECTION */}
           {ugcTab === 'preselection' && (
             <div style={card}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                <span>🔖</span>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1a202c', margin: 0 }}>Créateurs Présélectionnés</h3>
-              </div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1a202c', marginBottom: '0.4rem' }}>🔖 Créateurs Présélectionnés</h3>
               <p style={{ fontSize: '0.875rem', color: '#718096', marginBottom: '2rem' }}>0 créateur(s) dans votre présélection</p>
               <div style={{ textAlign: 'center', padding: '3rem' }}>
                 <div style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.3 }}>🔖</div>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#a0aec0', marginBottom: '0.5rem' }}>Aucun créateur présélectionné</h3>
-                <p style={{ color: '#cbd5e0', marginBottom: '1.5rem' }}>Explorez les créateurs et ajoutez vos favoris à votre présélection</p>
+                <p style={{ color: '#cbd5e0', marginBottom: '1.5rem' }}>Explorez les créateurs et ajoutez vos favoris</p>
                 <button onClick={() => setUgcTab('feed')} style={{ padding: '0.75rem 1.75rem', background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', fontWeight: 600 }}>Découvrir des créateurs</button>
               </div>
             </div>
