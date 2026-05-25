@@ -8,8 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useState } from 'react'
-import { Search, DollarSign, Users, Target, Briefcase, Eye, TrendingUp, Globe, MessageCircle, Phone, FileText, Download, Brain, Crown, Award, Zap, AlertCircle, CheckCircle, Mail, BookOpen } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Search, DollarSign, Users, Target, Briefcase, Eye, TrendingUp, Globe, MessageCircle, Phone, FileText, Download, Brain, Crown, Award, Zap, AlertCircle, CheckCircle, Mail, BookOpen, Lock } from 'lucide-react'
 import { toast } from 'sonner'
+import { useUserLevel } from '@/lib/hook/useUserLevel'
 
 const YoutubeIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58a2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/></svg>
 const Wand2 = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 4-1 1"/><path d="m4 15 1-1"/><path d="m8.5 8.5-5 13 13-5-8-8Z"/><path d="m12 12 4.5 4.5"/></svg>
@@ -26,7 +28,6 @@ const Smartphone = ({ className }) => <svg className={className} viewBox="0 0 24
 const Palette = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
 const Video = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect width="15" height="14" x="1" y="5" rx="2" ry="2"/></svg>
 
-// Template download links (à remplacer plus tard par de vrais liens)
 const TEMPLATE_LINKS = {
   "Template Post Instagram": "https://partnexx.fr/templates/instagram-post.zip",
   "Stories Templates Pack": "https://partnexx.fr/templates/stories-pack.zip",
@@ -36,7 +37,6 @@ const TEMPLATE_LINKS = {
   "Calendrier Éditorial": "https://partnexx.fr/templates/calendrier-editorial.zip",
 }
 
-// Guide links (à remplacer plus tard)
 const GUIDE_LINKS = {
   "Guide Complet Instagram 2024": "https://partnexx.fr/guides/instagram-2024",
   "Monétiser avec TikTok": "https://partnexx.fr/guides/monetiser-tiktok",
@@ -48,20 +48,43 @@ const GUIDE_LINKS = {
   "Community Management": "https://partnexx.fr/guides/community-management",
 }
 
+/* ============================================================
+   OUTILS IA — Avec niveau requis pour chaque outil
+   ============================================================
+   bronze   = débloqué dès profil 100% (3 outils)
+   argent   = 200 pts (3 outils en plus)
+   or       = 500 pts (3 outils en plus)
+   platine  = 1000 pts (3 outils en plus = tous)
+   ============================================================ */
 const aiTools = [
-  { title: "Générateur de Captions IA", description: "Créez des légendes engageantes optimisées pour chaque plateforme", icon: Wand2, color: "from-purple-500 to-pink-500", features: ["Multilingue", "Émojis intelligents", "Hashtags suggérés"], isPremium: false, prompt: "Génère 3 captions Instagram engageantes pour un influenceur lifestyle. Inclus des émojis et 5 hashtags pertinents pour chaque caption. Format: Caption 1: [texte]\nHashtags: [hashtags]" },
-  { title: "Recherche Hashtags Intelligente", description: "Trouvez les hashtags les plus performants selon votre niche", icon: Hash, color: "from-blue-500 to-cyan-500", features: ["Analyse tendances", "Score popularité", "Éviter shadowban"], isPremium: false, prompt: "Génère une liste de 20 hashtags performants pour un influenceur lifestyle/mode en France. Classe-les par catégorie: Populaires (1M+), Moyens (100K-1M), Niche (<100K). Explique pourquoi chaque groupe est utile." },
-  { title: "Analyseur de Tendances", description: "Découvrez les sujets viraux en temps réel", icon: Target, color: "from-orange-500 to-red-500", features: ["Alertes temps réel", "Analyse prédictive", "Multi-plateformes"], isPremium: true, prompt: "Analyse les tendances actuelles sur Instagram et TikTok pour les influenceurs lifestyle en France. Donne 5 tendances avec: le sujet, pourquoi c'est viral, comment l'adapter, et le format idéal." },
-  { title: "Générateur d'Idées Contenu", description: "Des suggestions personnalisées basées sur vos statistiques", icon: Lightbulb, color: "from-yellow-500 to-orange-500", features: ["Calendrier éditorial", "Formats variés", "Suggestions saison"], isPremium: false, prompt: "Génère 10 idées de contenu créatif pour un influenceur lifestyle sur Instagram et TikTok. Pour chaque idée: titre accrocheur, format recommandé (reel/post/story/carrousel), description courte, et pourquoi ça va performer." },
-  { title: "Optimiseur d'Images IA", description: "Conseils pour améliorer vos visuels automatiquement", icon: ImageIcon, color: "from-green-500 to-emerald-500", features: ["Multi-formats", "Composition", "Filtres IA"], isPremium: false, prompt: "Donne 10 conseils professionnels pour optimiser les photos Instagram d'un influenceur lifestyle. Couvre: composition, lumière, couleurs, retouche, et cohérence du feed." },
-  { title: "Générateur Scripts Vidéo", description: "Scripts personnalisés pour TikTok, Reels et Shorts", icon: Video, color: "from-pink-500 to-rose-500", features: ["Templates prêts", "Hooks accrocheurs", "CTA optimisés"], isPremium: true, prompt: "Écris un script complet pour une vidéo TikTok/Reel de 60 secondes sur le thème 'Ma routine matinale'. Structure: Hook (0-3s), Développement (3-50s), CTA (50-60s). Inclus les indications de timing et les transitions." },
-  { title: "Assistant Planification Stories", description: "Planifiez et créez des stories captivantes avec IA", icon: Smartphone, color: "from-indigo-500 to-purple-500", features: ["Stickers suggérés", "Meilleur timing", "CTA intelligents"], isPremium: false, prompt: "Crée un plan de 7 stories Instagram pour une semaine pour un influenceur lifestyle. Pour chaque jour: heure optimale, type de story, contenu suggéré, stickers recommandés, et CTA." },
-  { title: "Analyseur d'Audience", description: "Comprenez votre audience et adaptez votre contenu", icon: Users, color: "from-teal-500 to-cyan-500", features: ["Démographie", "Comportements", "Préférences contenu"], isPremium: true, prompt: "Analyse le profil type d'audience d'un influenceur lifestyle français avec 50K followers sur Instagram. Donne: démographie, centres d'intérêt, heures d'activité, types de contenu préférés, et recommandations." },
-  { title: "Générateur de Bio Instagram", description: "Créez une bio percutante qui convertit", icon: FileText, color: "from-violet-500 to-fuchsia-500", features: ["Call-to-action", "Emojis optimisés", "Mots-clés SEO"], isPremium: false, prompt: "Génère 3 versions de bio Instagram pour un influenceur lifestyle/mode français. Chaque bio doit: faire max 150 caractères, inclure des emojis, un CTA clair, et les mots-clés importants. Explique le choix de chaque version." },
-  { title: "Traducteur Multilingue", description: "Traduisez votre contenu pour toucher une audience internationale", icon: Globe, color: "from-sky-500 to-blue-500", features: ["30+ langues", "Ton adapté", "Contexte culturel"], isPremium: false, prompt: "Traduis ce message en anglais, espagnol et allemand en adaptant le ton pour chaque culture: 'Bonjour à tous ! Nouvelle vidéo disponible sur ma chaîne YouTube. N'oubliez pas de vous abonner et d'activer les notifications ! 🔔✨'" },
-  { title: "Générateur de Réponses", description: "Répondez à vos commentaires avec l'aide de l'IA", icon: MessageCircle, color: "from-emerald-500 to-teal-500", features: ["Ton personnalisé", "Réponses rapides", "Engagement optimisé"], isPremium: false, prompt: "Génère 10 réponses types pour les commentaires les plus fréquents d'un influenceur lifestyle: commentaires positifs, questions sur les produits, demandes de collaboration, commentaires négatifs, et emojis. Ton: chaleureux et authentique." },
-  { title: "Palette de Couleurs IA", description: "Trouvez la palette parfaite pour votre marque", icon: Palette, color: "from-rose-500 to-pink-500", features: ["Harmonies couleurs", "Accessibilité", "Export formats"], isPremium: true, prompt: "Propose 3 palettes de couleurs pour un influenceur lifestyle/mode sur Instagram. Pour chaque palette: 5 couleurs avec codes HEX, nom de la palette, mood/ambiance, et conseils d'utilisation pour les posts, stories et highlights." },
+  // 🥉 BRONZE — Outils créatifs basiques
+  { title: "Générateur de Bio Instagram", description: "Créez une bio percutante qui convertit", icon: FileText, color: "from-violet-500 to-fuchsia-500", features: ["Call-to-action", "Emojis optimisés", "Mots-clés SEO"], requiredLevel: 'bronze', prompt: "Génère 3 versions de bio Instagram pour un influenceur lifestyle/mode français. Chaque bio doit: faire max 150 caractères, inclure des emojis, un CTA clair, et les mots-clés importants. Explique le choix de chaque version." },
+  { title: "Palette de Couleurs IA", description: "Trouvez la palette parfaite pour votre marque", icon: Palette, color: "from-rose-500 to-pink-500", features: ["Harmonies couleurs", "Accessibilité", "Export formats"], requiredLevel: 'bronze', prompt: "Propose 3 palettes de couleurs pour un influenceur lifestyle/mode sur Instagram. Pour chaque palette: 5 couleurs avec codes HEX, nom de la palette, mood/ambiance, et conseils d'utilisation pour les posts, stories et highlights." },
+  { title: "Générateur d'Idées Contenu", description: "Des suggestions personnalisées basées sur vos statistiques", icon: Lightbulb, color: "from-yellow-500 to-orange-500", features: ["Calendrier éditorial", "Formats variés", "Suggestions saison"], requiredLevel: 'bronze', prompt: "Génère 10 idées de contenu créatif pour un influenceur lifestyle sur Instagram et TikTok. Pour chaque idée: titre accrocheur, format recommandé (reel/post/story/carrousel), description courte, et pourquoi ça va performer." },
+
+  // 🥈 ARGENT — Optimisation engagement
+  { title: "Générateur de Captions IA", description: "Créez des légendes engageantes optimisées pour chaque plateforme", icon: Wand2, color: "from-purple-500 to-pink-500", features: ["Multilingue", "Émojis intelligents", "Hashtags suggérés"], requiredLevel: 'argent', prompt: "Génère 3 captions Instagram engageantes pour un influenceur lifestyle. Inclus des émojis et 5 hashtags pertinents pour chaque caption. Format: Caption 1: [texte]\nHashtags: [hashtags]" },
+  { title: "Recherche Hashtags Intelligente", description: "Trouvez les hashtags les plus performants selon votre niche", icon: Hash, color: "from-blue-500 to-cyan-500", features: ["Analyse tendances", "Score popularité", "Éviter shadowban"], requiredLevel: 'argent', prompt: "Génère une liste de 20 hashtags performants pour un influenceur lifestyle/mode en France. Classe-les par catégorie: Populaires (1M+), Moyens (100K-1M), Niche (<100K). Explique pourquoi chaque groupe est utile." },
+  { title: "Générateur de Réponses", description: "Répondez à vos commentaires avec l'aide de l'IA", icon: MessageCircle, color: "from-emerald-500 to-teal-500", features: ["Ton personnalisé", "Réponses rapides", "Engagement optimisé"], requiredLevel: 'argent', prompt: "Génère 10 réponses types pour les commentaires les plus fréquents d'un influenceur lifestyle: commentaires positifs, questions sur les produits, demandes de collaboration, commentaires négatifs, et emojis. Ton: chaleureux et authentique." },
+
+  // 🥇 OR — Production avancée
+  { title: "Générateur Scripts Vidéo", description: "Scripts personnalisés pour TikTok, Reels et Shorts", icon: Video, color: "from-pink-500 to-rose-500", features: ["Templates prêts", "Hooks accrocheurs", "CTA optimisés"], requiredLevel: 'or', prompt: "Écris un script complet pour une vidéo TikTok/Reel de 60 secondes sur le thème 'Ma routine matinale'. Structure: Hook (0-3s), Développement (3-50s), CTA (50-60s). Inclus les indications de timing et les transitions." },
+  { title: "Assistant Planification Stories", description: "Planifiez et créez des stories captivantes avec IA", icon: Smartphone, color: "from-indigo-500 to-purple-500", features: ["Stickers suggérés", "Meilleur timing", "CTA intelligents"], requiredLevel: 'or', prompt: "Crée un plan de 7 stories Instagram pour une semaine pour un influenceur lifestyle. Pour chaque jour: heure optimale, type de story, contenu suggéré, stickers recommandés, et CTA." },
+  { title: "Traducteur Multilingue", description: "Traduisez votre contenu pour toucher une audience internationale", icon: Globe, color: "from-sky-500 to-blue-500", features: ["30+ langues", "Ton adapté", "Contexte culturel"], requiredLevel: 'or', prompt: "Traduis ce message en anglais, espagnol et allemand en adaptant le ton pour chaque culture: 'Bonjour à tous ! Nouvelle vidéo disponible sur ma chaîne YouTube. N'oubliez pas de vous abonner et d'activer les notifications ! 🔔✨'" },
+
+  // 💠 PLATINE — Stratégie premium
+  { title: "Optimiseur d'Images IA", description: "Conseils pour améliorer vos visuels automatiquement", icon: ImageIcon, color: "from-green-500 to-emerald-500", features: ["Multi-formats", "Composition", "Filtres IA"], requiredLevel: 'platine', prompt: "Donne 10 conseils professionnels pour optimiser les photos Instagram d'un influenceur lifestyle. Couvre: composition, lumière, couleurs, retouche, et cohérence du feed." },
+  { title: "Analyseur de Tendances", description: "Découvrez les sujets viraux en temps réel", icon: Target, color: "from-orange-500 to-red-500", features: ["Alertes temps réel", "Analyse prédictive", "Multi-plateformes"], requiredLevel: 'platine', prompt: "Analyse les tendances actuelles sur Instagram et TikTok pour les influenceurs lifestyle en France. Donne 5 tendances avec: le sujet, pourquoi c'est viral, comment l'adapter, et le format idéal." },
+  { title: "Analyseur d'Audience", description: "Comprenez votre audience et adaptez votre contenu", icon: Users, color: "from-teal-500 to-cyan-500", features: ["Démographie", "Comportements", "Préférences contenu"], requiredLevel: 'platine', prompt: "Analyse le profil type d'audience d'un influenceur lifestyle français avec 50K followers sur Instagram. Donne: démographie, centres d'intérêt, heures d'activité, types de contenu préférés, et recommandations." },
 ]
+
+// Métadonnées d'affichage par niveau (badge sur les outils verrouillés)
+const LEVEL_BADGES = {
+  bronze: { label: 'Bronze', emoji: '🥉', threshold: 0, gradient: 'from-orange-400 to-amber-600' },
+  argent: { label: 'Argent', emoji: '🥈', threshold: 200, gradient: 'from-slate-400 to-slate-600' },
+  or: { label: 'Or', emoji: '🥇', threshold: 500, gradient: 'from-yellow-400 to-amber-500' },
+  platine: { label: 'Platine', emoji: '💠', threshold: 1000, gradient: 'from-cyan-400 to-sky-500' },
+}
 
 const templates = [
   { title: "Template Post Instagram", description: "Designs professionnels pour vos posts Instagram", gradient: "from-pink-500 to-purple-500", icon: "📸", category: "Social Media", downloads: "2.4K" },
@@ -95,13 +118,19 @@ const faqs = [
     { question: "Comment se passe le paiement ?", answer: "Une fois la collaboration terminée et validée par la marque, le paiement est effectué sous 7 à 14 jours ouvrés via virement bancaire ou PayPal." },
   ]},
   { category: "Outils & Premium", questions: [
-    { question: "Quels outils IA sont gratuits sur Partnexx ?", answer: "La plupart des outils IA de base sont gratuits : générateur de captions, recherche de hashtags, générateur d'idées, optimiseur d'images. Les outils avancés sont réservés aux membres Premium." },
-    { question: "Quelle est la différence entre gratuit et Premium ?", answer: "Le plan gratuit donne accès aux opportunités basiques et outils essentiels. Premium débloque : opportunités exclusives, outils IA avancés, statistiques détaillées, support prioritaire et badge vérifié." },
-    { question: "Y a-t-il des réductions pour les étudiants ?", answer: "Oui ! Les étudiants bénéficient de 50% de réduction sur l'abonnement Premium. Contactez le support avec votre carte étudiante pour obtenir votre code promo." },
+    { question: "Quels outils IA sont gratuits sur Partnexx ?", answer: "Les outils IA Partnexx se débloquent progressivement avec votre niveau : 3 outils dès Bronze (profil complété à 100%), puis 3 outils en plus à chaque palier (Argent, Or, Platine). Au niveau Platine, vous avez accès à TOUS les outils IA Partnexx." },
+    { question: "Comment monter de niveau plus rapidement ?", answer: "Pour monter de niveau, complétez votre profil à 100%, relevez les défis quotidiens/hebdomadaires/mensuels, et participez à des collaborations. Chaque action vous fait gagner des points qui font évoluer votre Partnexx Score." },
+    { question: "Y a-t-il des réductions pour les étudiants ?", answer: "Oui ! Les étudiants bénéficient d'avantages spéciaux. Contactez le support avec votre carte étudiante pour en savoir plus." },
   ]},
 ]
 
-export default function RessourcesSection() {
+/* ============================================================
+   COMPOSANT PRINCIPAL
+   ============================================================ */
+export default function RessourcesSection({ user }) {
+  const router = useRouter()
+  const { level, currentLevelIndex, allLevels, isProfileComplete, score } = useUserLevel(user?.id)
+
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTool, setActiveTool] = useState(null)
   const [toolInput, setToolInput] = useState("")
@@ -112,6 +141,16 @@ export default function RessourcesSection() {
     item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.description.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  /* Helper : un outil est-il débloqué pour le niveau actuel ? */
+  const isToolUnlocked = (tool) => {
+    if (!isProfileComplete) return false
+    const requiredLevelIndex = allLevels.findIndex(l => l.key === tool.requiredLevel)
+    return currentLevelIndex >= requiredLevelIndex
+  }
+
+  /* Helper : compte les outils débloqués */
+  const unlockedToolsCount = aiTools.filter(isToolUnlocked).length
 
   const handleDownload = (title) => {
     const link = TEMPLATE_LINKS[title]
@@ -134,6 +173,12 @@ export default function RessourcesSection() {
   }
 
   const handleOpenTool = (tool) => {
+    // Sécurité : si l'outil est verrouillé, on n'ouvre pas
+    if (!isToolUnlocked(tool)) {
+      const badge = LEVEL_BADGES[tool.requiredLevel]
+      toast.error(`🔒 Outil verrouillé — Débloqué au niveau ${badge.label} (${badge.threshold} pts)`)
+      return
+    }
     setActiveTool(tool)
     setToolInput("")
     setToolResult("")
@@ -186,7 +231,7 @@ export default function RessourcesSection() {
         </div>
         <p className="text-muted-foreground mb-4">Outils IA • Templates Pro • Guides Complets</p>
         <div className="flex gap-4 flex-wrap">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Zap className="h-4 w-4 text-purple-600" /><span className="font-semibold text-foreground">12</span> Outils IA</div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Zap className="h-4 w-4 text-purple-600" /><span className="font-semibold text-foreground">{unlockedToolsCount}</span>/{aiTools.length} Outils IA débloqués</div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Layout className="h-4 w-4 text-blue-600" /><span className="font-semibold text-foreground">6</span> Templates prêts</div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><BookOpen className="h-4 w-4 text-pink-600" /><span className="font-semibold text-foreground">8</span> Guides</div>
         </div>
@@ -208,39 +253,109 @@ export default function RessourcesSection() {
           ))}
         </TabsList>
 
-        {/* OUTILS IA */}
+        {/* ============ OUTILS IA (avec locks) ============ */}
         <TabsContent value="outils" className="space-y-6">
+
+          {/* Bandeau info : profil incomplet */}
+          {!isProfileComplete && (
+            <Card className="bg-gradient-to-r from-orange-500/10 to-amber-500/10 border-orange-500/30">
+              <CardContent className="p-5 flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <Lock className="h-6 w-6 text-orange-600" />
+                  <div>
+                    <p className="font-bold text-orange-700">Outils IA verrouillés</p>
+                    <p className="text-sm text-muted-foreground">Complète ton profil à 100% pour débloquer les 3 premiers outils Bronze</p>
+                  </div>
+                </div>
+                <Button onClick={() => router.push('/dashboard/influencer?section=profil')} className="bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold">
+                  <Target className="h-4 w-4 mr-2" />Compléter mon profil
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Bandeau info : profil OK mais pas Platine */}
+          {isProfileComplete && unlockedToolsCount < aiTools.length && (
+            <Card className="bg-gradient-to-r from-primary/10 to-purple-500/10 border-primary/30">
+              <CardContent className="p-5 flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <Brain className="h-6 w-6 text-primary" />
+                  <div>
+                    <p className="font-semibold">
+                      <span className="text-primary">{unlockedToolsCount}/{aiTools.length}</span> outils IA débloqués
+                    </p>
+                    <p className="text-sm text-muted-foreground">Monte de niveau pour débloquer plus d&apos;outils — Platine débloque tout</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Grille des outils */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filterBySearch(aiTools).map((tool, index) => {
               const Icon = tool.icon
+              const unlocked = isToolUnlocked(tool)
+              const badge = LEVEL_BADGES[tool.requiredLevel]
+
               return (
-                <Card key={index} className="group relative overflow-hidden border-2 hover:border-primary transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer">
-                  <div className={`absolute inset-0 bg-gradient-to-br ${tool.color} opacity-0 group-hover:opacity-5 transition-opacity`} />
-                  <CardHeader className="relative">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className={`p-3 rounded-xl bg-gradient-to-br ${tool.color} shadow-lg`}><Icon className="h-6 w-6 text-white" /></div>
-                      {tool.isPremium && <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0"><Crown className="h-3 w-3 mr-1" />Premium</Badge>}
-                    </div>
-                    <CardTitle className="text-lg group-hover:text-primary transition-colors">{tool.title}</CardTitle>
-                    <p className="text-sm text-muted-foreground mt-2">{tool.description}</p>
-                  </CardHeader>
-                  <CardContent className="relative space-y-4">
-                    <div className="space-y-2">
-                      {tool.features.map((feature, i) => (
-                        <div key={i} className="flex items-center gap-2 text-sm"><CheckCircle className="h-4 w-4 text-green-600 shrink-0" /><span>{feature}</span></div>
-                      ))}
-                    </div>
-                    <Button className="w-full" onClick={() => handleOpenTool(tool)}>
-                      <Play className="h-4 w-4 mr-2" />Essayer maintenant
-                    </Button>
-                  </CardContent>
+                <Card
+                  key={index}
+                  className={`group relative overflow-hidden border-2 transition-all duration-300 ${unlocked ? 'hover:border-primary hover:shadow-xl hover:-translate-y-1 cursor-pointer' : 'cursor-not-allowed'}`}
+                  onClick={() => unlocked && handleOpenTool(tool)}
+                >
+                  {/* Effet flou + cadenas si verrouillé */}
+                  {!unlocked && (
+                    <>
+                      {/* Voile flouté qui couvre toute la carte */}
+                      <div className="absolute inset-0 z-20 backdrop-blur-md bg-background/40 flex flex-col items-center justify-center gap-3 p-4 text-center">
+                        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${badge.gradient} flex items-center justify-center shadow-lg`}>
+                          <Lock className="h-7 w-7 text-white" />
+                        </div>
+                        <Badge className={`bg-gradient-to-r ${badge.gradient} text-white border-0 shadow-lg`}>
+                          {badge.emoji} {badge.label}
+                        </Badge>
+                        <p className="text-sm font-semibold text-foreground">
+                          Débloqué au niveau {badge.label}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {badge.threshold > 0 ? `${badge.threshold} pts requis` : 'Profil 100% requis'}
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Contenu (flouté visuellement si verrouillé) */}
+                  <div className={!unlocked ? 'opacity-40' : ''}>
+                    <div className={`absolute inset-0 bg-gradient-to-br ${tool.color} opacity-0 group-hover:opacity-5 transition-opacity`} />
+                    <CardHeader className="relative">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className={`p-3 rounded-xl bg-gradient-to-br ${tool.color} shadow-lg`}><Icon className="h-6 w-6 text-white" /></div>
+                        <Badge className={`bg-gradient-to-r ${badge.gradient} text-white border-0`}>
+                          {badge.emoji} {badge.label}
+                        </Badge>
+                      </div>
+                      <CardTitle className="text-lg group-hover:text-primary transition-colors">{tool.title}</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-2">{tool.description}</p>
+                    </CardHeader>
+                    <CardContent className="relative space-y-4">
+                      <div className="space-y-2">
+                        {tool.features.map((feature, i) => (
+                          <div key={i} className="flex items-center gap-2 text-sm"><CheckCircle className="h-4 w-4 text-green-600 shrink-0" /><span>{feature}</span></div>
+                        ))}
+                      </div>
+                      <Button className="w-full" disabled={!unlocked}>
+                        <Play className="h-4 w-4 mr-2" />Essayer maintenant
+                      </Button>
+                    </CardContent>
+                  </div>
                 </Card>
               )
             })}
           </div>
         </TabsContent>
 
-        {/* TEMPLATES */}
+        {/* ============ TEMPLATES (libre pour tous) ============ */}
         <TabsContent value="templates" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filterBySearch(templates).map((template, index) => (
@@ -271,7 +386,7 @@ export default function RessourcesSection() {
           </div>
         </TabsContent>
 
-        {/* GUIDES */}
+        {/* ============ GUIDES (libre pour tous) ============ */}
         <TabsContent value="guides" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filterBySearch(guides).map((guide, index) => {
@@ -301,7 +416,7 @@ export default function RessourcesSection() {
           </div>
         </TabsContent>
 
-        {/* FAQ */}
+        {/* ============ FAQ (libre pour tous) ============ */}
         <TabsContent value="faq" className="space-y-6">
           <Card className="border-2 border-primary/20">
             <CardHeader>
