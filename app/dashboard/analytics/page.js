@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import supabase from '@/lib/supabase'
+import { usePlan } from '@/lib/hook/usePlan'
 
 export default function Analytics() {
   const router = useRouter()
@@ -12,6 +13,13 @@ export default function Analytics() {
   const [profile, setProfile] = useState(null)
   const [searchInfluenceur, setSearchInfluenceur] = useState('')
   const [tooltip, setTooltip] = useState(null)
+
+  const { plan, canAccess, loading: planLoading } = usePlan()
+
+  // true si le plan a accès aux analytics
+  const hasAnalytics = plan === 'growth' || plan === 'scale' || plan === 'enterprise'
+  // true si le plan a accès aux features IA
+  const hasIA = plan === 'scale' || plan === 'enterprise'
 
   useEffect(() => {
     const getUser = async () => {
@@ -24,6 +32,7 @@ export default function Analytics() {
   }, [])
 
   const handleExport = () => {
+    if (!hasAnalytics) return
     const data = `Analytics Partnexx - ${period}\nRevenus Totaux: €245,680\nROI Moyen: 420%\nConversions: 1,847\nTaux d'Engagement: 6.8%`
     const blob = new Blob([data], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
@@ -85,19 +94,11 @@ export default function Analytics() {
     inf.specialite.toLowerCase().includes(searchInfluenceur.toLowerCase())
   )
 
-  return (
-    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", background: '#f8f9ff', minHeight: '100vh', padding: '2rem' }}>
-      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-
-      {/* HEADER */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.3rem' }}>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#1a202c', margin: 0 }}>Analytics</h1>
-          <span style={{ background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.7rem', borderRadius: '100px' }}>⓪ IA Activée</span>
-        </div>
-        <p style={{ color: '#718096', margin: 0, fontSize: '0.875rem' }}>Analytics avancées • Insights intelligents • Rapports automatisés</p>
-      </div>
-
+  // ============================================================
+  // CONTENU PRINCIPAL (réutilisé pour le flou Trial aussi)
+  // ============================================================
+  const MainContent = () => (
+    <div>
       {/* ANALYTICS BUSINESS HEADER */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
         <div>
@@ -126,9 +127,7 @@ export default function Analytics() {
       {/* MÉTRIQUES */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
         {metrics.map((m, i) => (
-          <div key={i} style={{ ...card, background: m.bg, transition: 'transform .15s, box-shadow .15s', cursor: 'pointer' }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.08)' }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 6px rgba(0,0,0,0.04)' }}>
+          <div key={i} style={{ ...card, background: m.bg }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
               <div style={{ fontSize: '0.78rem', color: '#718096' }}>{m.label}</div>
               <span style={{ color: '#a0aec0', fontSize: '1rem' }}>{m.icon}</span>
@@ -160,25 +159,44 @@ export default function Analytics() {
       {/* ===== REVENUS ===== */}
       {tab === 'revenus' && (
         <div>
-          <div style={{ ...card, marginBottom: '1.5rem' }}>
-            <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '1.25rem' }}>💡 Innovation - Insights Revenus</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1rem' }}>
-              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '1.25rem' }}>
-                <div style={{ color: '#16a34a', fontWeight: 700, fontSize: '0.875rem', marginBottom: '0.5rem' }}>↗ Croissance Exceptionnelle</div>
-                <p style={{ fontSize: '0.82rem', color: '#4a5568', margin: '0 0 0.75rem', lineHeight: 1.5 }}>+43% de revenus vs trimestre précédent. Instagram drive 51% des conversions.</p>
-                <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 500 }}>Instagram +18% • TikTok +12% • YouTube +8%</div>
-              </div>
-              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '1.25rem' }}>
-                <div style={{ color: '#2563eb', fontWeight: 700, fontSize: '0.875rem', marginBottom: '0.5rem' }}>⊙ Optimisation Suggérée</div>
-                <p style={{ fontSize: '0.82rem', color: '#4a5568', margin: 0, lineHeight: 1.5 }}>Augmenter le budget TikTok de 25% pourrait générer +€48K de revenus supplémentaires.</p>
-              </div>
-              <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '1.25rem' }}>
-                <div style={{ color: '#a855f7', fontWeight: 700, fontSize: '0.875rem', marginBottom: '0.5rem' }}>✦ Prédiction IA</div>
-                <p style={{ fontSize: '0.82rem', color: '#4a5568', margin: '0 0 0.5rem', lineHeight: 1.5 }}>Objectif +€125K atteignable d'ici fin de trimestre avec les tendances actuelles.</p>
-                <div style={{ fontSize: '0.72rem', color: '#a855f7' }}>✦ Confiance: 87%</div>
+          {/* BLOC IA — caché en Growth, visible en Scale/Enterprise */}
+          {hasIA && (
+            <div style={{ ...card, marginBottom: '1.5rem' }}>
+              <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '1.25rem' }}>💡 Innovation - Insights Revenus</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1rem' }}>
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '1.25rem' }}>
+                  <div style={{ color: '#16a34a', fontWeight: 700, fontSize: '0.875rem', marginBottom: '0.5rem' }}>↗ Croissance Exceptionnelle</div>
+                  <p style={{ fontSize: '0.82rem', color: '#4a5568', margin: '0 0 0.75rem', lineHeight: 1.5 }}>+43% de revenus vs trimestre précédent. Instagram drive 51% des conversions.</p>
+                  <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 500 }}>Instagram +18% • TikTok +12% • YouTube +8%</div>
+                </div>
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '1.25rem' }}>
+                  <div style={{ color: '#2563eb', fontWeight: 700, fontSize: '0.875rem', marginBottom: '0.5rem' }}>⊙ Optimisation Suggérée</div>
+                  <p style={{ fontSize: '0.82rem', color: '#4a5568', margin: 0, lineHeight: 1.5 }}>Augmenter le budget TikTok de 25% pourrait générer +€48K de revenus supplémentaires.</p>
+                </div>
+                <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '12px', padding: '1.25rem' }}>
+                  <div style={{ color: '#a855f7', fontWeight: 700, fontSize: '0.875rem', marginBottom: '0.5rem' }}>✦ Prédiction IA</div>
+                  <p style={{ fontSize: '0.82rem', color: '#4a5568', margin: '0 0 0.5rem', lineHeight: 1.5 }}>Objectif +€125K atteignable d'ici fin de trimestre avec les tendances actuelles.</p>
+                  <div style={{ fontSize: '0.72rem', color: '#a855f7' }}>✦ Confiance: 87%</div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* BANNER Growth : pas d'IA mais données réelles */}
+          {!hasIA && hasAnalytics && (
+            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '12px', padding: '0.85rem 1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{ fontSize: '1.1rem' }}>💡</span>
+                <div>
+                  <div style={{ fontWeight: 600, color: '#0369a1', fontSize: '0.875rem' }}>Insights IA disponibles en Scale</div>
+                  <div style={{ fontSize: '0.75rem', color: '#0284c7' }}>Prédictions, optimisations et recommandations automatiques</div>
+                </div>
+              </div>
+              <a href="/pricing" style={{ padding: '0.4rem 0.9rem', background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, textDecoration: 'none' }}>
+                Passer à Scale
+              </a>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.5rem' }}>
             <div style={card}>
@@ -193,12 +211,8 @@ export default function Analytics() {
                   {months.map((m, i) => (
                     <div key={m} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
                       <div style={{ width: '100%', display: 'flex', gap: '2px', alignItems: 'flex-end' }}>
-                        <div style={{ flex: 1, height: `${revenusData[i] * 0.5}px`, background: 'linear-gradient(180deg,#a855f7,#6366f1)', borderRadius: '4px 4px 0 0', cursor: 'pointer', transition: 'opacity .15s' }}
-                          onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
-                          onMouseLeave={e => e.currentTarget.style.opacity = '1'} />
-                        <div style={{ flex: 1, height: `${coutData[i] * 0.5}px`, background: '#fca5a5', borderRadius: '4px 4px 0 0', cursor: 'pointer', transition: 'opacity .15s' }}
-                          onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
-                          onMouseLeave={e => e.currentTarget.style.opacity = '1'} />
+                        <div style={{ flex: 1, height: `${revenusData[i] * 0.5}px`, background: 'linear-gradient(180deg,#a855f7,#6366f1)', borderRadius: '4px 4px 0 0' }} />
+                        <div style={{ flex: 1, height: `${coutData[i] * 0.5}px`, background: '#fca5a5', borderRadius: '4px 4px 0 0' }} />
                       </div>
                       <div style={{ fontSize: '0.62rem', color: '#a0aec0' }}>{m}</div>
                     </div>
@@ -404,9 +418,7 @@ export default function Analytics() {
             ))}
           </div>
           {filteredInfluenceurs.map((inf, i) => (
-            <div key={inf.name} style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1.2fr 0.8fr 1fr', gap: '0.5rem', padding: '0.75rem', borderBottom: i < filteredInfluenceurs.length - 1 ? '1px solid #f0f0f0' : 'none', alignItems: 'center', borderRadius: '8px', transition: 'background .15s', cursor: 'pointer' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#f8f9ff'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <div key={inf.name} style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1.2fr 0.8fr 1fr', gap: '0.5rem', padding: '0.75rem', borderBottom: i < filteredInfluenceurs.length - 1 ? '1px solid #f0f0f0' : 'none', alignItems: 'center', borderRadius: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 {inf.top === 1 && <span>🥇</span>}{inf.top === 2 && <span>⭐</span>}{inf.top === 3 && <span>⭐</span>}{!inf.top && <div style={{ width: '18px' }} />}
                 <span style={{ fontWeight: 600, fontSize: '0.875rem', color: '#1a202c' }}>{inf.name}</span>
@@ -459,91 +471,48 @@ export default function Analytics() {
       {tab === 'comparaison' && (
         <div style={card}>
           <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '1.5rem' }}>📊 Comparaison des Campagnes</div>
-
           <div style={{ position: 'relative', paddingBottom: '3rem' }}>
-            {/* Y axis left */}
             <div style={{ position: 'absolute', left: 0, top: 0, bottom: '3rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', paddingRight: '0.5rem' }}>
               {['600000', '450000', '300000', '150000', '0'].map(l => (
                 <span key={l} style={{ fontSize: '0.62rem', color: '#a0aec0', textAlign: 'right' }}>{l}</span>
               ))}
             </div>
-            {/* Y axis right */}
             <div style={{ position: 'absolute', right: 0, top: 0, bottom: '3rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', paddingLeft: '0.5rem' }}>
               {['400', '300', '200', '100', '0'].map(l => (
                 <span key={l} style={{ fontSize: '0.62rem', color: '#a0aec0' }}>{l}</span>
               ))}
             </div>
-
-            {/* Chart */}
             <div style={{ marginLeft: '50px', marginRight: '40px', height: '280px', display: 'flex', alignItems: 'flex-end', gap: '6px', borderBottom: '1px solid #e2e8f0', borderLeft: '1px solid #e2e8f0', position: 'relative' }}>
-              {[0, 25, 50, 75, 100].map(pct => (
-                <div key={pct} style={{ position: 'absolute', left: 0, right: 0, bottom: `${pct}%`, borderTop: '1px dashed #f0f0f0', zIndex: 0 }} />
-              ))}
-
               {campagnes.map((c, i) => {
                 const revH = (c.revenus / 600000) * 260
                 const budgH = (c.budget / 600000) * 260
                 const roiH = (c.roi / 400) * 260
                 const hovered = tooltip?.index === i
-
                 return (
                   <div key={c.name} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '260px' }}>
-
-                      {/* Barre Revenus */}
-                      <div
-                        onMouseEnter={() => setTooltip({ name: c.name, revenus: c.revenus, budget: c.budget, roi: c.roi, index: i })}
-                        onMouseLeave={() => setTooltip(null)}
-                        style={{ width: '18px', height: `${revH}px`, background: hovered ? '#16a34a' : '#22c55e', borderRadius: '3px 3px 0 0', cursor: 'pointer', transition: 'all .15s', transform: hovered ? 'scaleY(1.04)' : 'none', transformOrigin: 'bottom' }}
-                      />
-                      {/* Barre Budget */}
-                      <div
-                        onMouseEnter={() => setTooltip({ name: c.name, revenus: c.revenus, budget: c.budget, roi: c.roi, index: i })}
-                        onMouseLeave={() => setTooltip(null)}
-                        style={{ width: '18px', height: `${budgH}px`, background: hovered ? '#dc2626' : '#ef4444', borderRadius: '3px 3px 0 0', cursor: 'pointer', transition: 'all .15s', transform: hovered ? 'scaleY(1.04)' : 'none', transformOrigin: 'bottom' }}
-                      />
-                      {/* Barre ROI */}
-                      <div
-                        onMouseEnter={() => setTooltip({ name: c.name, revenus: c.revenus, budget: c.budget, roi: c.roi, index: i })}
-                        onMouseLeave={() => setTooltip(null)}
-                        style={{ width: '18px', height: `${roiH}px`, background: hovered ? '#d97706' : '#f59e0b', borderRadius: '3px 3px 0 0', cursor: 'pointer', transition: 'all .15s', transform: hovered ? 'scaleY(1.04)' : 'none', transformOrigin: 'bottom' }}
-                      />
+                      <div onMouseEnter={() => setTooltip({ name: c.name, revenus: c.revenus, budget: c.budget, roi: c.roi, index: i })} onMouseLeave={() => setTooltip(null)} style={{ width: '18px', height: `${revH}px`, background: hovered ? '#16a34a' : '#22c55e', borderRadius: '3px 3px 0 0', cursor: 'pointer', transition: 'all .15s' }} />
+                      <div onMouseEnter={() => setTooltip({ name: c.name, revenus: c.revenus, budget: c.budget, roi: c.roi, index: i })} onMouseLeave={() => setTooltip(null)} style={{ width: '18px', height: `${budgH}px`, background: hovered ? '#dc2626' : '#ef4444', borderRadius: '3px 3px 0 0', cursor: 'pointer', transition: 'all .15s' }} />
+                      <div onMouseEnter={() => setTooltip({ name: c.name, revenus: c.revenus, budget: c.budget, roi: c.roi, index: i })} onMouseLeave={() => setTooltip(null)} style={{ width: '18px', height: `${roiH}px`, background: hovered ? '#d97706' : '#f59e0b', borderRadius: '3px 3px 0 0', cursor: 'pointer', transition: 'all .15s' }} />
                     </div>
-
-                    {/* Tooltip */}
                     {hovered && (
                       <div style={{ position: 'absolute', bottom: '270px', left: '50%', transform: 'translateX(-50%)', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.75rem 1rem', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 50, width: '185px', pointerEvents: 'none' }}>
                         <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#1a202c', marginBottom: '0.5rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f0f0f0' }}>{c.name}</div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.3rem' }}>
-                          <span style={{ color: '#718096' }}>Revenus :</span>
-                          <span style={{ fontWeight: 700, color: '#22c55e' }}>{c.revenus.toLocaleString('fr-FR')} €</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.3rem' }}>
-                          <span style={{ color: '#718096' }}>Budget :</span>
-                          <span style={{ fontWeight: 700, color: '#ef4444' }}>{c.budget.toLocaleString('fr-FR')} €</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
-                          <span style={{ color: '#718096' }}>ROI % :</span>
-                          <span style={{ fontWeight: 700, color: '#f59e0b' }}>{c.roi}%</span>
-                        </div>
-                        {/* Flèche */}
-                        <div style={{ position: 'absolute', bottom: '-7px', left: '50%', transform: 'translateX(-50%) rotate(45deg)', width: '12px', height: '12px', background: '#fff', border: '1px solid #e2e8f0', borderTop: 'none', borderLeft: 'none' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.3rem' }}><span style={{ color: '#718096' }}>Revenus :</span><span style={{ fontWeight: 700, color: '#22c55e' }}>{c.revenus.toLocaleString('fr-FR')} €</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.3rem' }}><span style={{ color: '#718096' }}>Budget :</span><span style={{ fontWeight: 700, color: '#ef4444' }}>{c.budget.toLocaleString('fr-FR')} €</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}><span style={{ color: '#718096' }}>ROI % :</span><span style={{ fontWeight: 700, color: '#f59e0b' }}>{c.roi}%</span></div>
                       </div>
                     )}
                   </div>
                 )
               })}
             </div>
-
-            {/* X axis labels */}
             <div style={{ marginLeft: '50px', marginRight: '40px', display: 'flex', gap: '6px', marginTop: '0.4rem' }}>
               {campagnes.map(c => (
                 <div key={c.name} style={{ flex: 1, textAlign: 'center', fontSize: '0.58rem', color: '#718096', wordBreak: 'break-word', lineHeight: 1.2 }}>{c.name}</div>
               ))}
             </div>
           </div>
-
-          {/* Legend */}
           <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', marginTop: '1rem' }}>
             {[['#22c55e', 'Revenus'], ['#ef4444', 'Budget'], ['#f59e0b', 'ROI %']].map(([color, label]) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', color: '#718096' }}>
@@ -554,6 +523,72 @@ export default function Analytics() {
           </div>
         </div>
       )}
+    </div>
+  )
+
+  // ============================================================
+  // RENDU PRINCIPAL
+  // ============================================================
+  return (
+    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", background: '#f8f9ff', minHeight: '100vh', padding: '2rem' }}>
+      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+      {/* HEADER */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.3rem' }}>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#1a202c', margin: 0 }}>Analytics</h1>
+          {hasIA && (
+            <span style={{ background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.7rem', borderRadius: '100px' }}>IA Activée</span>
+          )}
+          {!planLoading && (
+            <span style={{ background: plan === 'trial' ? '#fef9c3' : plan === 'growth' ? '#dcfce7' : '#dbeafe', color: plan === 'trial' ? '#854d0e' : plan === 'growth' ? '#15803d' : '#1d4ed8', fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.7rem', borderRadius: '100px', textTransform: 'uppercase' }}>
+              Plan {plan}
+            </span>
+          )}
+        </div>
+        <p style={{ color: '#718096', margin: 0, fontSize: '0.875rem' }}>
+          {hasIA ? 'Analytics avancées • Insights intelligents • Rapports automatisés' : hasAnalytics ? 'Analytics complètes • Données en temps réel' : 'Passez à Growth pour accéder aux analytics complètes'}
+        </p>
+      </div>
+
+      {/* ===== TRIAL : flou + overlay ===== */}
+      {!planLoading && !hasAnalytics && (
+        <div style={{ position: 'relative' }}>
+          {/* Contenu flouté en arrière-plan */}
+          <div style={{ filter: 'blur(6px)', opacity: 0.4, pointerEvents: 'none', userSelect: 'none' }}>
+            <MainContent />
+          </div>
+
+          {/* Overlay de blocage */}
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+            <div style={{ background: '#fff', borderRadius: '20px', padding: '3rem', textAlign: 'center', maxWidth: '480px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', border: '1px solid #f0f0f0' }}>
+              <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg,#a855f7,#ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', fontSize: '2rem' }}>📊</div>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1a202c', marginBottom: '0.75rem' }}>Analytics complètes</h2>
+              <p style={{ color: '#718096', fontSize: '0.875rem', lineHeight: 1.6, marginBottom: '0.5rem' }}>
+                Accédez à vos revenus, ROI, top performers et bien plus encore.
+              </p>
+              <p style={{ color: '#a0aec0', fontSize: '0.78rem', marginBottom: '2rem' }}>
+                Vos performances de campagne sont disponibles dans<br />
+                <strong style={{ color: '#a855f7' }}>Gestion des campagnes → Suivi des opérations → Performance</strong>
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                {['Revenus & ROI en temps réel', 'Top performers & influenceurs', 'Comparaison de campagnes', 'Insights IA & prédictions (Scale+)'].map(feature => (
+                  <div key={feature} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: '#4a5568' }}>
+                    <span style={{ color: '#a855f7', fontWeight: 700 }}>✓</span> {feature}
+                  </div>
+                ))}
+              </div>
+              <a href="/pricing" style={{ display: 'block', padding: '0.9rem 2rem', background: 'linear-gradient(135deg,#a855f7,#ec4899)', color: '#fff', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 700, textDecoration: 'none', marginBottom: '0.75rem' }}>
+                Passer à Growth — 99€/mois
+              </a>
+              <p style={{ color: '#a0aec0', fontSize: '0.72rem', margin: 0 }}>Sans engagement • Accès immédiat</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== GROWTH / SCALE / ENTERPRISE : contenu normal ===== */}
+      {!planLoading && hasAnalytics && <MainContent />}
     </div>
   )
 }
