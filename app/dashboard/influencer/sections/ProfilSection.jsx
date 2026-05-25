@@ -8,10 +8,11 @@ import { Progress } from '@/components/ui/progress'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { MapPin, Calendar, Target, Star, TrendingUp, MessageCircle, Brain, Shield, Award, Camera, Edit, RefreshCw, CheckCircle, Save } from 'lucide-react'
+import { MapPin, Calendar, Target, Star, TrendingUp, MessageCircle, Brain, Shield, Award, Camera, Edit, RefreshCw, CheckCircle, Save, Lock, Trophy } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import supabase from '@/lib/supabase'
+import { useUserLevel, LEVELS } from '@/lib/hook/useUserLevel'
 
 const YoutubeIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58a2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/></svg>
 const InstagramIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
@@ -36,7 +37,24 @@ const getPlatformColor = (platform) => {
   }
 }
 
+/* ============================================================
+   Métadonnées visuelles des niveaux (synchro avec useUserLevel)
+   ============================================================ */
+const LEVEL_VISUALS = {
+  bronze: { gradient: 'from-orange-400 to-amber-600', title: 'Profil Vérifié' },
+  argent: { gradient: 'from-slate-400 to-slate-600', title: 'Statisticien' },
+  or: { gradient: 'from-yellow-400 to-amber-500', title: 'Expert Créateur' },
+  platine: { gradient: 'from-cyan-400 to-sky-500', title: 'Premium' },
+  diamant: { gradient: 'from-teal-400 to-cyan-500', title: 'Élite Numérique' },
+  elite: { gradient: 'from-fuchsia-500 to-pink-500', title: 'Influenceur Premium' },
+  champion: { gradient: 'from-violet-500 to-purple-600', title: 'Créateur Reconnu' },
+  legende: { gradient: 'from-pink-500 via-orange-500 to-yellow-500', title: 'Top Créateur' },
+}
+
 export default function ProfilSection({ user, profile, metrics }) {
+  // ===== HOOK GAMIFICATION =====
+  const { level, currentLevelIndex, isProfileComplete, score, canAccess } = useUserLevel(user?.id)
+
   const [influencer, setInfluencer] = useState(null)
   const [socialAccounts, setSocialAccounts] = useState([])
   const [reviews, setReviews] = useState([])
@@ -44,7 +62,6 @@ export default function ProfilSection({ user, profile, metrics }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  // Form state
   const [displayName, setDisplayName] = useState('')
   const [username, setUsername] = useState('')
   const [bio, setBio] = useState('')
@@ -116,6 +133,10 @@ export default function ProfilSection({ user, profile, metrics }) {
   const firstName = displayName?.split(' ')[0] || profile?.username || 'Influenceur'
   const initials = displayName?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'IN'
 
+  // ===== STATUTS BADGES GAMIFICATION =====
+  const isVerified = canAccess('verifiedProfile')      // débloqué dès Bronze
+  const isTopCreator = canAccess('topCreatorStatus')   // débloqué uniquement Légende
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -154,17 +175,39 @@ export default function ProfilSection({ user, profile, metrics }) {
                 <Camera className="h-4 w-4" />
               </Button>
             </div>
-            <h2 className="text-2xl font-bold mb-1">{displayName || 'Votre nom'}</h2>
+
+            {/* Nom + Badge Top Créateur si Légende */}
+            <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
+              <h2 className="text-2xl font-bold">{displayName || 'Votre nom'}</h2>
+              {isTopCreator && (
+                <Badge className="bg-gradient-to-r from-pink-500 via-orange-500 to-yellow-500 text-white border-0 shadow-lg animate-pulse">
+                  <Trophy className="h-3 w-3 mr-1" />Top Créateur
+                </Badge>
+              )}
+            </div>
+
             <p className="text-muted-foreground mb-4 font-medium">@{username || 'username'}</p>
+
             <div className="flex justify-center mb-4">
               <div className="flex items-center gap-2 px-4 py-2 bg-muted rounded-full">
                 <MapPin className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">{country || 'Localisation non définie'}</span>
               </div>
             </div>
+
+            {/* BADGE PROFIL VÉRIFIÉ DYNAMIQUE */}
             <div className="flex justify-center mb-6">
-              <Badge className="px-4 py-2 gap-2"><Shield className="h-4 w-4" />Profil vérifié</Badge>
+              {isVerified ? (
+                <Badge className="px-4 py-2 gap-2 bg-green-500/15 text-green-700 border border-green-500/30 hover:bg-green-500/20">
+                  <CheckCircle className="h-4 w-4" />Profil vérifié
+                </Badge>
+              ) : (
+                <Badge className="px-4 py-2 gap-2 bg-muted text-muted-foreground border border-border">
+                  <Lock className="h-3 w-3" />Non vérifié — Complète ton profil
+                </Badge>
+              )}
             </div>
+
             <div className="grid grid-cols-3 gap-4 p-5 bg-muted/50 rounded-2xl border">
               <div className="text-center">
                 <p className="text-2xl font-bold text-primary">{totalFollowers > 0 ? `${(totalFollowers / 1000).toFixed(1)}K` : '0'}</p>
@@ -193,8 +236,8 @@ export default function ProfilSection({ user, profile, metrics }) {
           <CardContent className="relative space-y-6">
             <div className="text-center">
               <div className="text-6xl font-bold text-primary">{aiScore}</div>
-              <Badge className="mt-4 px-4 py-1.5">
-                {aiScore >= 80 ? 'Excellent' : aiScore >= 60 ? 'Bon' : aiScore >= 40 ? 'Moyen' : 'Débutant'}
+              <Badge className={`mt-4 px-4 py-1.5 ${level ? `bg-gradient-to-r ${LEVEL_VISUALS[level.key].gradient} text-white border-0` : ''}`}>
+                {level ? `${level.emoji} Niveau ${level.name}` : 'Profil incomplet'}
               </Badge>
             </div>
             <Progress value={aiScore} className="h-3" />
@@ -258,7 +301,6 @@ export default function ProfilSection({ user, profile, metrics }) {
                 <Input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="France" />
               </div>
 
-              {/* Niches */}
               {influencer?.niche && influencer.niche.length > 0 && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Niches</label>
@@ -270,7 +312,6 @@ export default function ProfilSection({ user, profile, metrics }) {
                 </div>
               )}
 
-              {/* Langues */}
               {influencer?.languages && influencer.languages.length > 0 && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Langues parlées</label>
@@ -282,7 +323,6 @@ export default function ProfilSection({ user, profile, metrics }) {
                 </div>
               )}
 
-              {/* Budget */}
               {(influencer?.min_budget || influencer?.max_budget) && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Budget souhaité</label>
@@ -449,7 +489,7 @@ export default function ProfilSection({ user, profile, metrics }) {
           </Card>
         </TabsContent>
 
-        {/* VÉRIFICATIONS */}
+        {/* ============ VÉRIFICATIONS (avec 8 BADGES DE NIVEAU) ============ */}
         <TabsContent value="verifications">
           <Card className="shadow-xl">
             <CardHeader>
@@ -459,6 +499,7 @@ export default function ProfilSection({ user, profile, metrics }) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Vérification d'identité */}
               <div className="rounded-2xl border p-5 bg-muted/30">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
@@ -477,6 +518,7 @@ export default function ProfilSection({ user, profile, metrics }) {
                 </div>
               </div>
 
+              {/* Comptes sociaux */}
               <div className="rounded-2xl border p-5 bg-muted/30">
                 <h3 className="font-semibold text-lg mb-4">Comptes sociaux connectés</h3>
                 <div className="space-y-2">
@@ -502,23 +544,69 @@ export default function ProfilSection({ user, profile, metrics }) {
                 </div>
               </div>
 
+              {/* ====== NOUVEAU : Grille des 8 badges de niveau ====== */}
               <div className="rounded-2xl border p-6 bg-muted/30">
-                <h3 className="font-semibold text-lg mb-6">Vos badges</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {[
-                    { icon: Award, label: "Créateur", sub: influencer?.collaborations_count > 0 ? `${influencer.collaborations_count} collaborations` : 'En progression' },
-                    { icon: Star, label: influencer?.subscription_plan || 'Gratuit', sub: "Abonnement actif" },
-                    { icon: Shield, label: "Vérifié", sub: "Identité confirmée" },
-                  ].map(({ icon: Icon, label, sub }) => (
-                    <div key={label} className="flex flex-col items-center gap-3 p-5 bg-primary/5 rounded-2xl border border-primary/20 hover:border-primary/40 transition-all hover:shadow-xl hover:scale-105">
-                      <div className="w-20 h-20 rounded-full bg-gradient-to-r from-primary to-accent flex items-center justify-center shadow-2xl">
-                        <Icon className="h-10 w-10 text-white" />
-                      </div>
-                      <p className="font-bold text-center capitalize">{label}</p>
-                      <p className="text-xs text-muted-foreground text-center">{sub}</p>
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+                  <h3 className="font-semibold text-lg">Vos badges Partnexx</h3>
+                  <Badge variant="outline" className="text-xs">
+                    {currentLevelIndex >= 0 ? currentLevelIndex + 1 : 0}/{LEVELS.length} débloqués
+                  </Badge>
                 </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {LEVELS.map((lvl, idx) => {
+                    const visual = LEVEL_VISUALS[lvl.key]
+                    const isUnlocked = currentLevelIndex >= 0 && idx <= currentLevelIndex
+                    const isCurrent = level?.key === lvl.key
+                    return (
+                      <div
+                        key={lvl.key}
+                        className={`relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
+                          isUnlocked
+                            ? 'bg-card border-primary/30 hover:shadow-xl hover:scale-105'
+                            : 'bg-muted/20 border-muted opacity-50'
+                        } ${isCurrent ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
+                      >
+                        {/* Icône badge */}
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl shadow-lg ${
+                          isUnlocked ? `bg-gradient-to-br ${visual.gradient}` : 'bg-muted grayscale'
+                        }`}>
+                          {isUnlocked ? lvl.emoji : <Lock className="h-6 w-6 text-muted-foreground" />}
+                        </div>
+
+                        {/* Titre + Sous-titre */}
+                        <div className="text-center min-h-[2.5rem]">
+                          <p className="font-bold text-sm">{lvl.name}</p>
+                          <p className="text-[10px] text-muted-foreground leading-tight">{visual.title}</p>
+                        </div>
+
+                        {/* État */}
+                        {isUnlocked ? (
+                          isCurrent ? (
+                            <Badge className="bg-gradient-to-r from-primary to-purple-500 text-white text-[10px] px-2 py-0">
+                              ACTUEL
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-green-500/10 text-green-600 border-green-500/20 text-[10px] px-2 py-0">
+                              ✓
+                            </Badge>
+                          )
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">{lvl.threshold.toLocaleString()} pts</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Indication progression */}
+                {!isProfileComplete && (
+                  <div className="mt-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg text-center">
+                    <p className="text-sm text-orange-700 font-medium">
+                      🔒 Complète ton profil à 100% pour débloquer ton premier badge Bronze
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

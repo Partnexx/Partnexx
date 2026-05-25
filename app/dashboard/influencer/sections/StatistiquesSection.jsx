@@ -2,11 +2,14 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { DollarSign, Users, Heart, Eye, TrendingUp, Target, Brain, Award, BarChart3, Activity, Flame, Star, CheckCircle, Clock } from 'lucide-react'
+import { DollarSign, Users, Heart, Eye, TrendingUp, Target, Brain, Award, BarChart3, Activity, Flame, Star, CheckCircle, Clock, Lock } from 'lucide-react'
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { useRouter } from 'next/navigation'
 import supabase from '@/lib/supabase'
+import { useUserLevel } from '@/lib/hook/useUserLevel'
 
 const YoutubeIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58a2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/></svg>
 const InstagramIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
@@ -33,7 +36,35 @@ const getPlatformColor = (platform) => {
 
 const tooltipStyle = { backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }
 
+/* ============================================================
+   COMPOSANT : Overlay de blocage (flou + cadenas + CTA)
+   ============================================================ */
+function LockedOverlay({ levelName, levelEmoji, pointsRequired, currentScore, gradient }) {
+  const pointsMissing = Math.max(0, pointsRequired - currentScore)
+  return (
+    <div className="absolute inset-0 z-30 backdrop-blur-md bg-background/50 flex flex-col items-center justify-center gap-4 p-6 text-center rounded-lg">
+      <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-lg`}>
+        <Lock className="h-8 w-8 text-white" />
+      </div>
+      <div>
+        <p className="text-lg font-bold mb-1">{levelEmoji} Niveau {levelName} requis</p>
+        <p className="text-sm text-muted-foreground">
+          Plus que <span className="font-bold text-primary">{pointsMissing} points</span> pour débloquer
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export default function StatistiquesSection({ metrics, transactions, user }) {
+  const router = useRouter()
+
+  // ===== HOOK GAMIFICATION =====
+  const { canAccess, isProfileComplete, profileCompletion, score: userScore, loading: levelLoading } = useUserLevel(user?.id)
+
+  const canAccessAdvancedStats = canAccess('advancedStats')      // Argent (200 pts)
+  const canAccessCompleteAnalytics = canAccess('completeAnalytics') // Or (500 pts)
+
   const [mounted, setMounted] = useState(false)
   const [socialAccounts, setSocialAccounts] = useState([])
   const [contentPosts, setContentPosts] = useState([])
@@ -42,41 +73,52 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
   useEffect(() => setMounted(true), [])
 
   useEffect(() => {
-  if (!user?.id) return
-  fetchData()
+    if (!user?.id) return
+    fetchData()
 
-  const channel = supabase
-    .channel('analytics-realtime')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'social_accounts' }, () => fetchData())
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'content_posts' }, () => fetchData())
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => fetchData())
-    .subscribe()
+    const channel = supabase
+      .channel('analytics-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'social_accounts' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'content_posts' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => fetchData())
+      .subscribe()
 
-  return () => supabase.removeChannel(channel)
-}, [user])
+    return () => supabase.removeChannel(channel)
+  }, [user])
 
   const fetchData = async () => {
-    const { data: influencer } = await supabase
-      .from('influencers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
+    try {
+      const { data: influencer } = await supabase
+        .from('influencers')
+        .select('id')
+        .eq('user_id', user.id)
+        .single()
 
-    if (!influencer) return
+      // BUG FIX : si pas d'influencer, on ne reste plus bloqué sur loading
+      if (!influencer) {
+        setSocialAccounts([])
+        setContentPosts([])
+        setLoading(false)
+        return
+      }
 
-    const [socialRes, postsRes] = await Promise.allSettled([
-      supabase.from('social_accounts').select('*').eq('influencer_id', influencer.id),
-      supabase.from('content_posts').select('*').eq('influencer_id', influencer.id).order('published_at', { ascending: false }),
-    ])
+      const [socialRes, postsRes] = await Promise.allSettled([
+        supabase.from('social_accounts').select('*').eq('influencer_id', influencer.id),
+        supabase.from('content_posts').select('*').eq('influencer_id', influencer.id).order('published_at', { ascending: false }),
+      ])
 
-    setSocialAccounts(socialRes.status === 'fulfilled' ? socialRes.value.data || [] : [])
-    setContentPosts(postsRes.status === 'fulfilled' ? postsRes.value.data || [] : [])
-    setLoading(false)
+      setSocialAccounts(socialRes.status === 'fulfilled' ? socialRes.value.data || [] : [])
+      setContentPosts(postsRes.status === 'fulfilled' ? postsRes.value.data || [] : [])
+    } catch (err) {
+      console.warn('StatistiquesSection fetch error', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (!mounted) return null
 
-  // Stats calculées depuis les vraies données
+  // Stats calculées
   const totalFollowers = socialAccounts.reduce((sum, s) => sum + (s.followers_count || 0), 0)
   const avgEngagement = socialAccounts.length > 0
     ? (socialAccounts.reduce((sum, s) => sum + parseFloat(s.engagement_rate || 0), 0) / socialAccounts.length).toFixed(1)
@@ -86,12 +128,10 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
   const totalEarned = (metrics?.totalGains || 0)
   const totalEscrow = (metrics?.enEscrow || 0)
 
-  // Top posts triés par engagement
   const topPosts = [...contentPosts]
     .sort((a, b) => parseFloat(b.engagement_rate || 0) - parseFloat(a.engagement_rate || 0))
     .slice(0, 5)
 
-  // Performance par type de contenu
   const contentByType = contentPosts.reduce((acc, p) => {
     const type = p.content_type || 'other'
     if (!acc[type]) acc[type] = { type, totalEng: 0, count: 0 }
@@ -104,7 +144,6 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
     avgEngagement: c.count > 0 ? parseFloat((c.totalEng / c.count).toFixed(1)) : 0,
   }))
 
-  // Données transactions pour graphique revenus
   const revenueByMonth = transactions?.reduce((acc, t) => {
     const month = new Date(t.created_at).toLocaleDateString('fr-FR', { month: 'short' })
     if (!acc[month]) acc[month] = { month, revenue: 0, payments: 0 }
@@ -118,51 +157,60 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
   }, {}) || {}
   const revenueData = Object.values(revenueByMonth)
 
-  // Stats cards dynamiques
   const statsCards = [
-    {
-      title: "Total Followers",
-      value: totalFollowers > 0 ? `${(totalFollowers / 1000).toFixed(1)}K` : '0',
-      change: '+Réel',
-      icon: Users,
-      gradient: "from-green-500 to-green-600",
-      sparklineData: socialAccounts.map(s => s.followers_count || 0).concat([totalFollowers]),
-      color: "hsl(142 76% 50%)"
-    },
-    {
-      title: "Engagement moyen",
-      value: `${avgEngagement}%`,
-      change: '+Réel',
-      icon: Heart,
-      gradient: "from-pink-500 to-purple-600",
-      sparklineData: socialAccounts.map(s => parseFloat(s.engagement_rate || 0)).concat([parseFloat(avgEngagement)]),
-      color: "hsl(315 100% 60%)"
-    },
-    {
-      title: "Vues totales",
-      value: totalViews > 0 ? `${(totalViews / 1000).toFixed(1)}K` : '0',
-      change: '+Réel',
-      icon: Eye,
-      gradient: "from-blue-500 to-blue-600",
-      sparklineData: contentPosts.slice(0, 9).map(p => p.views || 0),
-      color: "hsl(217 91% 60%)"
-    },
-    {
-      title: "Revenus totaux",
-      value: `${totalEarned.toFixed(0)}€`,
-      change: '+Réel',
-      icon: DollarSign,
-      gradient: "from-yellow-500 to-orange-500",
-      sparklineData: transactions?.slice(0, 9).map(t => parseFloat(t.influencer_amount || 0)) || [0],
-      color: "hsl(38 92% 60%)"
-    },
+    { title: "Total Followers", value: totalFollowers > 0 ? `${(totalFollowers / 1000).toFixed(1)}K` : '0', change: '+Réel', icon: Users, gradient: "from-green-500 to-green-600", sparklineData: socialAccounts.map(s => s.followers_count || 0).concat([totalFollowers]), color: "hsl(142 76% 50%)" },
+    { title: "Engagement moyen", value: `${avgEngagement}%`, change: '+Réel', icon: Heart, gradient: "from-pink-500 to-purple-600", sparklineData: socialAccounts.map(s => parseFloat(s.engagement_rate || 0)).concat([parseFloat(avgEngagement)]), color: "hsl(315 100% 60%)" },
+    { title: "Vues totales", value: totalViews > 0 ? `${(totalViews / 1000).toFixed(1)}K` : '0', change: '+Réel', icon: Eye, gradient: "from-blue-500 to-blue-600", sparklineData: contentPosts.slice(0, 9).map(p => p.views || 0), color: "hsl(217 91% 60%)" },
+    { title: "Revenus totaux", value: `${totalEarned.toFixed(0)}€`, change: '+Réel', icon: DollarSign, gradient: "from-yellow-500 to-orange-500", sparklineData: transactions?.slice(0, 9).map(t => parseFloat(t.influencer_amount || 0)) || [0], color: "hsl(38 92% 60%)" },
   ]
 
-  // Score global calculé
   const engScore = Math.min(parseFloat(avgEngagement) * 10, 100)
   const followScore = Math.min((totalFollowers / 1000), 100)
   const contentScore = Math.min(contentPosts.length * 10, 100)
   const globalScore = Math.round((engScore + followScore + contentScore) / 3)
+
+  // ===== CAS 1 : Profil incomplet → écran de blocage complet =====
+  if (!levelLoading && !isProfileComplete) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
+            <Badge variant="outline" className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 border-purple-400 text-white shadow-lg">
+              <Brain className="h-4 w-4 text-white" /><span className="text-sm font-semibold">IA activé</span>
+            </Badge>
+          </div>
+          <p className="text-muted-foreground">Performances Détaillées • Données Réelles Supabase • Insights Avancés</p>
+        </div>
+
+        <Card className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border-orange-500/30">
+          <CardContent className="p-12 text-center space-y-6">
+            <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center">
+              <Lock className="h-10 w-10 text-white" />
+            </div>
+            <div>
+              <h2 className="text-3xl font-bold text-orange-700 mb-2">Analytics verrouillés</h2>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Complète ton profil à 100% pour accéder à tes statistiques et débloquer ton niveau Bronze.
+              </p>
+            </div>
+            <div className="max-w-md mx-auto space-y-3">
+              <div className="flex justify-between text-sm font-semibold">
+                <span>Profil complété</span>
+                <span className="text-orange-600">{profileCompletion}%</span>
+              </div>
+              <div className="relative h-3 bg-orange-500/10 rounded-full overflow-hidden">
+                <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-400 to-amber-500 rounded-full transition-all duration-1000" style={{ width: `${profileCompletion}%` }} />
+              </div>
+              <Button onClick={() => router.push('/dashboard/influencer?section=profil')} className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold">
+                <Target className="h-4 w-4 mr-2" />Compléter mon profil
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -185,7 +233,7 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
         </div>
       ) : (
         <>
-          {/* Hero Stats */}
+          {/* ============ HERO STATS (Bronze - accessible) ============ */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {statsCards.map((stat, index) => {
               const Icon = stat.icon
@@ -206,8 +254,8 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
                       <p className="text-sm text-muted-foreground font-medium">{stat.title}</p>
                       <p className="text-4xl font-bold tracking-tight">{stat.value}</p>
                     </div>
-                    <div className="mt-4 h-12">
-                      <ResponsiveContainer width="100%" height="100%">
+                    <div className="mt-4 h-12 min-w-0">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <AreaChart data={sparkData.map((v) => ({ value: v }))}>
                           <defs>
                             <linearGradient id={`sg-${index}`} x1="0" y1="0" x2="0" y2="1">
@@ -225,10 +273,33 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
             })}
           </div>
 
+          {/* Bandeau incitatif si pas encore Or */}
+          {!canAccessCompleteAnalytics && (
+            <Card className="bg-gradient-to-r from-primary/10 to-purple-500/10 border-primary/30">
+              <CardContent className="p-5 flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <BarChart3 className="h-6 w-6 text-primary" />
+                  <div>
+                    <p className="font-semibold">
+                      {!canAccessAdvancedStats
+                        ? <>Débloque les <span className="text-primary">statistiques avancées</span> en passant Argent</>
+                        : <>Débloque les <span className="text-primary">analytics complets</span> en passant Or</>}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {!canAccessAdvancedStats
+                        ? `Plus que ${Math.max(0, 200 - userScore)} points pour Argent`
+                        : `Plus que ${Math.max(0, 500 - userScore)} points pour Or`}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Colonne gauche */}
             <div className="lg:col-span-4 space-y-4">
-              {/* Score Global */}
+              {/* Score Global - Bronze accessible */}
               <Card className="border-2 hover:shadow-xl transition-all duration-300">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg"><Award className="w-5 h-5 text-primary" />Score Global</CardTitle>
@@ -272,8 +343,18 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
                 </CardContent>
               </Card>
 
-              {/* Plateformes & Top Posts */}
-              <Card className="border-2">
+              {/* ====== Plateformes & Top Posts (Argent + Or) ====== */}
+              <Card className="border-2 relative">
+                {/* Lock overlay si pas Argent (pour les plateformes) */}
+                {!canAccessAdvancedStats && (
+                  <LockedOverlay
+                    levelName="Argent"
+                    levelEmoji="🥈"
+                    pointsRequired={200}
+                    currentScore={userScore}
+                    gradient="from-slate-400 to-slate-600"
+                  />
+                )}
                 <Tabs defaultValue="platforms" className="w-full">
                   <CardHeader className="pb-2">
                     <TabsList className="grid w-full grid-cols-2 gap-2 bg-transparent p-0 h-auto">
@@ -349,8 +430,19 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
               </Card>
             </div>
 
-            {/* Colonne droite */}
-            <div className="lg:col-span-8">
+            {/* Colonne droite : onglets Contenu / Revenus / Plateformes (Or) */}
+            <div className="lg:col-span-8 relative">
+              {/* Lock overlay si pas Or (pour les onglets analytics complets) */}
+              {!canAccessCompleteAnalytics && (
+                <LockedOverlay
+                  levelName="Or"
+                  levelEmoji="🥇"
+                  pointsRequired={500}
+                  currentScore={userScore}
+                  gradient="from-yellow-400 to-amber-500"
+                />
+              )}
+
               <Tabs defaultValue="content" className="space-y-6">
                 <TabsList className="grid w-full grid-cols-3 gap-2 bg-transparent p-0 h-auto">
                   {[
@@ -374,8 +466,8 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
                           Aucun contenu publié pour l&apos;instant
                         </div>
                       ) : (
-                        <div className="h-[400px]">
-                          <ResponsiveContainer width="100%" height="100%">
+                        <div className="h-[400px] min-w-0">
+                          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <BarChart data={contentPerformance}>
                               <defs>
                                 <linearGradient id="bGrad" x1="0" y1="0" x2="0" y2="1">
@@ -392,7 +484,6 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
                         </div>
                       )}
 
-                      {/* Stats posts */}
                       {contentPosts.length > 0 && (
                         <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t">
                           <div className="text-center">
@@ -441,8 +532,8 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
                           Aucune transaction pour l&apos;instant
                         </div>
                       ) : (
-                        <div className="h-[300px]">
-                          <ResponsiveContainer width="100%" height="100%">
+                        <div className="h-[300px] min-w-0">
+                          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <AreaChart data={revenueData}>
                               <defs>
                                 <linearGradient id="rGrad" x1="0" y1="0" x2="0" y2="1">
