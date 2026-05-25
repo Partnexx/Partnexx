@@ -10,10 +10,12 @@ import { Label } from '@/components/ui/label'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
-import { Search, MapPin, Calendar, DollarSign, Users, Send, AlertCircle, CheckCircle, Brain, Percent, Globe } from 'lucide-react'
+import { Search, MapPin, Calendar, DollarSign, Users, Send, AlertCircle, CheckCircle, Brain, Percent, Globe, Lock, Flame, Star, Rocket, Target } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import supabase from '@/lib/supabase'
+import { useUserLevel } from '@/lib/hook/useUserLevel'
+import LevelGate from '@/components/LevelGate'
 
 const Instagram = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -53,9 +55,33 @@ const campaignsData = [
   { id: "30b265f9-40e8-44ee-ab7e-b8f59b31e1f5", title: "Campagne Exclusive Luxe", company: "Prestige Parfums", logo: "PP", category: "Beauté", budget: { min: 5000, max: 8000, currency: "€" }, location: "Paris, France", timeline: "1 mois", description: "Campagne exclusive pour notre nouvelle ligne de parfums de luxe. Vous avez été sélectionné(e) en fonction de votre profil et de votre audience.", requirements: ["50K+ followers", "Audience premium", "Taux d'engagement > 5%", "Historique collaborations luxe"], platforms: ["Instagram"], contentTypes: ["Post", "Story", "Reel"], deliverables: 10, followers: { min: 50000, platform: "Instagram" }, deadline: "2024-02-25", applicants: 12, tags: ["Luxe", "Beauté", "Exclusif"], featured: true, urgent: true, verified: true, type: "targeted", matchScore: 96 },
   { id: "05cbffdd-726e-47df-b326-1368c9d971d8", title: "Ambassadeur Tech - Gaming", company: "GamersHub", logo: "GH", category: "Tech", budget: { min: 4000, max: 7000, currency: "€" }, location: "À distance", timeline: "6 mois", description: "Nous vous avons identifié comme ambassadeur potentiel pour notre marque gaming. Partenariat long terme avec avantages exclusifs.", requirements: ["30K+ followers", "Contenu gaming régulier", "Audience 16-30 ans", "Streaming actif"], platforms: ["YouTube", "Instagram", "Twitter"], contentTypes: ["Video", "Post", "Story"], deliverables: 15, followers: { min: 30000, platform: "YouTube" }, deadline: "2024-03-10", applicants: 8, tags: ["Gaming", "Tech", "Long terme"], verified: true, type: "targeted", matchScore: 92 },
   { id: "af66a54b-9c84-4510-a8b1-ea46cba4d211", title: "Campagne Lifestyle Premium", company: "LifeLux", logo: "LL", category: "Lifestyle", budget: { min: 3500, max: 6000, currency: "€" }, location: "Multiple", timeline: "2 mois", description: "Votre profil correspond parfaitement à notre recherche d'influenceur lifestyle premium. Campagne multi-plateforme avec voyages inclus.", requirements: ["40K+ followers", "Contenu lifestyle haut de gamme", "Audience internationale", "Disponibilité voyages"], platforms: ["Instagram", "YouTube"], contentTypes: ["Post", "Story", "Video"], deliverables: 12, followers: { min: 40000, platform: "Instagram" }, deadline: "2024-02-28", applicants: 15, tags: ["Lifestyle", "Premium", "Voyage"], featured: true, verified: true, type: "targeted", matchScore: 89 },
+
+  // 🔥 EXCLUSIVE (Diamant)
+  { id: "exc-001-hermes", title: "Lancement Sac Hermès Édition Limitée", company: "Hermès Paris", logo: "H", category: "Mode", budget: { min: 8000, max: 15000, currency: "€" }, location: "Paris, France", timeline: "3 semaines", description: "Hermès recherche un créateur d'élite pour le lancement de notre nouvelle édition limitée. Campagne réservée aux profils premium.", requirements: ["100K+ followers", "Audience luxe", "Engagement > 6%", "Image de marque haut de gamme"], platforms: ["Instagram"], contentTypes: ["Post", "Reel", "Story"], deliverables: 8, followers: { min: 100000, platform: "Instagram" }, deadline: "2026-06-15", applicants: 8, tags: ["Luxe", "Édition limitée", "Haute couture"], featured: true, verified: true, type: "exclusive" },
+  { id: "exc-002-apple", title: "Campagne Apple Vision Pro - France", company: "Apple", logo: "A", category: "Tech", budget: { min: 12000, max: 25000, currency: "€" }, location: "Multiple", timeline: "2 mois", description: "Apple lance officiellement Vision Pro en France. Nous recherchons 3 créateurs tech d'exception pour porter le message.", requirements: ["80K+ followers tech", "Contenu tech qualitatif", "Audience adultes 25-45", "Anglais courant"], platforms: ["YouTube", "Instagram"], contentTypes: ["Video longue", "Reel"], deliverables: 6, followers: { min: 80000, platform: "YouTube" }, deadline: "2026-07-01", applicants: 14, tags: ["Apple", "Tech", "Lancement"], featured: true, verified: true, type: "exclusive" },
+  { id: "exc-003-rolex", title: "Rolex - Campagne Submariner", company: "Rolex", logo: "R", category: "Lifestyle", budget: { min: 10000, max: 20000, currency: "€" }, location: "Suisse / France", timeline: "1 mois", description: "Rolex sélectionne 5 créateurs lifestyle premium pour la campagne de la nouvelle Submariner. Voyage en Suisse inclus.", requirements: ["70K+ followers", "Audience HNI (High Net Income)", "Contenu lifestyle premium", "Discrétion absolue"], platforms: ["Instagram"], contentTypes: ["Post", "Story", "Reel"], deliverables: 5, followers: { min: 70000, platform: "Instagram" }, deadline: "2026-06-20", applicants: 6, tags: ["Horlogerie", "Luxe", "Voyage"], featured: true, verified: true, type: "exclusive" },
+  { id: "exc-004-chanel", title: "Chanel Beauty - Nouvelle Égérie", company: "Chanel", logo: "C", category: "Beauté", budget: { min: 15000, max: 30000, currency: "€" }, location: "Paris, France", timeline: "3 mois", description: "Chanel recherche sa nouvelle égérie digitale pour la ligne beauté 2026. Partenariat exclusif et contenu privilégié.", requirements: ["120K+ followers", "Image élégante", "Audience féminine premium", "Expérience luxe"], platforms: ["Instagram", "TikTok"], contentTypes: ["Post", "Reel", "Vidéo"], deliverables: 12, followers: { min: 120000, platform: "Instagram" }, deadline: "2026-07-15", applicants: 22, tags: ["Égérie", "Beauté", "Luxe"], featured: true, verified: true, type: "exclusive" },
+
+  // ⭐ CONFIDENTIAL (Élite)
+  { id: "conf-001-secret", title: "Lancement Sneaker Confidentiel - NDA", company: "Marque Premium", logo: "?", category: "Mode", budget: { min: 18000, max: 35000, currency: "€" }, location: "À distance", timeline: "2 mois", description: "🔒 Campagne sous NDA. Lancement d'un produit révolutionnaire dans l'univers sneakers. Détails communiqués après signature du NDA.", requirements: ["50K+ followers", "Audience streetwear", "Signature NDA obligatoire", "Discrétion totale"], platforms: ["Instagram", "TikTok"], contentTypes: ["Reveal exclusif"], deliverables: 4, followers: { min: 50000, platform: "Instagram" }, deadline: "2026-08-01", applicants: 3, tags: ["NDA", "Secret", "Reveal"], featured: true, verified: true, type: "confidential" },
+  { id: "conf-002-tech", title: "Beta Test Confidentielle - Startup IA", company: "Stealth Mode Startup", logo: "🔒", category: "Tech", budget: { min: 25000, max: 50000, currency: "€" }, location: "Paris / À distance", timeline: "4 mois", description: "🔒 Startup confidentielle développant une IA révolutionnaire. Recherche 2 ambassadeurs pour beta-test et campagne de lancement.", requirements: ["100K+ followers tech", "NDA signé", "Disponibilité tests", "Accès anticipé"], platforms: ["YouTube", "Twitter"], contentTypes: ["Video", "Thread"], deliverables: 8, followers: { min: 100000, platform: "YouTube" }, deadline: "2026-09-01", applicants: 5, tags: ["IA", "Stealth", "Beta"], featured: true, verified: true, type: "confidential" },
+  { id: "conf-003-luxury", title: "Yacht Privé - Campagne Voyage Premium", company: "Riviera Yachts", logo: "RY", category: "Lifestyle", budget: { min: 30000, max: 60000, currency: "€" }, location: "Côte d'Azur", timeline: "1 semaine", description: "🔒 Campagne ultra-confidentielle avec yacht privé sur la Côte d'Azur. 1 seule sélection.", requirements: ["80K+ followers", "Audience HNI internationale", "NDA strict", "Passport valide"], platforms: ["Instagram"], contentTypes: ["Story", "Reel"], deliverables: 10, followers: { min: 80000, platform: "Instagram" }, deadline: "2026-07-30", applicants: 2, tags: ["Yacht", "Voyage", "Premium"], featured: true, verified: true, type: "confidential" },
+
+  // 🚀 PREMIUM (Champion)
+  { id: "prem-001-louis", title: "Ambassadeur Global Louis Vuitton 12 mois", company: "Louis Vuitton", logo: "LV", category: "Mode", budget: { min: 50000, max: 150000, currency: "€" }, location: "International", timeline: "12 mois", description: "🚀 Devenir ambassadeur global Louis Vuitton pour 12 mois. Voyages internationaux, événements VIP, equity possible.", requirements: ["200K+ followers", "Audience internationale", "Image impeccable", "Disponibilité 365 jours"], platforms: ["Instagram", "TikTok", "YouTube"], contentTypes: ["Multi-plateforme"], deliverables: 50, followers: { min: 200000, platform: "Instagram" }, deadline: "2026-09-15", applicants: 4, tags: ["Ambassadeur", "Global", "Equity"], featured: true, verified: true, type: "premium" },
+  { id: "prem-002-fashion", title: "Cover Vogue + Campagne Internationale", company: "Condé Nast", logo: "V", category: "Mode", budget: { min: 80000, max: 200000, currency: "€" }, location: "New York / Paris / Milan", timeline: "6 mois", description: "🚀 Devenir cover de Vogue + campagne internationale 6 mois. Réservé aux créateurs au sommet de leur art.", requirements: ["300K+ followers", "Multi-langue", "Couverture médiatique existante", "Expérience shoot pro"], platforms: ["Instagram", "TikTok"], contentTypes: ["Magazine", "Vidéo", "Post"], deliverables: 20, followers: { min: 300000, platform: "Instagram" }, deadline: "2026-10-01", applicants: 3, tags: ["Vogue", "Cover", "International"], featured: true, verified: true, type: "premium" },
 ]
 
-export default function OpportunitesSection() {
+/* ============================================================
+   COMPOSANT INTÉRIEUR (la vraie page une fois validée par LevelGate)
+   ============================================================ */
+function OpportunitesContent({ user }) {
+  const { canAccess, score: userScore } = useUserLevel(user?.id)
+
+  const canAccessExclusive = canAccess('exclusiveOpportunities')
+  const canAccessConfidential = canAccess('confidentialCampaigns')
+  const canAccessPremium = canAccess('premiumOpportunities')
+
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [selectedCampaign, setSelectedCampaign] = useState(null)
@@ -129,61 +155,80 @@ export default function OpportunitesSection() {
     }
   }
 
-  const CampaignCard = ({ campaign }) => (
-    <Card className="hover:shadow-lg transition-all duration-300 group">
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-12 w-12">
-              <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white font-bold">{campaign.logo}</AvatarFallback>
-            </Avatar>
-            <div>
-              <CardTitle className="text-lg group-hover:text-primary transition-colors">{campaign.title}</CardTitle>
-              <p className="text-sm text-muted-foreground">{campaign.company}</p>
+  const CampaignCard = ({ campaign, locked = false, lockLevelName, lockLevelEmoji, lockLevelGradient, lockPointsRequired }) => (
+    <Card className="hover:shadow-lg transition-all duration-300 group relative overflow-hidden">
+      {locked && (
+        <div className="absolute inset-0 z-30 backdrop-blur-md bg-background/50 flex flex-col items-center justify-center gap-3 p-6 text-center rounded-lg">
+          <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${lockLevelGradient} flex items-center justify-center shadow-lg`}>
+            <Lock className="h-8 w-8 text-white" />
+          </div>
+          <Badge className={`bg-gradient-to-r ${lockLevelGradient} text-white border-0 shadow-lg text-sm`}>
+            {lockLevelEmoji} {lockLevelName}
+          </Badge>
+          <p className="text-sm font-semibold">Opportunité réservée niveau {lockLevelName}</p>
+          <p className="text-xs text-muted-foreground">
+            Plus que <span className="font-bold text-primary">{Math.max(0, lockPointsRequired - userScore)} pts</span> à gagner
+          </p>
+        </div>
+      )}
+
+      <div className={locked ? 'opacity-40' : ''}>
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-12 w-12">
+                <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white font-bold">{campaign.logo}</AvatarFallback>
+              </Avatar>
+              <div>
+                <CardTitle className="text-lg group-hover:text-primary transition-colors">{campaign.title}</CardTitle>
+                <p className="text-sm text-muted-foreground">{campaign.company}</p>
+              </div>
             </div>
+            {campaign.verified && (
+              <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                <CheckCircle className="h-3 w-3 mr-1" />Vérifié
+              </Badge>
+            )}
           </div>
-          {campaign.verified && (
-            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
-              <CheckCircle className="h-3 w-3 mr-1" />Vérifié
-            </Badge>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground line-clamp-2">{campaign.description}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-2 text-sm">
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              {campaign.type === "affiliation"
+                ? <span className="font-semibold text-green-600">{campaign.commission}% commission</span>
+                : <span>{campaign.budget.min.toLocaleString()} - {campaign.budget.max.toLocaleString()} {campaign.budget.currency}</span>}
+            </div>
+            <div className="flex items-center gap-2 text-sm"><Calendar className="h-4 w-4 text-muted-foreground" /><span>{campaign.timeline}</span></div>
+            <div className="flex items-center gap-2 text-sm"><MapPin className="h-4 w-4 text-muted-foreground" /><span>{campaign.location}</span></div>
+            <div className="flex items-center gap-2 text-sm"><Users className="h-4 w-4 text-muted-foreground" /><span>{campaign.applicants} candidats</span></div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {campaign.platforms.slice(0, 3).map((platform) => (
+              <Badge key={platform} variant="outline" className="gap-1">{getPlatformIcon(platform)}{platform}</Badge>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {campaign.tags.slice(0, 3).map((tag) => <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>)}
+          </div>
+          {campaign.matchScore && (
+            <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-lg">
+              <Brain className="h-5 w-5 text-primary" />
+              <div className="flex-1"><p className="text-sm font-medium">Compatibilité IA</p><p className="text-xs text-muted-foreground">{campaign.matchScore}% de match</p></div>
+              <Badge className="bg-primary text-white">{campaign.matchScore}%</Badge>
+            </div>
           )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground line-clamp-2">{campaign.description}</p>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center gap-2 text-sm">
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-            {campaign.type === "affiliation"
-              ? <span className="font-semibold text-green-600">{campaign.commission}% commission</span>
-              : <span>{campaign.budget.min.toLocaleString()} - {campaign.budget.max.toLocaleString()} {campaign.budget.currency}</span>}
-          </div>
-          <div className="flex items-center gap-2 text-sm"><Calendar className="h-4 w-4 text-muted-foreground" /><span>{campaign.timeline}</span></div>
-          <div className="flex items-center gap-2 text-sm"><MapPin className="h-4 w-4 text-muted-foreground" /><span>{campaign.location}</span></div>
-          <div className="flex items-center gap-2 text-sm"><Users className="h-4 w-4 text-muted-foreground" /><span>{campaign.applicants} candidats</span></div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {campaign.platforms.slice(0, 3).map((platform) => (
-            <Badge key={platform} variant="outline" className="gap-1">{getPlatformIcon(platform)}{platform}</Badge>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {campaign.tags.slice(0, 3).map((tag) => <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>)}
-        </div>
-        {campaign.matchScore && (
-          <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-lg">
-            <Brain className="h-5 w-5 text-primary" />
-            <div className="flex-1"><p className="text-sm font-medium">Compatibilité IA</p><p className="text-xs text-muted-foreground">{campaign.matchScore}% de match</p></div>
-            <Badge className="bg-primary text-white">{campaign.matchScore}%</Badge>
-          </div>
-        )}
-        <Separator />
-        <Button className="w-full" onClick={() => handleOpenSheet(campaign)}>
-          <Send className="h-4 w-4 mr-2" />Postuler à cette campagne
-        </Button>
-      </CardContent>
+          <Separator />
+          <Button className="w-full" onClick={() => !locked && handleOpenSheet(campaign)} disabled={locked}>
+            <Send className="h-4 w-4 mr-2" />Postuler à cette campagne
+          </Button>
+        </CardContent>
+      </div>
     </Card>
   )
+
+  const visibleTabsCount = 3 + 1 + (canAccessConfidential ? 1 : 0) + (canAccessPremium ? 1 : 0)
 
   return (
     <div className="space-y-6">
@@ -219,19 +264,39 @@ export default function OpportunitesSection() {
       </Card>
 
       <Tabs defaultValue="targeted" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 gap-4 bg-transparent p-0 h-auto">
-          <TabsTrigger value="targeted" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-orange-500 data-[state=active]:to-red-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:scale-[1.02] transition-all duration-300 rounded-2xl border-2 border-border/50 data-[state=active]:border-orange-400 bg-card h-auto py-4 px-6 flex items-center justify-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-orange-500/20"><Brain className="h-5 w-5" /></div>
-            <div className="flex flex-col items-start"><span className="font-semibold">Pour vous</span><span className="text-xs opacity-80">({filterCampaigns("targeted").length})</span></div>
+        <TabsList className={`grid w-full gap-3 bg-transparent p-0 h-auto`} style={{ gridTemplateColumns: `repeat(${visibleTabsCount}, minmax(0, 1fr))` }}>
+          <TabsTrigger value="targeted" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-orange-500 data-[state=active]:to-red-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:scale-[1.02] transition-all duration-300 rounded-2xl border-2 border-border/50 data-[state=active]:border-orange-400 bg-card h-auto py-3 px-3 flex items-center justify-center gap-2">
+            <Brain className="h-5 w-5" />
+            <div className="flex flex-col items-start"><span className="font-semibold text-sm">Pour vous</span><span className="text-xs opacity-80">({filterCampaigns("targeted").length})</span></div>
           </TabsTrigger>
-          <TabsTrigger value="affiliation" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:scale-[1.02] transition-all duration-300 rounded-2xl border-2 border-border/50 data-[state=active]:border-green-400 bg-card h-auto py-4 px-6 flex items-center justify-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-500/20"><Percent className="h-5 w-5" /></div>
-            <div className="flex flex-col items-start"><span className="font-semibold">Affiliation</span><span className="text-xs opacity-80">({filterCampaigns("affiliation").length})</span></div>
+          <TabsTrigger value="affiliation" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:scale-[1.02] transition-all duration-300 rounded-2xl border-2 border-border/50 data-[state=active]:border-green-400 bg-card h-auto py-3 px-3 flex items-center justify-center gap-2">
+            <Percent className="h-5 w-5" />
+            <div className="flex flex-col items-start"><span className="font-semibold text-sm">Affiliation</span><span className="text-xs opacity-80">({filterCampaigns("affiliation").length})</span></div>
           </TabsTrigger>
-          <TabsTrigger value="general" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:scale-[1.02] transition-all duration-300 rounded-2xl border-2 border-border/50 data-[state=active]:border-blue-400 bg-card h-auto py-4 px-6 flex items-center justify-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-500/20"><Globe className="h-5 w-5" /></div>
-            <div className="flex flex-col items-start"><span className="font-semibold">Public</span><span className="text-xs opacity-80">({filterCampaigns("general").length})</span></div>
+          <TabsTrigger value="general" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:scale-[1.02] transition-all duration-300 rounded-2xl border-2 border-border/50 data-[state=active]:border-blue-400 bg-card h-auto py-3 px-3 flex items-center justify-center gap-2">
+            <Globe className="h-5 w-5" />
+            <div className="flex flex-col items-start"><span className="font-semibold text-sm">Public</span><span className="text-xs opacity-80">({filterCampaigns("general").length})</span></div>
           </TabsTrigger>
+
+          <TabsTrigger value="exclusive" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-teal-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:scale-[1.02] transition-all duration-300 rounded-2xl border-2 border-border/50 data-[state=active]:border-teal-400 bg-card h-auto py-3 px-3 flex items-center justify-center gap-2 relative">
+            <Flame className="h-5 w-5" />
+            <div className="flex flex-col items-start"><span className="font-semibold text-sm">Exclusif</span><span className="text-xs opacity-80">({filterCampaigns("exclusive").length})</span></div>
+            {!canAccessExclusive && <Lock className="absolute top-1 right-2 h-3 w-3 text-muted-foreground" />}
+          </TabsTrigger>
+
+          {canAccessConfidential && (
+            <TabsTrigger value="confidential" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-fuchsia-500 data-[state=active]:to-pink-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:scale-[1.02] transition-all duration-300 rounded-2xl border-2 border-border/50 data-[state=active]:border-fuchsia-400 bg-card h-auto py-3 px-3 flex items-center justify-center gap-2">
+              <Star className="h-5 w-5" />
+              <div className="flex flex-col items-start"><span className="font-semibold text-sm">Confidentiel</span><span className="text-xs opacity-80">({filterCampaigns("confidential").length})</span></div>
+            </TabsTrigger>
+          )}
+
+          {canAccessPremium && (
+            <TabsTrigger value="premium" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-violet-500 data-[state=active]:to-purple-700 data-[state=active]:text-white data-[state=active]:shadow-lg hover:scale-[1.02] transition-all duration-300 rounded-2xl border-2 border-border/50 data-[state=active]:border-violet-400 bg-card h-auto py-3 px-3 flex items-center justify-center gap-2">
+              <Rocket className="h-5 w-5" />
+              <div className="flex flex-col items-start"><span className="font-semibold text-sm">Premium</span><span className="text-xs opacity-80">({filterCampaigns("premium").length})</span></div>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="targeted" className="space-y-4">
@@ -284,6 +349,79 @@ export default function OpportunitesSection() {
             {filterCampaigns("affiliation").map((c) => <CampaignCard key={c.id} campaign={c} />)}
           </div>
         </TabsContent>
+
+        <TabsContent value="exclusive" className="space-y-4">
+          <Card className="bg-gradient-to-r from-teal-500/10 to-cyan-500/10 border-teal-500/30">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Flame className="h-5 w-5 text-teal-600" />
+                <CardTitle>Opportunités Exclusives</CardTitle>
+                <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0">🔥 Diamant</Badge>
+              </div>
+              <CardDescription>
+                Campagnes premium avec des marques de luxe (Hermès, Apple, Rolex...). Postulables uniquement à partir du niveau Diamant.
+                {!canAccessExclusive && (
+                  <span className="block mt-2 text-teal-600 font-semibold">
+                    🔒 Plus que {Math.max(0, 2000 - userScore)} points pour débloquer
+                  </span>
+                )}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filterCampaigns("exclusive").map((c) => (
+              <CampaignCard
+                key={c.id}
+                campaign={c}
+                locked={!canAccessExclusive}
+                lockLevelName="Diamant"
+                lockLevelEmoji="🔥"
+                lockLevelGradient="from-teal-400 to-cyan-500"
+                lockPointsRequired={2000}
+              />
+            ))}
+          </div>
+        </TabsContent>
+
+        {canAccessConfidential && (
+          <TabsContent value="confidential" className="space-y-4">
+            <Card className="bg-gradient-to-r from-fuchsia-500/10 to-pink-500/10 border-fuchsia-500/30">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-fuchsia-600" />
+                  <CardTitle>Campagnes Confidentielles</CardTitle>
+                  <Badge className="bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white border-0">⭐ Élite</Badge>
+                </div>
+                <CardDescription>
+                  Campagnes sous NDA. Lancements de produits avant l&apos;annonce officielle, partenariats avec startups en stealth mode...
+                </CardDescription>
+              </CardHeader>
+            </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filterCampaigns("confidential").map((c) => <CampaignCard key={c.id} campaign={c} />)}
+            </div>
+          </TabsContent>
+        )}
+
+        {canAccessPremium && (
+          <TabsContent value="premium" className="space-y-4">
+            <Card className="bg-gradient-to-r from-violet-500/10 to-purple-500/10 border-violet-500/30">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Rocket className="h-5 w-5 text-violet-600" />
+                  <CardTitle>Opportunités Premium</CardTitle>
+                  <Badge className="bg-gradient-to-r from-violet-500 to-purple-600 text-white border-0">🚀 Champion</Badge>
+                </div>
+                <CardDescription>
+                  Le top du top. Ambassadeur global 12 mois, cover Vogue, equity dans les sociétés. Réservé aux créateurs au sommet.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filterCampaigns("premium").map((c) => <CampaignCard key={c.id} campaign={c} />)}
+            </div>
+          </TabsContent>
+        )}
       </Tabs>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
@@ -340,5 +478,16 @@ export default function OpportunitesSection() {
         </SheetContent>
       </Sheet>
     </div>
+  )
+}
+
+/* ============================================================
+   EXPORT PRINCIPAL : wrappé par LevelGate
+   ============================================================ */
+export default function OpportunitesSection({ user }) {
+  return (
+    <LevelGate user={user} sectionTitle="Opportunités" sectionDescription="Campagnes Ciblées • Candidatures Rapides • Matching Intelligent">
+      <OpportunitesContent user={user} />
+    </LevelGate>
   )
 }

@@ -13,11 +13,11 @@ import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import supabase from '@/lib/supabase'
 import { useUserLevel, LEVELS } from '@/lib/hook/useUserLevel'
+import LevelGate from '@/components/LevelGate'
 
 const YoutubeIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58a2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/></svg>
 const InstagramIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
 const TikTokIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.95a8.28 8.28 0 0 0 4.84 1.55V7.05a4.85 4.85 0 0 1-1.07-.36z"/></svg>
-const Link2Off = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 17H7A5 5 0 0 1 7 7"/><path d="M15 7h2a5 5 0 0 1 4 8"/><line x1="8" x2="12" y1="12" y2="12"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
 
 const getPlatformIcon = (platform) => {
   switch (platform) {
@@ -37,9 +37,6 @@ const getPlatformColor = (platform) => {
   }
 }
 
-/* ============================================================
-   Métadonnées visuelles des niveaux (synchro avec useUserLevel)
-   ============================================================ */
 const LEVEL_VISUALS = {
   bronze: { gradient: 'from-orange-400 to-amber-600', title: 'Profil Vérifié' },
   argent: { gradient: 'from-slate-400 to-slate-600', title: 'Statisticien' },
@@ -51,8 +48,13 @@ const LEVEL_VISUALS = {
   legende: { gradient: 'from-pink-500 via-orange-500 to-yellow-500', title: 'Top Créateur' },
 }
 
-export default function ProfilSection({ user, profile, metrics }) {
-  // ===== HOOK GAMIFICATION =====
+/* ============================================================
+   COMPOSANT INTÉRIEUR
+   Note : skipProfileCheck est utilisé car la section Profil doit
+   être accessible même quand le profil n'est pas à 100% (sinon
+   l'utilisateur ne pourrait jamais compléter son profil !)
+   ============================================================ */
+function ProfilContent({ user, profile, metrics }) {
   const { level, currentLevelIndex, isProfileComplete, score, canAccess } = useUserLevel(user?.id)
 
   const [influencer, setInfluencer] = useState(null)
@@ -130,12 +132,10 @@ export default function ProfilSection({ user, profile, metrics }) {
     : '0.0'
 
   const aiScore = influencer?.ai_score || 0
-  const firstName = displayName?.split(' ')[0] || profile?.username || 'Influenceur'
   const initials = displayName?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'IN'
 
-  // ===== STATUTS BADGES GAMIFICATION =====
-  const isVerified = canAccess('verifiedProfile')      // débloqué dès Bronze
-  const isTopCreator = canAccess('topCreatorStatus')   // débloqué uniquement Légende
+  const isVerified = canAccess('verifiedProfile')
+  const isTopCreator = canAccess('topCreatorStatus')
 
   if (loading) {
     return (
@@ -162,7 +162,6 @@ export default function ProfilSection({ user, profile, metrics }) {
         </div>
       </div>
 
-      {/* Cards hero */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="relative overflow-hidden shadow-xl">
           <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/10 rounded-full blur-3xl" />
@@ -176,7 +175,6 @@ export default function ProfilSection({ user, profile, metrics }) {
               </Button>
             </div>
 
-            {/* Nom + Badge Top Créateur si Légende */}
             <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
               <h2 className="text-2xl font-bold">{displayName || 'Votre nom'}</h2>
               {isTopCreator && (
@@ -195,7 +193,6 @@ export default function ProfilSection({ user, profile, metrics }) {
               </div>
             </div>
 
-            {/* BADGE PROFIL VÉRIFIÉ DYNAMIQUE */}
             <div className="flex justify-center mb-6">
               {isVerified ? (
                 <Badge className="px-4 py-2 gap-2 bg-green-500/15 text-green-700 border border-green-500/30 hover:bg-green-500/20">
@@ -272,7 +269,6 @@ export default function ProfilSection({ user, profile, metrics }) {
           ))}
         </TabsList>
 
-        {/* GÉNÉRAL */}
         <TabsContent value="general">
           <Card className="shadow-xl">
             <CardHeader>
@@ -348,7 +344,6 @@ export default function ProfilSection({ user, profile, metrics }) {
           </Card>
         </TabsContent>
 
-        {/* RÉSEAUX */}
         <TabsContent value="reseaux">
           <Card className="shadow-xl">
             <CardHeader>
@@ -396,7 +391,6 @@ export default function ProfilSection({ user, profile, metrics }) {
           </Card>
         </TabsContent>
 
-        {/* PORTFOLIO */}
         <TabsContent value="portfolio">
           <Card className="shadow-xl">
             <CardHeader>
@@ -435,7 +429,6 @@ export default function ProfilSection({ user, profile, metrics }) {
           </Card>
         </TabsContent>
 
-        {/* AVIS */}
         <TabsContent value="avis">
           <Card className="shadow-xl">
             <CardHeader>
@@ -489,7 +482,6 @@ export default function ProfilSection({ user, profile, metrics }) {
           </Card>
         </TabsContent>
 
-        {/* ============ VÉRIFICATIONS (avec 8 BADGES DE NIVEAU) ============ */}
         <TabsContent value="verifications">
           <Card className="shadow-xl">
             <CardHeader>
@@ -499,7 +491,6 @@ export default function ProfilSection({ user, profile, metrics }) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Vérification d'identité */}
               <div className="rounded-2xl border p-5 bg-muted/30">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
@@ -518,7 +509,6 @@ export default function ProfilSection({ user, profile, metrics }) {
                 </div>
               </div>
 
-              {/* Comptes sociaux */}
               <div className="rounded-2xl border p-5 bg-muted/30">
                 <h3 className="font-semibold text-lg mb-4">Comptes sociaux connectés</h3>
                 <div className="space-y-2">
@@ -544,7 +534,6 @@ export default function ProfilSection({ user, profile, metrics }) {
                 </div>
               </div>
 
-              {/* ====== NOUVEAU : Grille des 8 badges de niveau ====== */}
               <div className="rounded-2xl border p-6 bg-muted/30">
                 <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
                   <h3 className="font-semibold text-lg">Vos badges Partnexx</h3>
@@ -567,20 +556,17 @@ export default function ProfilSection({ user, profile, metrics }) {
                             : 'bg-muted/20 border-muted opacity-50'
                         } ${isCurrent ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
                       >
-                        {/* Icône badge */}
                         <div className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl shadow-lg ${
                           isUnlocked ? `bg-gradient-to-br ${visual.gradient}` : 'bg-muted grayscale'
                         }`}>
                           {isUnlocked ? lvl.emoji : <Lock className="h-6 w-6 text-muted-foreground" />}
                         </div>
 
-                        {/* Titre + Sous-titre */}
                         <div className="text-center min-h-[2.5rem]">
                           <p className="font-bold text-sm">{lvl.name}</p>
                           <p className="text-[10px] text-muted-foreground leading-tight">{visual.title}</p>
                         </div>
 
-                        {/* État */}
                         {isUnlocked ? (
                           isCurrent ? (
                             <Badge className="bg-gradient-to-r from-primary to-purple-500 text-white text-[10px] px-2 py-0">
@@ -599,7 +585,6 @@ export default function ProfilSection({ user, profile, metrics }) {
                   })}
                 </div>
 
-                {/* Indication progression */}
                 {!isProfileComplete && (
                   <div className="mt-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg text-center">
                     <p className="text-sm text-orange-700 font-medium">
@@ -613,5 +598,23 @@ export default function ProfilSection({ user, profile, metrics }) {
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+/* ============================================================
+   EXPORT PRINCIPAL : wrappé par LevelGate
+   ATTENTION : skipProfileCheck=true ici car le Profil DOIT être
+   accessible même si profil < 100% (sinon impossible de le compléter)
+   ============================================================ */
+export default function ProfilSection({ user, profile, metrics }) {
+  return (
+    <LevelGate
+      user={user}
+      sectionTitle="Mon profil"
+      sectionDescription="Informations Personnelles • Réseaux Sociaux • Portfolio"
+      skipProfileCheck={true}
+    >
+      <ProfilContent user={user} profile={profile} metrics={metrics} />
+    </LevelGate>
   )
 }

@@ -10,6 +10,7 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { useRouter } from 'next/navigation'
 import supabase from '@/lib/supabase'
 import { useUserLevel } from '@/lib/hook/useUserLevel'
+import LevelGate from '@/components/LevelGate'
 
 const YoutubeIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58a2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/></svg>
 const InstagramIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
@@ -36,9 +37,6 @@ const getPlatformColor = (platform) => {
 
 const tooltipStyle = { backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }
 
-/* ============================================================
-   COMPOSANT : Overlay de blocage (flou + cadenas + CTA)
-   ============================================================ */
 function LockedOverlay({ levelName, levelEmoji, pointsRequired, currentScore, gradient }) {
   const pointsMissing = Math.max(0, pointsRequired - currentScore)
   return (
@@ -56,24 +54,24 @@ function LockedOverlay({ levelName, levelEmoji, pointsRequired, currentScore, gr
   )
 }
 
-export default function StatistiquesSection({ metrics, transactions, user }) {
-  const router = useRouter()
+/* ============================================================
+   COMPOSANT INTÉRIEUR
+   ============================================================ */
+function StatistiquesContent({ metrics, transactions, user }) {
+  const { canAccess, score: userScore } = useUserLevel(user?.id)
 
-  // ===== HOOK GAMIFICATION =====
-  const { canAccess, isProfileComplete, profileCompletion, score: userScore, loading: levelLoading } = useUserLevel(user?.id)
+  const canAccessAdvancedStats = canAccess('advancedStats')
+  const canAccessCompleteAnalytics = canAccess('completeAnalytics')
 
-  const canAccessAdvancedStats = canAccess('advancedStats')      // Argent (200 pts)
-  const canAccessCompleteAnalytics = canAccess('completeAnalytics') // Or (500 pts)
-
-  const [mounted, setMounted] = useState(false)
   const [socialAccounts, setSocialAccounts] = useState([])
   const [contentPosts, setContentPosts] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => setMounted(true), [])
-
   useEffect(() => {
-    if (!user?.id) return
+    if (!user?.id) {
+      setLoading(false)
+      return
+    }
     fetchData()
 
     const channel = supabase
@@ -94,7 +92,6 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
         .eq('user_id', user.id)
         .single()
 
-      // BUG FIX : si pas d'influencer, on ne reste plus bloqué sur loading
       if (!influencer) {
         setSocialAccounts([])
         setContentPosts([])
@@ -116,9 +113,6 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
     }
   }
 
-  if (!mounted) return null
-
-  // Stats calculées
   const totalFollowers = socialAccounts.reduce((sum, s) => sum + (s.followers_count || 0), 0)
   const avgEngagement = socialAccounts.length > 0
     ? (socialAccounts.reduce((sum, s) => sum + parseFloat(s.engagement_rate || 0), 0) / socialAccounts.length).toFixed(1)
@@ -169,49 +163,6 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
   const contentScore = Math.min(contentPosts.length * 10, 100)
   const globalScore = Math.round((engScore + followScore + contentScore) / 3)
 
-  // ===== CAS 1 : Profil incomplet → écran de blocage complet =====
-  if (!levelLoading && !isProfileComplete) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
-            <Badge variant="outline" className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 border-purple-400 text-white shadow-lg">
-              <Brain className="h-4 w-4 text-white" /><span className="text-sm font-semibold">IA activé</span>
-            </Badge>
-          </div>
-          <p className="text-muted-foreground">Performances Détaillées • Données Réelles Supabase • Insights Avancés</p>
-        </div>
-
-        <Card className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border-orange-500/30">
-          <CardContent className="p-12 text-center space-y-6">
-            <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center">
-              <Lock className="h-10 w-10 text-white" />
-            </div>
-            <div>
-              <h2 className="text-3xl font-bold text-orange-700 mb-2">Analytics verrouillés</h2>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Complète ton profil à 100% pour accéder à tes statistiques et débloquer ton niveau Bronze.
-              </p>
-            </div>
-            <div className="max-w-md mx-auto space-y-3">
-              <div className="flex justify-between text-sm font-semibold">
-                <span>Profil complété</span>
-                <span className="text-orange-600">{profileCompletion}%</span>
-              </div>
-              <div className="relative h-3 bg-orange-500/10 rounded-full overflow-hidden">
-                <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-400 to-amber-500 rounded-full transition-all duration-1000" style={{ width: `${profileCompletion}%` }} />
-              </div>
-              <Button onClick={() => router.push('/dashboard/influencer?section=profil')} className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold">
-                <Target className="h-4 w-4 mr-2" />Compléter mon profil
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -233,7 +184,6 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
         </div>
       ) : (
         <>
-          {/* ============ HERO STATS (Bronze - accessible) ============ */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {statsCards.map((stat, index) => {
               const Icon = stat.icon
@@ -273,7 +223,6 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
             })}
           </div>
 
-          {/* Bandeau incitatif si pas encore Or */}
           {!canAccessCompleteAnalytics && (
             <Card className="bg-gradient-to-r from-primary/10 to-purple-500/10 border-primary/30">
               <CardContent className="p-5 flex items-center justify-between flex-wrap gap-3">
@@ -297,9 +246,7 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Colonne gauche */}
             <div className="lg:col-span-4 space-y-4">
-              {/* Score Global - Bronze accessible */}
               <Card className="border-2 hover:shadow-xl transition-all duration-300">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg"><Award className="w-5 h-5 text-primary" />Score Global</CardTitle>
@@ -343,9 +290,7 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
                 </CardContent>
               </Card>
 
-              {/* ====== Plateformes & Top Posts (Argent + Or) ====== */}
               <Card className="border-2 relative">
-                {/* Lock overlay si pas Argent (pour les plateformes) */}
                 {!canAccessAdvancedStats && (
                   <LockedOverlay
                     levelName="Argent"
@@ -430,9 +375,7 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
               </Card>
             </div>
 
-            {/* Colonne droite : onglets Contenu / Revenus / Plateformes (Or) */}
             <div className="lg:col-span-8 relative">
-              {/* Lock overlay si pas Or (pour les onglets analytics complets) */}
               {!canAccessCompleteAnalytics && (
                 <LockedOverlay
                   levelName="Or"
@@ -456,7 +399,6 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
                   ))}
                 </TabsList>
 
-                {/* Contenu */}
                 <TabsContent value="content">
                   <Card className="border-2">
                     <CardHeader><CardTitle>Performance par Type de Contenu</CardTitle></CardHeader>
@@ -504,7 +446,6 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
                   </Card>
                 </TabsContent>
 
-                {/* Revenus */}
                 <TabsContent value="revenue" className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {[
@@ -557,7 +498,6 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
                   </Card>
                 </TabsContent>
 
-                {/* Plateformes */}
                 <TabsContent value="platforms">
                   {socialAccounts.length === 0 ? (
                     <Card>
@@ -632,5 +572,16 @@ export default function StatistiquesSection({ metrics, transactions, user }) {
         </>
       )}
     </div>
+  )
+}
+
+/* ============================================================
+   EXPORT PRINCIPAL : wrappé par LevelGate
+   ============================================================ */
+export default function StatistiquesSection({ metrics, transactions, user }) {
+  return (
+    <LevelGate user={user} sectionTitle="Analytics" sectionDescription="Performances Détaillées • Données Réelles Supabase • Insights Avancés">
+      <StatistiquesContent metrics={metrics} transactions={transactions} user={user} />
+    </LevelGate>
   )
 }
