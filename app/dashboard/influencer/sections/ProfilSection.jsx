@@ -12,7 +12,8 @@ import { MapPin, Calendar, Target, Star, TrendingUp, MessageCircle, Brain, Shiel
 import { useState, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import supabase from '@/lib/supabase'
-import { useUserLevel, LEVELS } from '@/lib/hook/useUserLevel'
+import { LEVELS } from "@/lib/hook/useUserLevel"
+import { useLevel } from "@/lib/context/LevelContext"
 import LevelGate from '@/components/LevelGate'
 
 const YoutubeIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58a2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/></svg>
@@ -76,7 +77,7 @@ const MAX_NICHES = 3
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024 // 2 MB
 
 function ProfilContent({ user, profile: initialProfile, metrics }) {
-  const { level, currentLevelIndex, isProfileComplete, score, canAccess, profileCompletion, refetch } = useUserLevel(user?.id)
+  const { level, currentLevelIndex, isProfileComplete, score, canAccess, profileCompletion, refetch } = useLevel()
 
   const [influencer, setInfluencer] = useState(null)
   const [profile, setProfile] = useState(initialProfile)

@@ -15,14 +15,14 @@ import {
 } from 'lucide-react'
 import supabase from '@/lib/supabase'
 import { toast } from 'sonner'
-import { useUserLevel } from '@/lib/hook/useUserLevel'
+import { useLevel } from "@/lib/context/LevelContext"
 import LevelGate from '@/components/LevelGate'
 
 /* ============================================================
    COMPOSANT INTÉRIEUR
    ============================================================ */
 function CollaborationsContent({ user }) {
-  const { canAccess, score: userScore } = useUserLevel(user?.id)
+  const { canAccess, score: userScore } = useLevel()
   const canAccessDetailed = canAccess('detailedCollabTracking') // Or (500 pts)
 
   const [activeTab, setActiveTab] = useState("active")
