@@ -54,8 +54,13 @@ const CAMPAIGN_TYPES = [
 const OBJECTIVES = ["Notoriété", "Engagement", "Ventes / Conversions"]
 
 const CONTENT_TYPES = [
-  "Post Instagram", "Story Instagram", "Reel Instagram",
-  "TikTok", "Vidéo YouTube", "Post LinkedIn", "Tweet"
+  { label: "Post Instagram", value: "post" },
+  { label: "Story Instagram", value: "story" },
+  { label: "Reel Instagram", value: "reel" },
+  { label: "TikTok / Vidéo courte", value: "video" },
+  { label: "Vidéo YouTube", value: "video" },
+  { label: "Carrousel", value: "carousel" },
+  { label: "Live", value: "live" },
 ]
 
 const EMPTY_FORM = {
@@ -104,19 +109,23 @@ function CreateCampaignWizard({ brandId, onCreated, onBack }) {
     setSaving(true)
     const budget = parseFloat(form.totalBudget || form.amountPerContent || form.monthlyAmount || 0)
     const { data, error } = await supabase.from('campaigns').insert({
-      brand_id: brandId,
-      title: form.name,
-      description: form.brief,
-      budget_per_influencer_min: parseFloat(form.amountPerContent || 0),
-      budget_per_influencer_max: parseFloat(form.amountPerContent || 0),
-      total_budget: budget,
-      start_date: form.startDate || null,
-      end_date: form.indefiniteDuration ? null : (form.endDate || null),
-      platforms: [],
-      content_types: form.contentTypes,
-      requirements: form.constraints,
-      status: 'draft',
-    }).select().single()
+  brand_id: brandId,
+  title: form.name,
+  description: form.brief || null,
+  brief: form.brief || null,
+  budget_total: budget,
+  budget_per_influencer_min: parseFloat(form.amountPerContent || 0) || null,
+  budget_per_influencer_max: parseFloat(form.amountPerContent || 0) || null,
+  commission_rate: parseFloat(form.commissionRate || 0) || null,
+  start_date: form.startDate || null,
+  end_date: form.indefiniteDuration ? null : (form.endDate || null),
+  application_deadline: form.submissionDeadline || null,
+  content_types: form.contentTypes.length > 0 ? [...new Set(form.contentTypes.map(k => k.split(':')[0]))] : null,
+  target_niches: form.categories.length > 0 ? form.categories : null,
+  goals: form.objectives.length > 0 ? form.objectives : null,
+  status: 'draft',
+  is_public: true,
+}).select().single()
 
     if (error) { toast.error("Erreur lors de la création"); setSaving(false); return }
     setCreatedName(form.name)
@@ -401,10 +410,22 @@ function CreateCampaignWizard({ brandId, onCreated, onBack }) {
             <div>
               <label className="block text-sm font-medium mb-2">Types de contenu souhaités *</label>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {CONTENT_TYPES.map(type => (
-                  <div key={type} className="flex items-center space-x-2">
-                    <Checkbox id={type} checked={form.contentTypes.includes(type)} onCheckedChange={() => toggle('contentTypes', type)} />
-                    <label htmlFor={type} className="text-sm cursor-pointer">{type}</label>
+                {CONTENT_TYPES.map((type, i) => (
+                  <div key={i} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`ct-${i}`}
+                      checked={form.contentTypes.includes(type.value + ':' + type.label)}
+                      onCheckedChange={() => {
+                        const key = type.value + ':' + type.label
+                        setForm(p => ({
+                          ...p,
+                          contentTypes: p.contentTypes.includes(key)
+                            ? p.contentTypes.filter(k => k !== key)
+                            : [...p.contentTypes, key]
+                        }))
+                      }}
+                    />
+                    <label htmlFor={`ct-${i}`} className="text-sm cursor-pointer">{type.label}</label>
                   </div>
                 ))}
               </div>
@@ -455,7 +476,7 @@ function CreateCampaignWizard({ brandId, onCreated, onBack }) {
               <Card className="p-4">
                 <h4 className="font-medium mb-3">Contenus attendus</h4>
                 <div className="space-y-2 text-sm">
-                  <div><span className="font-medium">Types:</span> {form.contentTypes.join(", ")}</div>
+                  <div><span className="font-medium">Types:</span> {form.contentTypes.map(k => k.split(':')[1]).join(", ")}</div>
                   <div><span className="font-medium">Quantité:</span> {form.contentQuantity}</div>
                   {form.constraints && <div><span className="font-medium">Contraintes:</span> {form.constraints}</div>}
                 </div>
@@ -864,7 +885,7 @@ export default function CampagnesSection({ user, profile }) {
 
     const [campRes, appRes] = await Promise.allSettled([
       supabase.from('campaigns').select('*').eq('brand_id', brand.id).order('created_at', { ascending: false }),
-      supabase.from('applications').select('*, influencers(display_name, ai_score)').eq('brand_id', brand.id).order('applied_at', { ascending: false }),
+      supabase.from('applications').select('*').eq('brand_id', brand.id)
     ])
 
     const camps = campRes.status === 'fulfilled' ? campRes.value.data || [] : []

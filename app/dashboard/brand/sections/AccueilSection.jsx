@@ -3,40 +3,31 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import {
-  BarChart3, Users, Eye, Rocket, Plus, TrendingUp, Brain,
+  BarChart3, Users, Rocket, Plus, TrendingUp, Brain,
   Target, Clock, DollarSign, UserPlus, FileText, Award,
-  Sparkles, CheckCircle, AlertTriangle, Lightbulb, Shield,
+  Sparkles, AlertTriangle, Lightbulb, Shield,
   Globe, Heart, Download, PlayCircle, BookOpen, Bell
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell
+  ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts'
 import supabase from '@/lib/supabase'
 import { toast } from 'sonner'
 
 const Atom = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/><path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/></svg>
-const Gauge = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
 const Orbit = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(-45 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(45 12 12)"/><circle cx="12" cy="12" r="1"/></svg>
 
 const performanceData = [
-  { name: "Lun", vues: 12000, engagement: 2400, conversions: 89 },
-  { name: "Mar", vues: 21000, engagement: 3200, conversions: 156 },
-  { name: "Mer", vues: 18000, engagement: 2800, conversions: 134 },
-  { name: "Jeu", vues: 26000, engagement: 3600, conversions: 198 },
-  { name: "Ven", vues: 30000, engagement: 4200, conversions: 267 },
-  { name: "Sam", vues: 28000, engagement: 3800, conversions: 234 },
-  { name: "Dim", vues: 20000, engagement: 3200, conversions: 178 },
+  { name: "Lun", vues: 12000, engagement: 2400 },
+  { name: "Mar", vues: 21000, engagement: 3200 },
+  { name: "Mer", vues: 18000, engagement: 2800 },
+  { name: "Jeu", vues: 26000, engagement: 3600 },
+  { name: "Ven", vues: 30000, engagement: 4200 },
+  { name: "Sam", vues: 28000, engagement: 3800 },
+  { name: "Dim", vues: 20000, engagement: 3200 },
 ]
-
-const platformColors = {
-  instagram: '#E1306C',
-  tiktok: '#000000',
-  youtube: '#FF0000',
-  linkedin: '#0077B5',
-}
 
 const aiInsights = [
   { id: 1, title: "Opportunité détectée", description: "Micro-influenceurs beauté : +67% d'engagement vs macro-influenceurs ce mois", priority: "high", action: "Ajuster stratégie", icon: Lightbulb, color: "emerald" },
@@ -50,6 +41,13 @@ const marketingNews = [
   { id: 2, title: "Micro-influenceurs : la tendance qui domine 2025", summary: "Les créateurs 10K-100K followers génèrent 3x plus d'engagement", time: "Il y a 4h", category: "Stratégie", image: "📈", priority: "medium" },
   { id: 3, title: "Nouvelles obligations RGPD pour l'influence marketing", summary: "Guide complet des nouvelles règles européennes pour les partenariats payés", time: "Il y a 1j", category: "Conformité", image: "⚖️", priority: "high" },
   { id: 4, title: "TikTok Shop explose : +340% de conversions", summary: "Les fonctionnalités e-commerce natives transforment l'influence marketing", time: "Il y a 2j", category: "E-commerce", image: "🛍️", priority: "medium" },
+]
+
+const platformData = [
+  { name: 'Instagram', value: 45, color: '#E1306C' },
+  { name: 'TikTok', value: 30, color: '#666' },
+  { name: 'YouTube', value: 15, color: '#FF0000' },
+  { name: 'LinkedIn', value: 10, color: '#0077B5' },
 ]
 
 const tooltipStyle = { backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }
@@ -82,8 +80,8 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
     if (brand) setBrandData(brand)
 
     const [campRes, appRes, convRes] = await Promise.allSettled([
-      supabase.from('campaigns').select('*').eq('brand_id', brand?.id).order('created_at', { ascending: false }),
-      supabase.from('applications').select('*, campaigns(title), influencers(display_name)').eq('brand_id', brand?.id).order('applied_at', { ascending: false }).limit(10),
+      supabase.from('campaigns').select('id, title, status, budget_total').eq('brand_id', brand?.id),
+      supabase.from('applications').select('*').eq('brand_id', brand?.id).order('applied_at', { ascending: false }).limit(10),
       supabase.from('conversations').select('*').eq('brand_id', brand?.id).order('last_message_at', { ascending: false }).limit(5),
     ])
 
@@ -96,9 +94,8 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
   const currentHour = currentTime.getHours()
   const greeting = currentHour < 12 ? "Bonjour" : currentHour < 18 ? "Bon après-midi" : "Bonsoir"
   const companyName = brandData?.company_name || profile?.full_name || 'vous'
-
   const activeCampaigns = campaigns.filter(c => c.status === 'active').length
-  const totalBudget = campaigns.reduce((sum, c) => sum + parseFloat(c.total_budget || 0), 0)
+  const totalBudget = campaigns.reduce((sum, c) => sum + parseFloat(c.budget_total || 0), 0)
   const pendingApplications = applications.filter(a => a.status === 'pending').length
   const unreadMessages = conversations.reduce((sum, c) => sum + (c.brand_unread || 0), 0)
 
@@ -111,30 +108,6 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
     { label: "Conversations", value: conversations.length, icon: BarChart3, gradient: "from-violet-50 to-purple-50", growth: "Actives", description: "Avec influenceurs" },
   ]
 
-  const recentActivities = [
-    ...applications.slice(0, 2).map(a => ({
-      id: a.id, type: "application",
-      title: `Candidature de ${a.influencers?.display_name || 'Influenceur'}`,
-      description: `Pour la campagne: ${a.campaigns?.title || 'Campagne'}`,
-      time: new Date(a.applied_at).toLocaleDateString('fr-FR'),
-      icon: UserPlus, color: "purple"
-    })),
-    ...campaigns.slice(0, 2).map(c => ({
-      id: c.id, type: "campaign",
-      title: `Campagne: ${c.title}`,
-      description: `Budget: ${parseFloat(c.total_budget || 0).toLocaleString()}€ • Statut: ${c.status}`,
-      time: new Date(c.created_at).toLocaleDateString('fr-FR'),
-      icon: Rocket, color: "emerald"
-    })),
-  ]
-
-  const platformData = [
-    { name: 'Instagram', value: 45, color: '#E1306C' },
-    { name: 'TikTok', value: 30, color: '#666' },
-    { name: 'YouTube', value: 15, color: '#FF0000' },
-    { name: 'LinkedIn', value: 10, color: '#0077B5' },
-  ]
-
   return (
     <div className="space-y-6">
       {/* HERO */}
@@ -144,9 +117,7 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <h1 className="text-3xl lg:text-4xl font-black text-white">
-                  {greeting}, {companyName} !
-                </h1>
+                <h1 className="text-3xl lg:text-4xl font-black text-white">{greeting}, {companyName} !</h1>
                 <Atom className="h-6 w-6 text-white/80 animate-pulse" />
               </div>
               <p className="text-lg text-white/95 font-semibold">
@@ -176,26 +147,22 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
         <CardContent className="pt-0 relative space-y-4">
           <div className="flex flex-wrap gap-3">
             <Badge className="bg-white/20 text-white border-white/30 px-4 py-2">
-              <Award className="h-4 w-4 mr-2" />
-              {brandData?.subscription_plan || 'Gratuit'}
+              <Award className="h-4 w-4 mr-2" />{brandData?.subscription_plan || 'Gratuit'}
             </Badge>
             <Badge className="bg-emerald-500/20 text-white border-emerald-300/30 px-4 py-2">
-              <Sparkles className="h-4 w-4 mr-2" />
-              {brandData?.industry || 'Marque'}
+              <Sparkles className="h-4 w-4 mr-2" />{brandData?.industry || 'Marque'}
             </Badge>
             {pendingApplications > 0 && (
               <Badge className="bg-orange-500/20 text-white border-orange-300/30 px-4 py-2">
-                <Bell className="h-4 w-4 mr-2" />
-                {pendingApplications} candidature{pendingApplications > 1 ? 's' : ''} à traiter
+                <Bell className="h-4 w-4 mr-2" />{pendingApplications} candidature{pendingApplications > 1 ? 's' : ''} à traiter
               </Badge>
             )}
           </div>
-
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
             <Button className="bg-white/15 border-white/25 text-white hover:bg-white/25 border h-auto py-3 px-4 w-full" variant="outline" onClick={() => setActiveSection('campagnes')}>
               <Plus className="h-4 w-4 mr-2" />Nouvelle campagne
             </Button>
-            <Button className="bg-white/15 border-white/25 text-white hover:bg-white/25 border h-auto py-3 px-4 w-full" variant="outline" onClick={() => setActiveSection('candidatures')}>
+            <Button className="bg-white/15 border-white/25 text-white hover:bg-white/25 border h-auto py-3 px-4 w-full" variant="outline" onClick={() => setActiveSection('campagnes')}>
               <Users className="h-4 w-4 mr-2" />Voir candidatures
             </Button>
             <Button className="bg-white/15 border-white/25 text-white hover:bg-white/25 border h-auto py-3 px-4 w-full" variant="outline" onClick={() => setActiveSection('messagerie')}>
@@ -234,8 +201,7 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
         <Card className="border-0 shadow-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              Performance de la semaine
+              <BarChart3 className="h-5 w-5 text-primary" />Performance de la semaine
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -243,11 +209,11 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={performanceData}>
                   <defs>
-                    <linearGradient id="vuesGrad" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id="vuesGradB" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="hsl(262 80% 50%)" stopOpacity={0.3} />
                       <stop offset="100%" stopColor="hsl(262 80% 50%)" stopOpacity={0} />
                     </linearGradient>
-                    <linearGradient id="engGrad" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id="engGradB" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="hsl(142 76% 50%)" stopOpacity={0.3} />
                       <stop offset="100%" stopColor="hsl(142 76% 50%)" stopOpacity={0} />
                     </linearGradient>
@@ -256,8 +222,8 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
                   <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
                   <Tooltip contentStyle={tooltipStyle} />
-                  <Area type="monotone" dataKey="vues" stroke="hsl(262 80% 50%)" fill="url(#vuesGrad)" strokeWidth={2} name="Vues" />
-                  <Area type="monotone" dataKey="engagement" stroke="hsl(142 76% 50%)" fill="url(#engGrad)" strokeWidth={2} name="Engagement" />
+                  <Area type="monotone" dataKey="vues" stroke="hsl(262 80% 50%)" fill="url(#vuesGradB)" strokeWidth={2} name="Vues" />
+                  <Area type="monotone" dataKey="engagement" stroke="hsl(142 76% 50%)" fill="url(#engGradB)" strokeWidth={2} name="Engagement" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -267,12 +233,11 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
         <Card className="border-0 shadow-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              Répartition plateformes
+              <Target className="h-5 w-5 text-primary" />Répartition plateformes
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64 flex items-center justify-center">
+            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={platformData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, value }) => `${name} ${value}%`} labelLine={false}>
@@ -288,9 +253,8 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
         </Card>
       </div>
 
-      {/* Campagnes en cours + Activités récentes */}
+      {/* Campagnes + Activités */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Campagnes */}
         <Card className="border-0 shadow-xl">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -310,7 +274,7 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
                 <div key={campaign.id} className="flex items-center justify-between p-3 rounded-xl border bg-muted/30 hover:bg-muted/50 transition-colors">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate">{campaign.title}</p>
-                    <p className="text-xs text-muted-foreground">{parseFloat(campaign.total_budget || 0).toLocaleString()}€ • {campaign.status}</p>
+                    <p className="text-xs text-muted-foreground">{parseFloat(campaign.budget_total || 0).toLocaleString()}€ • {campaign.status}</p>
                   </div>
                   <Badge className={
                     campaign.status === 'active' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
@@ -325,38 +289,38 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
           </CardContent>
         </Card>
 
-        {/* Activités récentes */}
         <Card className="border-0 shadow-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" />Activité récente</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {recentActivities.length === 0 ? (
+            {applications.length === 0 && campaigns.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">Aucune activité récente</div>
             ) : (
-              recentActivities.map((activity) => {
-                const Icon = activity.icon
-                return (
-                  <div key={activity.id} className="flex items-start gap-3 p-3 rounded-xl border bg-muted/30 hover:bg-muted/50 transition-colors">
-                    <div className={`p-2 rounded-lg flex-shrink-0 ${
-                      activity.color === 'emerald' ? 'bg-emerald-500/10' :
-                      activity.color === 'purple' ? 'bg-purple-500/10' :
-                      activity.color === 'blue' ? 'bg-blue-500/10' : 'bg-orange-500/10'
-                    }`}>
-                      <Icon className={`h-4 w-4 ${
-                        activity.color === 'emerald' ? 'text-emerald-600' :
-                        activity.color === 'purple' ? 'text-purple-600' :
-                        activity.color === 'blue' ? 'text-blue-600' : 'text-orange-600'
-                      }`} />
+              <>
+                {applications.slice(0, 2).map(a => (
+                  <div key={a.id} className="flex items-start gap-3 p-3 rounded-xl border bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <div className="p-2 rounded-lg flex-shrink-0 bg-purple-500/10">
+                      <UserPlus className="h-4 w-4 text-purple-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm">{activity.title}</p>
-                      <p className="text-xs text-muted-foreground line-clamp-1">{activity.description}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{activity.time}</p>
+                      <p className="font-semibold text-sm">Nouvelle candidature</p>
+                      <p className="text-xs text-muted-foreground mt-1">{new Date(a.applied_at).toLocaleDateString('fr-FR')}</p>
                     </div>
                   </div>
-                )
-              })
+                ))}
+                {campaigns.slice(0, 2).map(c => (
+                  <div key={c.id} className="flex items-start gap-3 p-3 rounded-xl border bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <div className="p-2 rounded-lg flex-shrink-0 bg-emerald-500/10">
+                      <Rocket className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm">{c.title}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{parseFloat(c.budget_total || 0).toLocaleString()}€ • {c.status}</p>
+                    </div>
+                  </div>
+                ))}
+              </>
             )}
           </CardContent>
         </Card>
@@ -385,14 +349,12 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
                     <div className={`p-2 rounded-lg ${
                       insight.color === 'emerald' ? 'bg-emerald-500/10' :
                       insight.color === 'blue' ? 'bg-blue-500/10' :
-                      insight.color === 'purple' ? 'bg-purple-500/10' :
-                      'bg-orange-500/10'
+                      insight.color === 'purple' ? 'bg-purple-500/10' : 'bg-orange-500/10'
                     }`}>
                       <Icon className={`h-5 w-5 ${
                         insight.color === 'emerald' ? 'text-emerald-600' :
                         insight.color === 'blue' ? 'text-blue-600' :
-                        insight.color === 'purple' ? 'text-purple-600' :
-                        'text-orange-600'
+                        insight.color === 'purple' ? 'text-purple-600' : 'text-orange-600'
                       }`} />
                     </div>
                     <div className="flex-1">
@@ -417,7 +379,6 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
 
       {/* Actualités + Ressources */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Actualités */}
         <Card className="border-0 shadow-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-3 text-xl">
@@ -448,7 +409,6 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
           </CardContent>
         </Card>
 
-        {/* Ressources */}
         <Card className="border-0 shadow-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-3 text-xl">
@@ -482,7 +442,7 @@ export default function AccueilSection({ user, profile, setActiveSection }) {
         </Card>
       </div>
 
-      {/* Nouveautés Partnexx */}
+      {/* Nouveautés */}
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <Sparkles className="h-6 w-6 text-primary" />
