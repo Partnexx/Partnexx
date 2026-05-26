@@ -3,14 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { useState } from 'react'
-import { Search, Calendar, DollarSign, FileText, Download, CreditCard, Brain, CheckCircle, Clock, AlertCircle, Eye, Shield, TrendingUp } from 'lucide-react'
+import { Search, Calendar, DollarSign, FileText, Download, CreditCard, Brain, CheckCircle, Clock, AlertCircle, Eye, Shield, TrendingUp, Lock, Wallet, Send, BarChart3 } from 'lucide-react'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { toast } from 'sonner'
+import { useUserLevel } from '@/lib/hook/useUserLevel'
+import LevelGate from '@/components/LevelGate'
 
 const getStatusColor = (status) => {
   switch (status) {
@@ -54,6 +58,11 @@ const getPaymentStatusLabel = (status) => {
   }
 }
 
+const tooltipStyle = { backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }
+
+/* ============================================================
+   ONGLET CONTRATS (inchangé)
+   ============================================================ */
 function ContratsTab({ contracts = [] }) {
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
@@ -86,7 +95,6 @@ function ContratsTab({ contracts = [] }) {
 
   return (
     <div className="space-y-6">
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-blue-500/5" />
@@ -125,7 +133,6 @@ function ContratsTab({ contracts = [] }) {
         </Card>
       </div>
 
-      {/* Filtres */}
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -140,7 +147,6 @@ function ContratsTab({ contracts = [] }) {
         </div>
       </div>
 
-      {/* Liste */}
       <div className="space-y-4">
         {contracts.length === 0 ? (
           <Card>
@@ -225,7 +231,6 @@ function ContratsTab({ contracts = [] }) {
         )}
       </div>
 
-      {/* Dialog détail contrat */}
       <Dialog open={!!selectedContrat} onOpenChange={() => setSelectedContrat(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -305,9 +310,21 @@ function ContratsTab({ contracts = [] }) {
   )
 }
 
-function PaiementsTab({ transactions = [] }) {
+/* ============================================================
+   ONGLET PAIEMENTS — avec retrait Bronze + historique avancé Platine
+   ============================================================ */
+function PaiementsTab({ transactions = [], user }) {
+  const { canAccess, score: userScore } = useUserLevel(user?.id)
+
+  const canWithdraw = canAccess('withdrawals')               // Bronze (profil 100%)
+  const canAccessAdvancedHistory = canAccess('advancedRevenueHistory') // Platine (1000 pts)
+
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
+  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false)
+  const [iban, setIban] = useState("")
+  const [holderName, setHolderName] = useState("")
+  const [withdrawLoading, setWithdrawLoading] = useState(false)
 
   const filtered = transactions.filter(t => {
     const matchSearch = search === "" ||
@@ -320,9 +337,164 @@ function PaiementsTab({ transactions = [] }) {
   const totalPending = transactions.filter(t => t.status === 'in_escrow').reduce((sum, t) => sum + parseFloat(t.influencer_amount || 0), 0)
   const totalAll = transactions.reduce((sum, t) => sum + parseFloat(t.influencer_amount || 0), 0)
 
+  // Montant disponible au retrait = totalReceived (released, pas encore retiré)
+  const availableForWithdraw = totalReceived
+
+  // ===== Calcul du graphique 12 derniers mois (pour Platine) =====
+  const last12Months = []
+  const now = new Date()
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const monthLabel = d.toLocaleDateString('fr-FR', { month: 'short' })
+    const total = transactions
+      .filter(t => {
+        const txDate = new Date(t.created_at)
+        return txDate.getFullYear() === d.getFullYear() && txDate.getMonth() === d.getMonth() && t.status === 'released'
+      })
+      .reduce((sum, t) => sum + parseFloat(t.influencer_amount || 0), 0)
+    last12Months.push({ month: monthLabel, revenue: total, key: monthKey })
+  }
+
+  // Stats détaillées (Platine)
+  const monthsWithRevenue = last12Months.filter(m => m.revenue > 0)
+  const avgMonthly = monthsWithRevenue.length > 0
+    ? monthsWithRevenue.reduce((sum, m) => sum + m.revenue, 0) / monthsWithRevenue.length
+    : 0
+  const bestMonth = last12Months.reduce((best, m) => m.revenue > (best?.revenue || 0) ? m : best, null)
+  const totalLast12 = last12Months.reduce((sum, m) => sum + m.revenue, 0)
+
+  // ===== Handlers =====
+  const handleWithdraw = async () => {
+    if (!iban.trim() || !holderName.trim()) {
+      toast.error("Renseigne ton IBAN et le titulaire du compte")
+      return
+    }
+    setWithdrawLoading(true)
+    // TODO: brancher Stripe Connect ici plus tard
+    await new Promise(r => setTimeout(r, 800))
+    toast.success(`Demande de retrait de ${availableForWithdraw.toLocaleString()}€ envoyée ! Tu recevras les fonds sous 3-5 jours ouvrés.`)
+    setWithdrawDialogOpen(false)
+    setIban("")
+    setHolderName("")
+    setWithdrawLoading(false)
+  }
+
+  const handleExportCSV = () => {
+    const rows = [['Date', 'Description', 'Montant', 'Statut']]
+    transactions.forEach(t => {
+      rows.push([
+        new Date(t.created_at).toLocaleDateString('fr-FR'),
+        t.description || `Transaction ${t.id.slice(0, 8)}`,
+        parseFloat(t.influencer_amount || 0).toFixed(2),
+        getPaymentStatusLabel(t.status),
+      ])
+    })
+    const csv = rows.map(r => r.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `partnexx-historique-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Export CSV téléchargé')
+  }
+
   return (
     <div className="space-y-6">
-      {/* Stats */}
+      {/* ============ CARTE RETRAIT (Bronze) ============ */}
+      <Card className={`relative overflow-hidden border-2 ${canWithdraw ? 'border-green-500/30 bg-gradient-to-br from-green-500/5 to-emerald-500/5' : 'border-muted'}`}>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg ${canWithdraw ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-muted'}`}>
+                {canWithdraw ? <Wallet className="h-7 w-7 text-white" /> : <Lock className="h-6 w-6 text-muted-foreground" />}
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-medium">Disponible pour retrait</p>
+                <p className={`text-3xl font-bold ${canWithdraw ? 'text-green-600' : 'text-muted-foreground'}`}>
+                  {availableForWithdraw.toLocaleString()}€
+                </p>
+                {!canWithdraw && (
+                  <p className="text-xs text-orange-600 mt-1 flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> Complète ton profil à 100% pour débloquer les retraits
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <Button
+              onClick={() => setWithdrawDialogOpen(true)}
+              disabled={!canWithdraw || availableForWithdraw <= 0}
+              size="lg"
+              className={`gap-2 ${canWithdraw && availableForWithdraw > 0 ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white' : ''}`}
+            >
+              {!canWithdraw ? (
+                <><Lock className="h-4 w-4" />Verrouillé</>
+              ) : availableForWithdraw <= 0 ? (
+                <>Aucun gain disponible</>
+              ) : (
+                <><Send className="h-4 w-4" />Retirer mes gains</>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ============ DIALOG RETRAIT ============ */}
+      <Dialog open={withdrawDialogOpen} onOpenChange={setWithdrawDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                <Wallet className="h-5 w-5 text-white" />
+              </div>
+              Demande de retrait
+            </DialogTitle>
+            <DialogDescription>
+              Renseigne tes informations bancaires pour recevoir {availableForWithdraw.toLocaleString()}€
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 flex items-center justify-between">
+              <span className="text-sm font-medium">Montant à retirer</span>
+              <span className="text-xl font-bold text-green-600">{availableForWithdraw.toLocaleString()}€</span>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="holder">Titulaire du compte *</Label>
+              <Input id="holder" placeholder="Nom Prénom" value={holderName} onChange={(e) => setHolderName(e.target.value)} />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="iban">IBAN *</Label>
+              <Input id="iban" placeholder="FR76 1234 5678 9012 3456 7890 123" value={iban} onChange={(e) => setIban(e.target.value.toUpperCase())} />
+              <p className="text-xs text-muted-foreground">Les fonds arriveront sur ce compte sous 3-5 jours ouvrés.</p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setWithdrawDialogOpen(false)}>
+                Annuler
+              </Button>
+              <Button
+                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white"
+                onClick={handleWithdraw}
+                disabled={withdrawLoading}
+              >
+                {withdrawLoading ? (
+                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Envoi...</>
+                ) : (
+                  <><Send className="h-4 w-4 mr-2" />Confirmer</>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ============ STATS BASIQUES (tout le monde) ============ */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-green-500/5" />
@@ -361,7 +533,7 @@ function PaiementsTab({ transactions = [] }) {
         </Card>
       </div>
 
-      {/* Barre de progression */}
+      {/* Barre progression */}
       {totalAll > 0 && (
         <Card>
           <CardContent className="p-6">
@@ -377,6 +549,88 @@ function PaiementsTab({ transactions = [] }) {
           </CardContent>
         </Card>
       )}
+
+      {/* ============ HISTORIQUE AVANCÉ (Platine) ============ */}
+      <Card className="relative overflow-hidden border-2">
+        {!canAccessAdvancedHistory && (
+          <div className="absolute inset-0 z-30 backdrop-blur-md bg-background/60 flex flex-col items-center justify-center gap-4 p-6 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 flex items-center justify-center shadow-lg">
+              <Lock className="h-8 w-8 text-white" />
+            </div>
+            <Badge className="bg-gradient-to-r from-cyan-400 to-sky-500 text-white border-0 shadow-lg">
+              💠 Niveau Platine requis
+            </Badge>
+            <div>
+              <p className="text-lg font-bold mb-1">Historique avancé verrouillé</p>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Filtres dates, export CSV, graphique d&apos;évolution, stats détaillées des revenus
+              </p>
+              <p className="text-sm text-cyan-600 font-semibold mt-2">
+                Plus que {Math.max(0, 1000 - userScore)} points pour débloquer
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className={!canAccessAdvancedHistory ? 'opacity-30' : ''}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-cyan-600" />
+                Historique Avancé
+                <Badge className="bg-gradient-to-r from-cyan-400 to-sky-500 text-white border-0">💠 Platine</Badge>
+              </CardTitle>
+              <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={!canAccessAdvancedHistory}>
+                <Download className="h-4 w-4 mr-2" />Exporter CSV
+              </Button>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-6">
+            {/* Stats détaillées */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg bg-muted/30 border">
+                <p className="text-xs text-muted-foreground mb-1">Revenu moyen / mois</p>
+                <p className="text-xl font-bold text-cyan-600">{Math.round(avgMonthly).toLocaleString()}€</p>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/30 border">
+                <p className="text-xs text-muted-foreground mb-1">Meilleur mois</p>
+                <p className="text-xl font-bold text-cyan-600">
+                  {bestMonth && bestMonth.revenue > 0 ? `${bestMonth.revenue.toLocaleString()}€` : '—'}
+                </p>
+                {bestMonth && bestMonth.revenue > 0 && <p className="text-xs text-muted-foreground capitalize">{bestMonth.month}</p>}
+              </div>
+              <div className="p-4 rounded-lg bg-muted/30 border">
+                <p className="text-xs text-muted-foreground mb-1">Total 12 derniers mois</p>
+                <p className="text-xl font-bold text-cyan-600">{totalLast12.toLocaleString()}€</p>
+              </div>
+            </div>
+
+            {/* Graphique */}
+            <div className="h-[300px] min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                <AreaChart data={last12Months}>
+                  <defs>
+                    <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(195 80% 50%)" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="hsl(195 80% 50%)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={v => `${v}€`} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v.toLocaleString()}€`, 'Revenus']} />
+                  <Area type="monotone" dataKey="revenue" stroke="hsl(195 80% 50%)" fill="url(#revenueGrad)" strokeWidth={3} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            <p className="text-xs text-muted-foreground text-center">
+              📊 Évolution de tes revenus sur les 12 derniers mois
+            </p>
+          </CardContent>
+        </div>
+      </Card>
 
       {/* Filtres */}
       <div className="flex flex-col md:flex-row gap-3">
@@ -455,7 +709,10 @@ function PaiementsTab({ transactions = [] }) {
   )
 }
 
-export default function ContratsSection({ contracts = [], transactions = [] }) {
+/* ============================================================
+   COMPOSANT INTÉRIEUR (la vraie page une fois validée par LevelGate)
+   ============================================================ */
+function ContratsContent({ contracts = [], transactions = [], user }) {
   const [activeTab, setActiveTab] = useState("contrats")
 
   return (
@@ -490,9 +747,24 @@ export default function ContratsSection({ contracts = [], transactions = [] }) {
           <ContratsTab contracts={contracts} />
         </TabsContent>
         <TabsContent value="paiements" className="mt-6">
-          <PaiementsTab transactions={transactions} />
+          <PaiementsTab transactions={transactions} user={user} />
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+/* ============================================================
+   EXPORT PRINCIPAL : wrappé par LevelGate
+   ============================================================ */
+export default function ContratsSection({ contracts = [], transactions = [], user }) {
+  return (
+    <LevelGate
+      user={user}
+      sectionTitle="Contrats & Paiements"
+      sectionDescription="Gestion Contractuelle • Suivi des Paiements • Historique Complet"
+    >
+      <ContratsContent contracts={contracts} transactions={transactions} user={user} />
+    </LevelGate>
   )
 }

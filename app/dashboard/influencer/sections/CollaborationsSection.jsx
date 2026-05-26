@@ -11,12 +11,20 @@ import { useState, useEffect } from 'react'
 import {
   Search, Calendar, DollarSign, Eye, TrendingUp,
   Clock, Upload, FileText, Download, Zap, Brain, Award, BarChart3,
-  AlertCircle, CheckCircle, Package, MessageSquare, Star,
+  AlertCircle, CheckCircle, Package, MessageSquare, Star, Lock,
 } from 'lucide-react'
 import supabase from '@/lib/supabase'
 import { toast } from 'sonner'
+import { useUserLevel } from '@/lib/hook/useUserLevel'
+import LevelGate from '@/components/LevelGate'
 
-export default function CollaborationsSection() {
+/* ============================================================
+   COMPOSANT INTÉRIEUR
+   ============================================================ */
+function CollaborationsContent({ user }) {
+  const { canAccess, score: userScore } = useUserLevel(user?.id)
+  const canAccessDetailed = canAccess('detailedCollabTracking') // Or (500 pts)
+
   const [activeTab, setActiveTab] = useState("active")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCollab, setSelectedCollab] = useState(null)
@@ -27,58 +35,64 @@ export default function CollaborationsSection() {
   const [contracts, setContracts] = useState([])
   const [contentPosts, setContentPosts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [influencerId, setInfluencerId] = useState(null)
 
   useEffect(() => {
+    if (!user?.id) {
+      setLoading(false)
+      return
+    }
     fetchAll()
-  }, [])
+  }, [user])
 
   const fetchAll = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    try {
+      const { data: influencer } = await supabase
+        .from('influencers')
+        .select('id')
+        .eq('user_id', user.id)
+        .single()
 
-    const { data: influencer } = await supabase
-      .from('influencers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
+      if (!influencer) {
+        setLoading(false)
+        return
+      }
 
-    if (!influencer) return
-    setInfluencerId(influencer.id)
+      const [collabRes, appRes, contractRes, postsRes] = await Promise.allSettled([
+        supabase
+          .from('collaborations')
+          .select('*, campaigns(id, title, description, cover_url), brands(id, company_name, logo_url)')
+          .eq('influencer_id', influencer.id)
+          .order('created_at', { ascending: false }),
 
-    const [collabRes, appRes, contractRes, postsRes] = await Promise.allSettled([
-      supabase
-        .from('collaborations')
-        .select('*, campaigns(id, title, description, cover_url), brands(id, company_name, logo_url)')
-        .eq('influencer_id', influencer.id)
-        .order('created_at', { ascending: false }),
+        supabase
+          .from('applications')
+          .select('*, campaigns(title, description, budget_per_influencer_min, budget_per_influencer_max)')
+          .eq('influencer_id', influencer.id)
+          .order('applied_at', { ascending: false }),
 
-      supabase
-        .from('applications')
-        .select('*, campaigns(title, description, budget_per_influencer_min, budget_per_influencer_max)')
-        .eq('influencer_id', influencer.id)
-        .order('applied_at', { ascending: false }),
+        supabase
+          .from('contracts')
+          .select('*, brands(company_name)')
+          .eq('influencer_id', influencer.id)
+          .order('created_at', { ascending: false }),
 
-      supabase
-        .from('contracts')
-        .select('*, brands(company_name)')
-        .eq('influencer_id', influencer.id)
-        .order('created_at', { ascending: false }),
+        supabase
+          .from('content_posts')
+          .select('*')
+          .eq('influencer_id', influencer.id),
+      ])
 
-      supabase
-        .from('content_posts')
-        .select('*')
-        .eq('influencer_id', influencer.id),
-    ])
-
-    setCollaborations(collabRes.status === 'fulfilled' ? collabRes.value.data || [] : [])
-    setApplications(appRes.status === 'fulfilled' ? appRes.value.data || [] : [])
-    setContracts(contractRes.status === 'fulfilled' ? contractRes.value.data || [] : [])
-    setContentPosts(postsRes.status === 'fulfilled' ? postsRes.value.data || [] : [])
-    setLoading(false)
+      setCollaborations(collabRes.status === 'fulfilled' ? collabRes.value.data || [] : [])
+      setApplications(appRes.status === 'fulfilled' ? appRes.value.data || [] : [])
+      setContracts(contractRes.status === 'fulfilled' ? contractRes.value.data || [] : [])
+      setContentPosts(postsRes.status === 'fulfilled' ? postsRes.value.data || [] : [])
+    } catch (err) {
+      console.warn('CollaborationsSection fetch error', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // Stats calculées depuis les vraies données
   const activeCollaborations = collaborations.filter(c => ['in_progress', 'accepted'].includes(c.status))
   const completedCollaborations = collaborations.filter(c => c.status === 'completed')
 
@@ -103,13 +117,8 @@ export default function CollaborationsSection() {
     }
   }
 
-  const getContractForCollab = (collab) => {
-    return contracts.find(c => c.collaboration_id === collab.id)
-  }
-
-  const getPostsForCollab = (collab) => {
-    return contentPosts.filter(p => p.collaboration_id === collab.id)
-  }
+  const getContractForCollab = (collab) => contracts.find(c => c.collaboration_id === collab.id)
+  const getPostsForCollab = (collab) => contentPosts.filter(p => p.collaboration_id === collab.id)
 
   const handleDownloadPDF = (contract) => {
     if (contract?.pdf_url) {
@@ -135,6 +144,40 @@ export default function CollaborationsSection() {
     )
   }
 
+  /* ============================================================
+     COMPOSANT : Card collab BASIQUE (Bronze) - simplifié
+     ============================================================ */
+  const CollabCardBasic = ({ collab, isCompleted = false }) => {
+    const contract = getContractForCollab(collab)
+    return (
+      <Card className="overflow-hidden hover:shadow-md transition-all duration-300">
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <Avatar className="h-12 w-12 border-2 border-border shrink-0">
+                <AvatarFallback className={`font-bold ${isCompleted ? 'bg-gradient-to-br from-muted to-muted-foreground/20' : 'bg-gradient-to-br from-primary to-accent text-white'}`}>
+                  {collab.brands?.company_name?.slice(0, 2).toUpperCase() || 'MA'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold truncate">{collab.campaigns?.title || 'Campagne'}</h3>
+                <p className="text-sm text-muted-foreground truncate">{collab.brands?.company_name || 'Marque'}</p>
+                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{formatDate(collab.created_at)}</span>
+                  {contract && <span className="flex items-center gap-1 text-green-600 font-semibold"><DollarSign className="h-3 w-3" />{parseFloat(contract.amount).toLocaleString()}€</span>}
+                </div>
+              </div>
+            </div>
+            <Badge variant="outline" className={isCompleted ? 'bg-muted text-muted-foreground' : 'bg-green-500/10 text-green-600 border-green-500/20'}>
+              {isCompleted ? <CheckCircle className="h-3 w-3 mr-1" /> : <Clock className="h-3 w-3 mr-1" />}
+              {getStatusLabel(collab.status)}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <div className="space-y-6 pb-8">
       {/* Header */}
@@ -150,7 +193,7 @@ export default function CollaborationsSection() {
         </div>
       </div>
 
-      {/* Stats temps réel */}
+      {/* Stats — toujours visibles (Bronze) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="overflow-hidden relative group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
           <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/5" />
@@ -201,6 +244,33 @@ export default function CollaborationsSection() {
         </Card>
       </div>
 
+      {/* Bandeau incitatif si pas Or */}
+      {!canAccessDetailed && (
+        <Card className="bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border-yellow-500/30">
+          <CardContent className="p-5 flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg">
+                <Star className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="font-bold text-yellow-700">
+                  Suivi détaillé verrouillé <Badge className="bg-gradient-to-r from-yellow-400 to-amber-500 text-white border-0 ml-2">🥇 Or</Badge>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Débloque les livrables, performance des contenus et analytics détaillés en passant Or
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-semibold">Plus que <span className="text-yellow-600">{Math.max(0, 500 - userScore)} pts</span></p>
+              <div className="w-32 h-2 bg-yellow-500/20 rounded-full overflow-hidden mt-1">
+                <div className="h-full bg-gradient-to-r from-yellow-400 to-amber-500" style={{ width: `${Math.min((userScore / 500) * 100, 100)}%` }} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Search */}
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -234,7 +304,15 @@ export default function CollaborationsSection() {
                 <p className="text-sm text-muted-foreground">Vos collaborations actives apparaîtront ici</p>
               </CardContent>
             </Card>
+          ) : !canAccessDetailed ? (
+            /* === VUE BASIQUE (Bronze/Argent) === */
+            <div className="space-y-3">
+              {filterCollaborations(activeCollaborations).map((collab) => (
+                <CollabCardBasic key={collab.id} collab={collab} />
+              ))}
+            </div>
           ) : (
+            /* === VUE DÉTAILLÉE (Or+) === */
             filterCollaborations(activeCollaborations).map((collab) => {
               const contract = getContractForCollab(collab)
               const posts = getPostsForCollab(collab)
@@ -270,7 +348,6 @@ export default function CollaborationsSection() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-6 pt-6">
-                    {/* Infos principales */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <Card className="border-dashed hover:border-solid transition-all hover:shadow-md">
                         <CardContent className="p-4">
@@ -311,7 +388,6 @@ export default function CollaborationsSection() {
                       </Card>
                     </div>
 
-                    {/* Livrables */}
                     {deliverables.length > 0 && (
                       <div>
                         <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
@@ -331,7 +407,6 @@ export default function CollaborationsSection() {
                       </div>
                     )}
 
-                    {/* Posts liés */}
                     {posts.length > 0 && (
                       <div>
                         <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
@@ -360,7 +435,6 @@ export default function CollaborationsSection() {
                       </div>
                     )}
 
-                    {/* Actions */}
                     <div className="flex gap-3 pt-4 border-t">
                       <Button
                         variant="outline"
@@ -396,7 +470,15 @@ export default function CollaborationsSection() {
                 <p className="text-sm text-muted-foreground">Votre historique apparaîtra ici</p>
               </CardContent>
             </Card>
+          ) : !canAccessDetailed ? (
+            /* === VUE BASIQUE === */
+            <div className="space-y-3">
+              {filterCollaborations(completedCollaborations).map((collab) => (
+                <CollabCardBasic key={collab.id} collab={collab} isCompleted />
+              ))}
+            </div>
           ) : (
+            /* === VUE DÉTAILLÉE === */
             filterCollaborations(completedCollaborations).map((collab) => {
               const contract = getContractForCollab(collab)
               const posts = getPostsForCollab(collab)
@@ -471,7 +553,7 @@ export default function CollaborationsSection() {
           )}
         </TabsContent>
 
-        {/* Tab : Candidatures */}
+        {/* Tab : Candidatures (toujours accessible) */}
         <TabsContent value="candidatures" className="space-y-4 mt-6">
           {applications.length === 0 ? (
             <Card>
@@ -521,7 +603,7 @@ export default function CollaborationsSection() {
         </TabsContent>
       </Tabs>
 
-      {/* Dialog Détails */}
+      {/* Dialog Détails (Or only) */}
       <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -611,7 +693,7 @@ export default function CollaborationsSection() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Contrat */}
+      {/* Dialog Contrat (Or only) */}
       <Dialog open={isContractDialogOpen} onOpenChange={setIsContractDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -679,5 +761,20 @@ export default function CollaborationsSection() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+/* ============================================================
+   EXPORT PRINCIPAL : wrappé par LevelGate
+   ============================================================ */
+export default function CollaborationsSection({ user }) {
+  return (
+    <LevelGate
+      user={user}
+      sectionTitle="Mes collaborations"
+      sectionDescription="Partenariats Actifs • Historique Complet • Performance Détaillée"
+    >
+      <CollaborationsContent user={user} />
+    </LevelGate>
   )
 }
