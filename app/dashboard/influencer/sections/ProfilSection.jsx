@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { MapPin, Calendar, Target, Star, TrendingUp, MessageCircle, Brain, Shield, Award, Camera, Edit, RefreshCw, CheckCircle, Save, Lock, Trophy } from 'lucide-react'
+import { MapPin, Calendar, Target, Star, TrendingUp, MessageCircle, Brain, Shield, Award, Camera, Edit, RefreshCw, CheckCircle, Save, Lock, Trophy, AlertCircle } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import supabase from '@/lib/supabase'
@@ -49,25 +49,59 @@ const LEVEL_VISUALS = {
 }
 
 /* ============================================================
-   COMPOSANT INTÉRIEUR
-   Note : skipProfileCheck est utilisé car la section Profil doit
-   être accessible même quand le profil n'est pas à 100% (sinon
-   l'utilisateur ne pourrait jamais compléter son profil !)
+   PRESETS pour les badges cliquables
+   - Niches : valeur stockée en lowercase sans accent
+   - Content types : valeurs de l'enum SQL content_type
    ============================================================ */
-function ProfilContent({ user, profile, metrics }) {
-  const { level, currentLevelIndex, isProfileComplete, score, canAccess } = useUserLevel(user?.id)
+const NICHE_OPTIONS = [
+  { value: 'mode', label: 'Mode', emoji: '👗' },
+  { value: 'beaute', label: 'Beauté', emoji: '💄' },
+  { value: 'lifestyle', label: 'Lifestyle', emoji: '✨' },
+  { value: 'tech', label: 'Tech', emoji: '💻' },
+  { value: 'gaming', label: 'Gaming', emoji: '🎮' },
+  { value: 'food', label: 'Food', emoji: '🍔' },
+  { value: 'fitness', label: 'Fitness', emoji: '💪' },
+  { value: 'voyage', label: 'Voyage', emoji: '✈️' },
+  { value: 'business', label: 'Business', emoji: '💼' },
+  { value: 'humour', label: 'Humour', emoji: '😂' },
+  { value: 'musique', label: 'Musique', emoji: '🎵' },
+  { value: 'education', label: 'Éducation', emoji: '📚' },
+]
+
+const CONTENT_TYPE_OPTIONS = [
+  { value: 'post', label: 'Post', emoji: '📷' },
+  { value: 'story', label: 'Story', emoji: '⏱️' },
+  { value: 'reel', label: 'Reel', emoji: '🎬' },
+  { value: 'video', label: 'Vidéo', emoji: '🎥' },
+  { value: 'carousel', label: 'Carrousel', emoji: '🔄' },
+  { value: 'live', label: 'Live', emoji: '🔴' },
+]
+
+const MAX_NICHES = 3
+
+/* ============================================================
+   COMPOSANT INTÉRIEUR
+   ============================================================ */
+function ProfilContent({ user, profile: initialProfile, metrics }) {
+  const { level, currentLevelIndex, isProfileComplete, score, canAccess, profileCompletion, refetch } = useUserLevel(user?.id)
 
   const [influencer, setInfluencer] = useState(null)
+  const [profile, setProfile] = useState(initialProfile)
   const [socialAccounts, setSocialAccounts] = useState([])
   const [reviews, setReviews] = useState([])
   const [collaborations, setCollaborations] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
+  // ===== State du formulaire =====
   const [displayName, setDisplayName] = useState('')
   const [username, setUsername] = useState('')
   const [bio, setBio] = useState('')
   const [country, setCountry] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
+  const [selectedNiches, setSelectedNiches] = useState([])
+  const [selectedContentTypes, setSelectedContentTypes] = useState([])
+  const [minBudget, setMinBudget] = useState('')
 
   useEffect(() => {
     if (!user?.id) return
@@ -75,20 +109,35 @@ function ProfilContent({ user, profile, metrics }) {
   }, [user])
 
   const fetchAll = async () => {
+    setLoading(true)
+
     const { data: inf } = await supabase
       .from('influencers')
       .select('*')
       .eq('user_id', user.id)
       .single()
 
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
     if (inf) {
       setInfluencer(inf)
       setDisplayName(inf.display_name || '')
       setCountry(inf.country || '')
+      setSelectedNiches(inf.niche || [])
+      setSelectedContentTypes(inf.content_types || [])
+      setMinBudget(inf.min_budget || '')
     }
 
-    setUsername(profile?.username || '')
-    setBio(profile?.bio || '')
+    if (prof) {
+      setProfile(prof)
+      setUsername(prof.username || '')
+      setBio(prof.bio || '')
+      setAvatarUrl(prof.avatar_url || '')
+    }
 
     const [socialRes, reviewsRes, collabRes] = await Promise.allSettled([
       supabase.from('social_accounts').select('*').eq('influencer_id', inf?.id),
@@ -102,23 +151,68 @@ function ProfilContent({ user, profile, metrics }) {
     setLoading(false)
   }
 
+  // ===== Toggle d'une niche =====
+  const toggleNiche = (value) => {
+    if (selectedNiches.includes(value)) {
+      // Désélection
+      setSelectedNiches(prev => prev.filter(v => v !== value))
+    } else {
+      // Sélection — bloque si déjà 3 niches
+      if (selectedNiches.length >= MAX_NICHES) {
+        toast.error(`Maximum ${MAX_NICHES} niches. Désélectionne-en une d'abord.`)
+        return
+      }
+      setSelectedNiches(prev => [...prev, value])
+    }
+  }
+
+  // ===== Toggle d'un type de contenu =====
+  const toggleContentType = (value) => {
+    setSelectedContentTypes(prev =>
+      prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
+    )
+  }
+
+  // ===== Sauvegarde =====
   const handleSave = async () => {
     setSaving(true)
     try {
-      await supabase.from('influencers').update({
+      // Validation min_budget
+      const minBudgetNum = minBudget === '' ? null : parseFloat(minBudget)
+      if (minBudget !== '' && (isNaN(minBudgetNum) || minBudgetNum < 0)) {
+        toast.error('Le tarif minimum doit être un nombre positif')
+        setSaving(false)
+        return
+      }
+
+      // 1. Update influencers
+      const { error: infError } = await supabase.from('influencers').update({
         display_name: displayName,
         country: country,
+        niche: selectedNiches,
+        content_types: selectedContentTypes,
+        min_budget: minBudgetNum,
         updated_at: new Date().toISOString(),
       }).eq('user_id', user.id)
 
-      await supabase.from('profiles').update({
+      if (infError) throw infError
+
+      // 2. Update profiles
+      const { error: profError } = await supabase.from('profiles').update({
         username: username,
         full_name: displayName,
+        bio: bio,
+        avatar_url: avatarUrl || null,
+        updated_at: new Date().toISOString(),
       }).eq('id', user.id)
 
-      toast.success("Profil mis à jour !")
+      if (profError) throw profError
+
+      toast.success("Profil mis à jour ! ✨")
+      await refetch()
     } catch (err) {
-      toast.error("Erreur lors de la sauvegarde")
+      console.error('Save error', err)
+      toast.error(`Erreur : ${err.message || 'sauvegarde échouée'}`)
     }
     setSaving(false)
   }
@@ -136,6 +230,16 @@ function ProfilContent({ user, profile, metrics }) {
 
   const isVerified = canAccess('verifiedProfile')
   const isTopCreator = canAccess('topCreatorStatus')
+
+  // Champs manquants pour aider l'utilisateur
+  const missingFields = []
+  if (!displayName) missingFields.push('nom')
+  if (!username) missingFields.push('username')
+  if (!avatarUrl) missingFields.push('photo de profil')
+  if (!bio) missingFields.push('bio')
+  if (!selectedNiches.length) missingFields.push('niches')
+  if (!selectedContentTypes.length) missingFields.push('types de contenu')
+  if (!minBudget) missingFields.push('tarif minimum')
 
   if (loading) {
     return (
@@ -162,15 +266,44 @@ function ProfilContent({ user, profile, metrics }) {
         </div>
       </div>
 
+      {/* ============ INDICATEUR DE COMPLÉTION ============ */}
+      {!isProfileComplete && (
+        <Card className="border-orange-500/40 bg-gradient-to-br from-orange-500/5 to-amber-500/5">
+          <CardContent className="p-5 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center">
+                  <AlertCircle className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-bold text-orange-700">Complète ton profil pour débloquer Bronze 🥉</p>
+                  <p className="text-sm text-muted-foreground">
+                    {missingFields.length > 0 && `Il manque : ${missingFields.join(', ')}`}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-black text-orange-600">{profileCompletion}%</div>
+                <p className="text-xs text-muted-foreground">complété</p>
+              </div>
+            </div>
+            <div className="relative h-2 bg-orange-500/10 rounded-full overflow-hidden">
+              <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-400 to-amber-500 rounded-full transition-all duration-500" style={{ width: `${profileCompletion}%` }} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="relative overflow-hidden shadow-xl">
           <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/10 rounded-full blur-3xl" />
           <CardContent className="relative p-8 text-center">
             <div className="relative inline-block mb-6">
               <Avatar className="h-32 w-32 border-4 border-background shadow-2xl ring-2 ring-primary/20">
+                {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
                 <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-primary to-accent text-white">{initials}</AvatarFallback>
               </Avatar>
-              <Button size="icon" className="absolute -bottom-2 -right-2 h-10 w-10 rounded-full shadow-lg" onClick={() => toast.info("Upload photo — disponible prochainement")}>
+              <Button size="icon" className="absolute -bottom-2 -right-2 h-10 w-10 rounded-full shadow-lg" onClick={() => toast.info("Upload photo — bientôt via Supabase Storage. En attendant, colle une URL dans l'onglet Général ↓")}>
                 <Camera className="h-4 w-4" />
               </Button>
             </div>
@@ -269,6 +402,7 @@ function ProfilContent({ user, profile, metrics }) {
           ))}
         </TabsList>
 
+        {/* ============ ONGLET GÉNÉRAL — FORMULAIRE COMPLET ============ */}
         <TabsContent value="general">
           <Card className="shadow-xl">
             <CardHeader>
@@ -277,66 +411,172 @@ function ProfilContent({ user, profile, metrics }) {
                 Informations générales
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+
+              {/* ===== Identité ===== */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Nom d&apos;affichage</label>
-                  <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Votre nom" />
+                  <label className="text-sm font-medium">Nom d&apos;affichage <span className="text-red-500">*</span></label>
+                  <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Mathias Baudoin" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Nom d&apos;utilisateur</label>
-                  <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="@username" />
+                  <label className="text-sm font-medium">Nom d&apos;utilisateur <span className="text-red-500">*</span></label>
+                  <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="mathiasbaudoin" />
                 </div>
               </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Email</label>
                 <Input value={user?.email || ''} disabled className="bg-muted/50" />
               </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Pays</label>
                 <Input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="France" />
               </div>
 
-              {influencer?.niche && influencer.niche.length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Niches</label>
-                  <div className="flex flex-wrap gap-2">
-                    {influencer.niche.map((n, i) => (
-                      <Badge key={i} className="bg-primary/10 text-primary border-primary/20 capitalize">{n}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* ===== Avatar URL ===== */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Photo de profil (URL) <span className="text-red-500">*</span></label>
+                <Input
+                  value={avatarUrl}
+                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  placeholder="https://api.dicebear.com/7.x/avataaars/svg?seed=mathias"
+                />
+                <p className="text-xs text-muted-foreground">
+                  💡 Astuce : tu peux générer un avatar sympa sur{' '}
+                  <a href="https://www.dicebear.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">dicebear.com</a>{' '}
+                  ou utiliser ton image hébergée. Upload via Supabase Storage bientôt disponible.
+                </p>
+              </div>
 
-              {influencer?.languages && influencer.languages.length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Langues parlées</label>
-                  <div className="flex flex-wrap gap-2">
-                    {influencer.languages.map((l, i) => (
-                      <Badge key={i} variant="secondary" className="capitalize">{l}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {(influencer?.min_budget || influencer?.max_budget) && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Budget souhaité</label>
-                  <div className="p-3 bg-muted/50 rounded-lg border">
-                    <p className="font-semibold text-green-600">
-                      {parseFloat(influencer.min_budget || 0).toLocaleString()}€ — {parseFloat(influencer.max_budget || 0).toLocaleString()}€
-                    </p>
-                  </div>
-                </div>
-              )}
+              {/* ===== Bio ===== */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center justify-between">
+                  <span>Bio <span className="text-red-500">*</span></span>
+                  <span className="text-xs text-muted-foreground">{bio.length}/500</span>
+                </label>
+                <Textarea
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value.slice(0, 500))}
+                  placeholder="Présente-toi en quelques mots : ton univers, ton style, ce qui te rend unique..."
+                  rows={4}
+                />
+              </div>
 
               <Separator />
-              <div className="flex justify-end">
-                <Button onClick={handleSave} disabled={saving}>
+
+              {/* ===== Niches (max 3) ===== */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <label className="text-sm font-medium">
+                    Mes niches principales <span className="text-red-500">*</span>
+                  </label>
+                  <Badge variant="outline" className="text-xs">
+                    {selectedNiches.length}/{MAX_NICHES} sélectionnées
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Choisis jusqu&apos;à {MAX_NICHES} niches qui te représentent le mieux. C&apos;est ce que verront les marques.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {NICHE_OPTIONS.map(opt => {
+                    const isSelected = selectedNiches.includes(opt.value)
+                    const isDisabled = !isSelected && selectedNiches.length >= MAX_NICHES
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => toggleNiche(opt.value)}
+                        disabled={isDisabled}
+                        className={`px-4 py-2 rounded-full border-2 text-sm font-medium transition-all ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-primary to-purple-500 text-white border-transparent shadow-lg scale-105'
+                            : isDisabled
+                            ? 'bg-muted/30 text-muted-foreground border-muted cursor-not-allowed opacity-50'
+                            : 'bg-card hover:bg-muted border-border hover:border-primary/50 hover:scale-105'
+                        }`}
+                      >
+                        <span className="mr-1.5">{opt.emoji}</span>
+                        {opt.label}
+                        {isSelected && <span className="ml-2 text-xs">✓</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* ===== Types de contenu ===== */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <label className="text-sm font-medium">
+                    Types de contenu que je crée <span className="text-red-500">*</span>
+                  </label>
+                  <Badge variant="outline" className="text-xs">
+                    {selectedContentTypes.length} sélectionné{selectedContentTypes.length > 1 ? 's' : ''}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Coche tous les formats que tu maîtrises. Aucune limite.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {CONTENT_TYPE_OPTIONS.map(opt => {
+                    const isSelected = selectedContentTypes.includes(opt.value)
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => toggleContentType(opt.value)}
+                        className={`px-4 py-2 rounded-full border-2 text-sm font-medium transition-all ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-pink-500 to-orange-500 text-white border-transparent shadow-lg scale-105'
+                            : 'bg-card hover:bg-muted border-border hover:border-primary/50 hover:scale-105'
+                        }`}
+                      >
+                        <span className="mr-1.5">{opt.emoji}</span>
+                        {opt.label}
+                        {isSelected && <span className="ml-2 text-xs">✓</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* ===== Tarif minimum ===== */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Tarif minimum par collaboration (€) <span className="text-red-500">*</span>
+                </label>
+                <div className="relative max-w-xs">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="50"
+                    value={minBudget}
+                    onChange={(e) => setMinBudget(e.target.value)}
+                    placeholder="500"
+                    className="pl-8"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">€</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  C&apos;est ton prix de départ. Les marques verront ce tarif comme base pour proposer leurs collaborations.
+                </p>
+              </div>
+
+              <Separator />
+
+              {/* ===== Bouton Save ===== */}
+              <div className="flex justify-end gap-3">
+                <Button onClick={handleSave} disabled={saving} size="lg" className="bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-600 text-white font-bold">
                   {saving ? (
                     <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Sauvegarde...</>
                   ) : (
-                    <><Save className="h-4 w-4 mr-2" />Enregistrer</>
+                    <><Save className="h-4 w-4 mr-2" />Enregistrer mon profil</>
                   )}
                 </Button>
               </div>
@@ -344,6 +584,7 @@ function ProfilContent({ user, profile, metrics }) {
           </Card>
         </TabsContent>
 
+        {/* ============ ONGLET RÉSEAUX ============ */}
         <TabsContent value="reseaux">
           <Card className="shadow-xl">
             <CardHeader>
@@ -391,6 +632,7 @@ function ProfilContent({ user, profile, metrics }) {
           </Card>
         </TabsContent>
 
+        {/* ============ ONGLET PORTFOLIO ============ */}
         <TabsContent value="portfolio">
           <Card className="shadow-xl">
             <CardHeader>
@@ -429,6 +671,7 @@ function ProfilContent({ user, profile, metrics }) {
           </Card>
         </TabsContent>
 
+        {/* ============ ONGLET AVIS ============ */}
         <TabsContent value="avis">
           <Card className="shadow-xl">
             <CardHeader>
@@ -482,6 +725,7 @@ function ProfilContent({ user, profile, metrics }) {
           </Card>
         </TabsContent>
 
+        {/* ============ ONGLET VÉRIFICATIONS ============ */}
         <TabsContent value="verifications">
           <Card className="shadow-xl">
             <CardHeader>
@@ -601,11 +845,6 @@ function ProfilContent({ user, profile, metrics }) {
   )
 }
 
-/* ============================================================
-   EXPORT PRINCIPAL : wrappé par LevelGate
-   ATTENTION : skipProfileCheck=true ici car le Profil DOIT être
-   accessible même si profil < 100% (sinon impossible de le compléter)
-   ============================================================ */
 export default function ProfilSection({ user, profile, metrics }) {
   return (
     <LevelGate
