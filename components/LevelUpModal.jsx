@@ -10,9 +10,10 @@ import { Trophy, Sparkles, X } from 'lucide-react'
    LevelUpModal — Modal plein écran style "Level Up !"
    
    Props:
-   - open: bool — affiche/cache le modal
-   - onClose: function — appelé quand l'utilisateur ferme
-   - newLevel: objet LEVEL (avec key, name, emoji, threshold, features)
+   - open: bool
+   - onClose: function
+   - newLevel: objet LEVEL (niveau atteint)
+   - previousLevel: objet LEVEL ou null (niveau précédent, pour comparaisons)
    ============================================================ */
 
 const LEVEL_VISUALS = {
@@ -63,14 +64,21 @@ const FEATURE_LABELS = {
   privateInvitations: 'Invitations privées exclusives',
 }
 
-const SCORE_MULTIPLIER_LABELS = {
-  1: null,
-  1.5: '+50% sur les gains de points',
-  2: '+100% sur les gains de points',
+/* ============================================================
+   Helper : Calcule le pourcentage en plus par rapport au précédent
+   Ex: 1 → 1.25 = "+25%", 1.25 → 1.5 = "+20%", 1 → 4 = "+300%"
+   ============================================================ */
+function getMultiplierIncreaseText(currentMultiplier, previousMultiplier) {
+  if (!previousMultiplier || currentMultiplier === previousMultiplier) return null
+
+  // Pourcentage relatif à 1 (base) — comme ça l'utilisateur voit le bonus total
+  // x1.25 = "+25% sur les gains de points"
+  // x4 = "+300% sur les gains de points"
+  const percent = Math.round((currentMultiplier - 1) * 100)
+  return `+${percent}% sur les gains de points`
 }
 
-export default function LevelUpModal({ open, onClose, newLevel }) {
-  // Empêcher le scroll en arrière-plan quand le modal est ouvert
+export default function LevelUpModal({ open, onClose, newLevel, previousLevel }) {
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden'
@@ -83,7 +91,13 @@ export default function LevelUpModal({ open, onClose, newLevel }) {
   if (!newLevel) return null
 
   const visual = LEVEL_VISUALS[newLevel.key] || LEVEL_VISUALS.bronze
-  const multiplierText = SCORE_MULTIPLIER_LABELS[newLevel.scoreMultiplier]
+
+  // Affichage du multiplicateur SEULEMENT s'il a changé
+  const multiplierText = getMultiplierIncreaseText(newLevel.scoreMultiplier, previousLevel?.scoreMultiplier)
+
+  // Affichage de la commission discount SEULEMENT si elle a changé (passage Légende)
+  const commissionChanged = (newLevel.commissionDiscount || 0) > (previousLevel?.commissionDiscount || 0)
+  const commissionText = commissionChanged ? `-${newLevel.commissionDiscount}% de commission Partnexx` : null
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -92,18 +106,14 @@ export default function LevelUpModal({ open, onClose, newLevel }) {
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={onClose}
       >
-        {/* Titre caché pour l'accessibilité (lecteurs d'écran) */}
         <VisuallyHidden.Root>
           <DialogTitle>Niveau supérieur ! {newLevel.name}</DialogTitle>
           <DialogDescription>Tu as atteint le niveau {newLevel.name}</DialogDescription>
         </VisuallyHidden.Root>
 
-        {/* Backdrop animated */}
         <div className="relative overflow-hidden rounded-3xl">
-          {/* Gradient background */}
           <div className={`absolute inset-0 bg-gradient-to-br ${visual.gradient} opacity-95`} />
 
-          {/* Particules (étoiles animées en CSS pur) */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {[...Array(20)].map((_, i) => (
               <div
@@ -122,10 +132,8 @@ export default function LevelUpModal({ open, onClose, newLevel }) {
             ))}
           </div>
 
-          {/* Halo lumineux */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-white/20 rounded-full blur-3xl animate-pulse" />
 
-          {/* Bouton X */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 z-50 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md flex items-center justify-center text-white transition-all hover:scale-110"
@@ -134,16 +142,13 @@ export default function LevelUpModal({ open, onClose, newLevel }) {
             <X className="h-5 w-5" />
           </button>
 
-          {/* Contenu principal */}
           <div className="relative z-10 p-8 sm:p-12 text-center text-white">
-            {/* "LEVEL UP" tagline */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 mb-6 animate-bounce">
               <Sparkles className="h-4 w-4" />
               <span className="text-sm font-bold tracking-widest uppercase">Niveau supérieur !</span>
               <Sparkles className="h-4 w-4" />
             </div>
 
-            {/* Emoji géant avec halo */}
             <div className="relative mb-4">
               <div className={`inline-flex items-center justify-center w-32 h-32 sm:w-40 sm:h-40 rounded-full bg-white/20 backdrop-blur-md border-4 border-white/40 shadow-2xl ${visual.glow}`}>
                 <span className="text-7xl sm:text-8xl animate-pulse" style={{ animationDuration: '2s' }}>
@@ -152,7 +157,6 @@ export default function LevelUpModal({ open, onClose, newLevel }) {
               </div>
             </div>
 
-            {/* Nom du niveau */}
             <h1 className="text-5xl sm:text-6xl font-black mb-2 drop-shadow-lg">
               {newLevel.name}
             </h1>
@@ -160,15 +164,26 @@ export default function LevelUpModal({ open, onClose, newLevel }) {
               {visual.tagline}
             </p>
 
-            {/* Score multiplier (si applicable) */}
+            {/* Badge multiplicateur — affiché SEULEMENT s'il a changé */}
             {multiplierText && (
-              <Badge className="mb-6 bg-white/20 backdrop-blur-md text-white border-white/40 px-4 py-2 text-sm">
+              <Badge className="mb-3 bg-white/20 backdrop-blur-md text-white border-white/40 px-4 py-2 text-sm">
                 <Trophy className="h-4 w-4 mr-2" />
                 {multiplierText}
               </Badge>
             )}
 
-            {/* Liste des features débloquées */}
+            {/* Badge commission discount — affiché SEULEMENT à Légende */}
+            {commissionText && (
+              <div className="mb-6">
+                <Badge className="bg-white/20 backdrop-blur-md text-white border-white/40 px-4 py-2 text-sm">
+                  💰 {commissionText}
+                </Badge>
+              </div>
+            )}
+
+            {/* Espace si pas de badge */}
+            {!multiplierText && !commissionText && <div className="mb-6" />}
+
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 mb-6 text-left max-w-md mx-auto">
               <p className="text-xs font-bold uppercase tracking-wider text-white/80 mb-3 text-center">
                 ✨ Nouvelles fonctionnalités débloquées
@@ -183,7 +198,6 @@ export default function LevelUpModal({ open, onClose, newLevel }) {
               </ul>
             </div>
 
-            {/* Bouton continuer */}
             <Button
               onClick={onClose}
               size="lg"

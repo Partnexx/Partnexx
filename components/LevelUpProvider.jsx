@@ -7,14 +7,9 @@ import LevelUpModal from '@/components/LevelUpModal'
    
    Composant à placer dans le layout du dashboard pour gérer
    l'affichage du modal "Level Up !" de manière centralisée.
-   
-   Usage:
-     <LevelUpProvider user={user}>
-       {children}
-     </LevelUpProvider>
    ============================================================ */
 export default function LevelUpProvider({ user, children }) {
-  const { levelUpModalOpen, levelUpNewLevel, closeLevelUpModal } = useUserLevel(user?.id)
+  const { levelUpModalOpen, levelUpNewLevel, levelUpPreviousLevel, closeLevelUpModal } = useUserLevel(user?.id)
 
   return (
     <>
@@ -23,6 +18,7 @@ export default function LevelUpProvider({ user, children }) {
         open={levelUpModalOpen}
         onClose={closeLevelUpModal}
         newLevel={levelUpNewLevel}
+        previousLevel={levelUpPreviousLevel}
       />
     </>
   )
