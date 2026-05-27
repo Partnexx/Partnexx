@@ -1,4 +1,4 @@
-// sections/FinancesSection.jsx (et tous les autres)
+'use client'
 export default function FinancesSection() {
-  return <div className="p-8 text-center text-muted-foreground">Section en construction...</div>
+  return <div className="p-8 text-center text-muted-foreground">Gestion des finances — en construction...</div>
 }

@@ -1,4 +1,4 @@
-// sections/StatistiquesSection.jsx (et tous les autres)
-export default function StatistiquesSection() {
-  return <div className="p-8 text-center text-muted-foreground">Section en construction...</div>
+'use client'
+export default function AnalyticsSection() {
+  return <div className="p-8 text-center text-muted-foreground">Gestion des analytics — en construction...</div>
 }
