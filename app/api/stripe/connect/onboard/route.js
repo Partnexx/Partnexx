@@ -8,35 +8,86 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+const BUSINESS_TYPE_MAP = {
+  individual: 'individual',
+  auto_entrepreneur: 'individual',
+  company: 'company',
+}
+
 export async function POST(req) {
   try {
-    const { influencerId } = await req.json()
+    const { influencerId, businessType } = await req.json()
 
-    // 1. Créer un compte Connect Stripe pour l'influenceur
-    const account = await stripe.accounts.create({
-      type: 'express',
-      country: 'FR',
-      capabilities: {
-        transfers: { requested: true },
-      },
+    if (!influencerId) {
+      return NextResponse.json({ error: 'influencerId requis' }, { status: 400 })
+    }
+    if (!businessType || !BUSINESS_TYPE_MAP[businessType]) {
+      return NextResponse.json(
+        { error: 'businessType invalide. Valeurs autorisees : individual, auto_entrepreneur, company' },
+        { status: 400 }
+      )
+    }
+
+    const { data: influencer, error: fetchError } = await supabaseAdmin
+      .from('influencers')
+      .select('id, stripe_account_id')
+      .eq('id', influencerId)
+      .single()
+
+    if (fetchError || !influencer) {
+      return NextResponse.json({ error: 'Createur introuvable' }, { status: 404 })
+    }
+
+    let accountId = influencer.stripe_account_id
+
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        country: 'FR',
+        business_type: BUSINESS_TYPE_MAP[businessType],
+        capabilities: {
+          transfers: { requested: true },
+        },
+      })
+      accountId = account.id
+
+      const { error: updateError } = await supabaseAdmin
+        .from('influencers')
+        .update({
+          stripe_account_id: accountId,
+          business_type: businessType,
+        })
+        .eq('id', influencerId)
+
+      if (updateError) {
+        console.error('Update influencer error:', updateError)
+        return NextResponse.json({ error: updateError.message }, { status: 500 })
+      }
+    } else {
+      const { error: updateError } = await supabaseAdmin
+        .from('influencers')
+        .update({ business_type: businessType })
+        .eq('id', influencerId)
+
+      if (updateError) {
+        console.error('Update business_type error:', updateError)
+        return NextResponse.json({ error: updateError.message }, { status: 500 })
+      }
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://partnexx-three.vercel.app'
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: baseUrl + '/dashboard/influencer?stripe=refresh',
+      return_url: baseUrl + '/dashboard/influencer?stripe=success',
+      type: 'account_onboarding',
     })
 
-    // 2. Sauvegarder le stripe_account_id dans Supabase
-    await supabaseAdmin
-      .from('influencers')
-      .update({ stripe_account_id: account.id })
-      .eq('id', influencerId)
-
-    // 3. Créer le lien d'onboarding Stripe
-    const accountLink = await stripe.accountLinks.create({
-  account: account.id,
-  refresh_url: `https://partnexx-three.vercel.app/dashboard/influencer?stripe=refresh`,
-  return_url: `https://partnexx-three.vercel.app/dashboard/influencer?stripe=success`,
-  type: 'account_onboarding',
-})
-
-    return NextResponse.json({ url: accountLink.url })
-
+    return NextResponse.json({
+      url: accountLink.url,
+      accountId,
+      businessType,
+    })
   } catch (error) {
     console.error('Connect onboard error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
