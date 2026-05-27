@@ -2,19 +2,17 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import supabase from '@/lib/supabase'
-import dynamic from 'next/dynamic'
-
-const AccueilSection = dynamic(() => import('./sections/AccueilSection'), { ssr: false })
-const CampagnesSection = dynamic(() => import('./sections/CampagnesSection'), { ssr: false })
-const PartenairesSection = dynamic(() => import('./sections/PartenairesSection'), { ssr: false })
-const MessagerieSection = dynamic(() => import('./sections/MessagerieSection'), { ssr: false })
-const AnalyticsSection = dynamic(() => import('./sections/AnalyticsSection'), { ssr: false })
-const FinancesSection = dynamic(() => import('./sections/FinancesSection'), { ssr: false })
-const ContratsSection = dynamic(() => import('./sections/ContratsSection'), { ssr: false })
-const CalendrierSection = dynamic(() => import('./sections/CalendrierSection'), { ssr: false })
-const RessourcesSection = dynamic(() => import('./sections/RessourcesSection'), { ssr: false })
-const CompteSection = dynamic(() => import('./sections/CompteSection'), { ssr: false })
-const ParametresSection = dynamic(() => import('./sections/ParametresSection'), { ssr: false })
+import AccueilSection from './sections/AccueilSection'
+import CampagnesSection from './sections/CampagnesSection'
+import PartenairesSection from './sections/PartenairesSection'
+import MessagerieSection from './sections/MessagerieSection'
+import AnalyticsSection from './sections/AnalyticsSection'
+import FinancesSection from './sections/FinancesSection'
+import ContratsSection from './sections/ContratsSection'
+import CalendrierSection from './sections/CalendrierSection'
+import RessourcesSection from './sections/RessourcesSection'
+import CompteSection from './sections/CompteSection'
+import ParametresSection from './sections/ParametresSection'
 
 const menuItems = [
   { id: 'accueil', label: 'Accueil', icon: '🏠' },
@@ -78,9 +76,7 @@ export default function DashboardBrand() {
 
   return (
     <div className="min-h-screen bg-background flex w-screen">
-      {/* SIDEBAR */}
       <aside className={`fixed left-0 top-0 h-screen bg-card border-r border-border transition-all duration-300 flex flex-col z-50 overflow-y-auto ${sidebarCollapsed ? 'w-16' : 'w-64'}`}>
-        {/* Header */}
         <div className="p-3 border-b border-border flex items-center justify-between">
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2">
@@ -91,28 +87,17 @@ export default function DashboardBrand() {
               </div>
             </div>
           )}
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors text-sm"
-          >
+          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors text-sm">
             {sidebarCollapsed ? '▶' : '◀'}
           </button>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
           {menuItems.map(item => {
             const isActive = activeSection === item.id
             return (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                } ${sidebarCollapsed ? 'justify-center' : ''}`}
-              >
+              <button key={item.id} onClick={() => setActiveSection(item.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${isActive ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} ${sidebarCollapsed ? 'justify-center' : ''}`}>
                 <span className="text-base flex-shrink-0">{item.icon}</span>
                 {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
               </button>
@@ -120,7 +105,6 @@ export default function DashboardBrand() {
           })}
         </nav>
 
-        {/* User + Logout */}
         <div className="p-2 border-t border-border space-y-1">
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50">
@@ -133,17 +117,13 @@ export default function DashboardBrand() {
               </div>
             </div>
           )}
-          <button
-            onClick={handleLogout}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-red-500 hover:bg-red-50 transition-colors ${sidebarCollapsed ? 'justify-center' : ''}`}
-          >
+          <button onClick={handleLogout} className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-red-500 hover:bg-red-50 transition-colors ${sidebarCollapsed ? 'justify-center' : ''}`}>
             <span>🚪</span>
             {!sidebarCollapsed && 'Déconnexion'}
           </button>
         </div>
       </aside>
 
-      {/* MAIN */}
       <main className={`flex-1 transition-all duration-300 min-h-screen min-w-0 overflow-hidden ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="p-6 max-w-full overflow-hidden">
           {renderSection()}
