@@ -1,25 +1,24 @@
 'use client'
-import { useUserLevel } from '@/lib/hook/useUserLevel'
+import { LevelProvider, useLevel } from '@/lib/context/LevelContext'
 import LevelUpModal from '@/components/LevelUpModal'
 
-/* ============================================================
-   LevelUpProvider
-   
-   Composant à placer dans le layout du dashboard pour gérer
-   l'affichage du modal "Level Up !" de manière centralisée.
-   ============================================================ */
-export default function LevelUpProvider({ user, children }) {
-  const { levelUpModalOpen, levelUpNewLevel, levelUpPreviousLevel, closeLevelUpModal } = useUserLevel(user?.id)
-
+function LevelUpModalManager() {
+  const { levelUpModalOpen, levelUpNewLevel, levelUpPreviousLevel, closeLevelUpModal } = useLevel()
   return (
-    <>
+    <LevelUpModal
+      open={levelUpModalOpen}
+      onClose={closeLevelUpModal}
+      newLevel={levelUpNewLevel}
+      previousLevel={levelUpPreviousLevel}
+    />
+  )
+}
+
+export default function LevelUpProvider({ user, children }) {
+  return (
+    <LevelProvider user={user}>
       {children}
-      <LevelUpModal
-        open={levelUpModalOpen}
-        onClose={closeLevelUpModal}
-        newLevel={levelUpNewLevel}
-        previousLevel={levelUpPreviousLevel}
-      />
-    </>
+      <LevelUpModalManager />
+    </LevelProvider>
   )
 }

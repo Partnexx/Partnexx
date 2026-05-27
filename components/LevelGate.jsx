@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Lock, Target } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useUserLevel } from '@/lib/hook/useUserLevel'
+import { useLevel } from "@/lib/context/LevelContext"
 
 /* ============================================================================
    LevelGate — Wrapper réutilisable pour les sections gamifiées
@@ -26,7 +26,7 @@ export default function LevelGate({
   skipProfileCheck = false,
 }) {
   const router = useRouter()
-  const { loading, isProfileComplete, profileCompletion } = useUserLevel(user?.id)
+  const { loading, isProfileComplete, profileCompletion } = useLevel()
 
   // ====== ÉTAT 1 : Loading (évite le flash) ======
   if (loading) {

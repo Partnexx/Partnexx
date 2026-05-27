@@ -13,7 +13,7 @@ import { useState } from 'react'
 import { Search, Calendar, DollarSign, FileText, Download, CreditCard, Brain, CheckCircle, Clock, AlertCircle, Eye, Shield, TrendingUp, Lock, Wallet, Send, BarChart3 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { toast } from 'sonner'
-import { useUserLevel } from '@/lib/hook/useUserLevel'
+import { useLevel } from "@/lib/context/LevelContext"
 import LevelGate from '@/components/LevelGate'
 
 const getStatusColor = (status) => {
@@ -314,7 +314,7 @@ function ContratsTab({ contracts = [] }) {
    ONGLET PAIEMENTS — avec retrait Bronze + historique avancé Platine
    ============================================================ */
 function PaiementsTab({ transactions = [], user }) {
-  const { canAccess, score: userScore } = useUserLevel(user?.id)
+  const { canAccess, score: userScore } = useLevel()
 
   const canWithdraw = canAccess('withdrawals')               // Bronze (profil 100%)
   const canAccessAdvancedHistory = canAccess('advancedRevenueHistory') // Platine (1000 pts)

@@ -14,7 +14,7 @@ import { Search, MapPin, Calendar, DollarSign, Users, Send, AlertCircle, CheckCi
 import { toast } from 'sonner'
 import { z } from 'zod'
 import supabase from '@/lib/supabase'
-import { useUserLevel } from '@/lib/hook/useUserLevel'
+import { useLevel } from "@/lib/context/LevelContext"
 import LevelGate from '@/components/LevelGate'
 
 const Instagram = ({ className }) => (
@@ -76,7 +76,7 @@ const campaignsData = [
    COMPOSANT INTÉRIEUR (la vraie page une fois validée par LevelGate)
    ============================================================ */
 function OpportunitesContent({ user }) {
-  const { canAccess, score: userScore } = useUserLevel(user?.id)
+  const { canAccess, score: userScore } = useLevel()
 
   const canAccessExclusive = canAccess('exclusiveOpportunities')
   const canAccessConfidential = canAccess('confidentialCampaigns')

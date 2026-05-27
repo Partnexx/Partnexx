@@ -20,7 +20,7 @@ const rows = [
     diy: { value: "0%", desc: "Mais beaucoup de temps perdu", good: false },
     agency: { value: "20–30%", desc: "Sur chaque collab", good: false },
     favikon: { value: "10–20%", desc: "Selon le plan", good: false },
-    partnexx: { value: "7–15%", desc: "Seulement quand ça marche", good: true },
+    partnexx: { value: "5–18%", desc: "Dégressif selon ton plan", good: true },
   },
   {
     criterion: "Temps de lancement",

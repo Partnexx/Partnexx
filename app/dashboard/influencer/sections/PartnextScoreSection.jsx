@@ -7,55 +7,85 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Trophy, Star, Target, Clock, TrendingUp, Crown, Award, Flame,
-  Brain, Eye, Users, Calendar, BarChart3, Zap, Lock, CheckCircle
+  Brain, Eye, Users, Calendar, BarChart3, Zap, Lock, CheckCircle, Sparkle,
+  Heart, MessageSquare, Share2, Video
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import supabase from '@/lib/supabase'
-import { useUserLevel, LEVELS } from '@/lib/hook/useUserLevel'
+import { LEVELS } from '@/lib/hook/useUserLevel'
+import { useLevel } from '@/lib/context/LevelContext'
 
 const Sparkles = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4M19 17v4M3 5h4M17 19h4"/></svg>
 const Rocket = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
-const Coffee = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" x2="6" y1="2" y2="4"/><line x1="10" x2="10" y1="2" y2="4"/><line x1="14" x2="14" y1="2" y2="4"/></svg>
-const Lightbulb = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
 const Diamond = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2.7 10.3a2.41 2.41 0 0 0 0 3.41l7.59 7.59a2.41 2.41 0 0 0 3.41 0l7.59-7.59a2.41 2.41 0 0 0 0-3.41L13.7 2.71a2.41 2.41 0 0 0-3.41 0Z"/></svg>
 const Gem = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="6 3 18 3 22 9 12 22 2 9"/><path d="M11 3 8 9l4 13 4-13-3-6"/><line x1="2" x2="22" y1="9" y2="9"/></svg>
 const Coins = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>
 const Compass = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
 const Gamepad2 = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="6" x2="10" y1="12" y2="12"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="15" x2="15.01" y1="13" y2="13"/><line x1="18" x2="18.01" y1="11" y2="11"/><rect width="20" height="12" x="2" y="6" rx="2"/></svg>
 const PlayCircle = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-const BookOpen = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+const Lightbulb = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
 const Gift = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg>
-const Briefcase = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 7h-3a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2Z"/><path d="M16 13H8"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg>
 const ShoppingBag = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
 
 const LEVEL_VISUALS = {
-  bronze: { gradient: 'from-orange-400 to-amber-600', bgGradient: 'from-orange-50 to-amber-100', borderColor: 'border-orange-300', textColor: 'text-orange-700', tagline: 'Débloque tes premières opportunités', perks: [{ icon: '🎯', label: 'Défis quotidiens débloqués' }, { icon: '✅', label: 'Profil créateur vérifié' }, { icon: '📊', label: 'Dashboard débloqué' }, { icon: '💸', label: 'Flux financiers : retraits activés' }] },
-  argent: { gradient: 'from-slate-400 to-slate-600', bgGradient: 'from-slate-50 to-slate-100', borderColor: 'border-slate-300', textColor: 'text-slate-700', tagline: 'Progression créateur accélérée', perks: [{ icon: '✅', label: 'Défis hebdomadaires débloqués' }, { icon: '📊', label: 'Statistiques avancées' }, { icon: '🎨', label: 'Thèmes de profil exclusifs' }, { icon: '🎯', label: 'Multiplicateur Partnexx Score x1,25' }] },
-  or: { gradient: 'from-yellow-400 to-amber-500', bgGradient: 'from-yellow-50 to-amber-100', borderColor: 'border-yellow-400', textColor: 'text-yellow-700', tagline: 'Développe ton activité créateur', perks: [{ icon: '✅', label: 'Défis mensuels débloqués' }, { icon: '📊', label: 'Analytics créateurs complets' }, { icon: '🎨', label: 'Personnalisation avancée du profil' }, { icon: '🎯', label: 'Suivi détaillé des performances collaborations' }] },
-  platine: { gradient: 'from-cyan-400 to-sky-500', bgGradient: 'from-cyan-50 to-sky-100', borderColor: 'border-cyan-400', textColor: 'text-cyan-700', tagline: 'Débloque les avantages premium', perks: [{ icon: '🛍️', label: 'Marketplace débloquée' }, { icon: '🤖', label: 'Accès aux IA Partnexx' }, { icon: '📈', label: 'Historique revenus avancé' }, { icon: '🎧', label: 'Support prioritaire' }] },
-  diamant: { gradient: 'from-teal-400 to-cyan-500', bgGradient: 'from-teal-50 to-cyan-100', borderColor: 'border-teal-400', textColor: 'text-teal-700', tagline: 'Accès créateur avancé', perks: [{ icon: '✨', label: 'Opportunités exclusives débloquées' }, { icon: '🛍️', label: 'Marketplace Premium débloquée' }, { icon: '🚀', label: 'Accès anticipé aux nouveautés Partnexx' }, { icon: '💎', label: 'Récompenses créateur augmentées sur les invitations de marques' }] },
-  elite: { gradient: 'from-fuchsia-500 to-pink-500', bgGradient: 'from-fuchsia-50 to-pink-100', borderColor: 'border-fuchsia-400', textColor: 'text-fuchsia-700', tagline: 'Cercle premium Partnexx', perks: [{ icon: '🤝', label: 'Collaborations premium négociées' }, { icon: '📣', label: 'Mise en avant sur le LinkedIn de Partnexx' }, { icon: '💼', label: 'Campagnes confidentielles' }, { icon: '👑', label: "Accès complet à l'écosystème PARTNEXX" }] },
-  champion: { gradient: 'from-violet-500 to-purple-600', bgGradient: 'from-violet-50 to-purple-100', borderColor: 'border-violet-400', textColor: 'text-violet-700', tagline: 'Niveau créateur reconnu', perks: [{ icon: '🌟', label: 'Mise en avant sur le Instagram de PARTNEXX' }, { icon: '🤝', label: 'Opportunités premium débloquées' }, { icon: '🎁', label: 'Partnexx Score X3' }, { icon: '💎', label: 'Avantages marketplace' }] },
-  legende: { gradient: 'from-pink-500 via-orange-500 to-yellow-500', bgGradient: 'from-pink-50 via-orange-50 to-yellow-100', borderColor: 'border-pink-400', textColor: 'text-pink-700', tagline: 'Niveau maximum Partnexx', perks: [{ icon: '💰', label: 'Frais Partnexx réduits de 2%' }, { icon: '🏆', label: 'Statut "Top Créateur"' }, { icon: '✉️', label: 'Invitations privées Partnexx' }, { icon: '🧠', label: 'Conseiller stratégique dédié' }] },
+  bronze: { gradient: 'from-orange-400 to-amber-600', bgGradient: 'from-orange-50 to-amber-100', borderColor: 'border-orange-300', textColor: 'text-orange-700', tagline: 'Débloque tes premières opportunités', perks: [{ icon: '🎯', label: 'Défis quotidiens débloqués' }, { icon: '✅', label: 'Profil créateur vérifié' }, { icon: '📊', label: 'Dashboard débloqué' }, { icon: '💸', label: 'Retraits activés' }] },
+  argent: { gradient: 'from-slate-400 to-slate-600', bgGradient: 'from-slate-50 to-slate-100', borderColor: 'border-slate-300', textColor: 'text-slate-700', tagline: 'Progression accélérée', perks: [{ icon: '📊', label: 'Statistiques avancées' }, { icon: '🎨', label: 'Thèmes de profil exclusifs' }, { icon: '🎯', label: 'Multiplicateur x1.25' }] },
+  or: { gradient: 'from-yellow-400 to-amber-500', bgGradient: 'from-yellow-50 to-amber-100', borderColor: 'border-yellow-400', textColor: 'text-yellow-700', tagline: 'Expert créateur', perks: [{ icon: '📊', label: 'Analytics complets' }, { icon: '🎨', label: 'Personnalisation avancée' }, { icon: '🎯', label: 'Multiplicateur x1.5' }, { icon: '📈', label: 'Suivi collaborations' }] },
+  platine: { gradient: 'from-cyan-400 to-sky-500', bgGradient: 'from-cyan-50 to-sky-100', borderColor: 'border-cyan-400', textColor: 'text-cyan-700', tagline: 'Avantages premium', perks: [{ icon: '🛍️', label: 'Marketplace débloquée' }, { icon: '🤖', label: 'IA Partnexx' }, { icon: '📈', label: 'Revenus avancés' }, { icon: '🎧', label: 'Support prioritaire' }] },
+  diamant: { gradient: 'from-teal-400 to-cyan-500', bgGradient: 'from-teal-50 to-cyan-100', borderColor: 'border-teal-400', textColor: 'text-teal-700', tagline: 'Élite numérique', perks: [{ icon: '✨', label: 'Opportunités exclusives' }, { icon: '🛍️', label: 'Marketplace Premium' }, { icon: '🚀', label: 'Accès anticipé' }, { icon: '💎', label: 'Récompenses x2' }] },
+  elite: { gradient: 'from-fuchsia-500 to-pink-500', bgGradient: 'from-fuchsia-50 to-pink-100', borderColor: 'border-fuchsia-400', textColor: 'text-fuchsia-700', tagline: 'Cercle premium', perks: [{ icon: '🤝', label: 'Collabs premium' }, { icon: '📣', label: 'Mise en avant LinkedIn' }, { icon: '💼', label: 'Campagnes confidentielles' }, { icon: '👑', label: "Écosystème complet" }] },
+  champion: { gradient: 'from-violet-500 to-purple-600', bgGradient: 'from-violet-50 to-purple-100', borderColor: 'border-violet-400', textColor: 'text-violet-700', tagline: 'Créateur reconnu', perks: [{ icon: '🌟', label: 'Mise en avant Instagram' }, { icon: '🤝', label: 'Opportunités premium' }, { icon: '🎁', label: 'Multiplicateur x3' }, { icon: '💎', label: 'Avantages marketplace' }] },
+  legende: { gradient: 'from-pink-500 via-orange-500 to-yellow-500', bgGradient: 'from-pink-50 via-orange-50 to-yellow-100', borderColor: 'border-pink-400', textColor: 'text-pink-700', tagline: 'Top créateur', perks: [{ icon: '💰', label: 'Frais réduits -2%' }, { icon: '🏆', label: 'Statut Top Créateur' }, { icon: '✉️', label: 'Invitations privées' }, { icon: '🧠', label: 'Conseiller dédié' }] },
 }
 
-const dailyChallenges = [
-  { id: "daily-1", title: "Maître de l'Engagement", description: "Atteindre 95% de taux d'engagement sur une story", reward: "+15 pts + Badge Viral", timeLeft: "18h 42m", progress: 78, difficulty: "Facile", icon: Eye, color: "from-green-500 to-emerald-600", participants: 1247, completions: 432 },
-  { id: "daily-2", title: "Speed Creator", description: "Créer et publier 3 contenus en moins de 2h", reward: "+25 pts + Boost IA", timeLeft: "18h 42m", progress: 33, difficulty: "Moyen", icon: Rocket, color: "from-blue-500 to-cyan-600", participants: 892, completions: 156 },
-  { id: "daily-3", title: "Influenceur du Café", description: "Obtenir 50 commentaires sur un post avant midi", reward: "+35 pts + Consultation Pro", timeLeft: "6h 15m", progress: 64, difficulty: "Difficile", icon: Coffee, color: "from-orange-500 to-red-600", participants: 523, completions: 89 },
-]
-const weeklyChallenges = [
-  { id: "weekly-10", title: "Empereur des Conversions", description: "Maintenir 90%+ de taux de conversion sur 7 jours", reward: "+150 pts + Accès VIP Premium", timeLeft: "4j 12h", progress: 71, difficulty: "Epic", icon: Crown, color: "from-purple-500 to-indigo-600", participants: 312, completions: 45, streak: 3 },
-  { id: "weekly-11", title: "Architecte de Communauté", description: "Recruter 10 nouveaux followers qualifiés", reward: "+100 pts + Outils Analytics Pro", timeLeft: "4j 12h", progress: 60, difficulty: "Difficile", icon: Users, color: "from-pink-500 to-rose-600", participants: 756, completions: 189 },
-  { id: "weekly-12", title: "Génie Créatif", description: "Innover avec 5 formats de contenu différents", reward: "+120 pts + Mentor Personnel", timeLeft: "4j 12h", progress: 40, difficulty: "Epic", icon: Lightbulb, color: "from-yellow-500 to-orange-600", participants: 445, completions: 67 },
-]
-const monthlyChallenges = [
-  { id: "monthly-20", title: "Légende de Partnexx", description: "Dominer le classement pendant 30 jours", reward: "+500 pts + Statut Légende + Revenue Share", timeLeft: "18j 7h", progress: 45, difficulty: "Légendaire", icon: Trophy, color: "from-yellow-400 via-orange-500 to-red-600", participants: 50, completions: 2, exclusive: true },
-  { id: "monthly-21", title: "Empire Builder", description: "Générer 50k€+ de revenus via la plateforme", reward: "+300 pts + Consultant Dédié + Événement Exclusif", timeLeft: "18j 7h", progress: 72, difficulty: "Epic", icon: Briefcase, color: "from-indigo-500 to-purple-600", participants: 128, completions: 12 },
-  { id: "monthly-22", title: "Mentor Suprême", description: "Former et accompagner 5 nouveaux créateurs au succès", reward: "+250 pts + Programme Ambassador + Equity", timeLeft: "18j 7h", progress: 20, difficulty: "Epic", icon: BookOpen, color: "from-green-500 to-teal-600", participants: 89, completions: 8 },
-]
+/* ============================================================
+   ⭐ NOUVEAU SYSTÈME : 3 défis par niveau (Facile/Moyen/Difficile)
+   ============================================================ */
+const CHALLENGES_BY_LEVEL = {
+  bronze: [
+    { id: 'bronze-easy', title: 'Premiers pas', description: 'Publier 2 contenus aujourd\'hui', basePoints: 10, difficulty: 'Facile', icon: Video, color: 'from-green-500 to-emerald-600' },
+    { id: 'bronze-medium', title: 'Maître des likes', description: 'Atteindre 250 likes sur 1 post', basePoints: 25, difficulty: 'Moyen', icon: Heart, color: 'from-blue-500 to-cyan-600' },
+    { id: 'bronze-hard', title: 'Première communauté', description: 'Gagner 25 nouveaux followers en 24h', basePoints: 50, difficulty: 'Difficile', icon: Users, color: 'from-orange-500 to-red-600' },
+  ],
+  argent: [
+    { id: 'argent-easy', title: 'Rythme régulier', description: 'Publier 3 contenus dans la journée', basePoints: 20, difficulty: 'Facile', icon: Video, color: 'from-green-500 to-emerald-600' },
+    { id: 'argent-medium', title: 'Engagement boost', description: 'Obtenir 50 commentaires sur 1 post', basePoints: 50, difficulty: 'Moyen', icon: MessageSquare, color: 'from-blue-500 to-cyan-600' },
+    { id: 'argent-hard', title: 'Story virale', description: 'Atteindre 50% de taux de vues sur une story', basePoints: 100, difficulty: 'Difficile', icon: Eye, color: 'from-orange-500 to-red-600' },
+  ],
+  or: [
+    { id: 'or-easy', title: 'Productivité', description: 'Publier 5 contenus en 24h', basePoints: 35, difficulty: 'Facile', icon: Rocket, color: 'from-green-500 to-emerald-600' },
+    { id: 'or-medium', title: 'Conversation', description: 'Répondre à 100 commentaires dans la journée', basePoints: 80, difficulty: 'Moyen', icon: MessageSquare, color: 'from-blue-500 to-cyan-600' },
+    { id: 'or-hard', title: 'Stratège', description: 'Tester 4 formats différents en 24h', basePoints: 175, difficulty: 'Difficile', icon: Lightbulb, color: 'from-orange-500 to-red-600' },
+  ],
+  platine: [
+    { id: 'platine-easy', title: 'Discipline', description: 'Publier sur 2 plateformes le même jour avec 500+ vues chacune', basePoints: 60, difficulty: 'Facile', icon: Share2, color: 'from-green-500 to-emerald-600' },
+    { id: 'platine-medium', title: 'Branding', description: 'Obtenir 5 000 vues cumulées en 24h', basePoints: 140, difficulty: 'Moyen', icon: Eye, color: 'from-blue-500 to-cyan-600' },
+    { id: 'platine-hard', title: 'Croissance accélérée', description: 'Gagner 250 followers en 7 jours', basePoints: 300, difficulty: 'Difficile', icon: TrendingUp, color: 'from-orange-500 to-red-600' },
+  ],
+  diamant: [
+    { id: 'diamant-easy', title: 'Multicanal', description: 'Publier sur 3 plateformes différentes avec 2k+ vues chacune', basePoints: 100, difficulty: 'Facile', icon: Share2, color: 'from-green-500 to-emerald-600' },
+    { id: 'diamant-medium', title: 'Influence', description: 'Faire 25 000 vues sur un contenu en 24h', basePoints: 240, difficulty: 'Moyen', icon: Eye, color: 'from-blue-500 to-cyan-600' },
+    { id: 'diamant-hard', title: 'Monétisation', description: 'Signer 1 collaboration en 7 jours via Partnexx', basePoints: 500, difficulty: 'Difficile', icon: Gem, color: 'from-orange-500 to-red-600' },
+  ],
+  elite: [
+    { id: 'elite-easy', title: 'Présence forte', description: 'Faire 10 stories cumulées dans la journée', basePoints: 175, difficulty: 'Facile', icon: Video, color: 'from-green-500 to-emerald-600' },
+    { id: 'elite-medium', title: 'Reach massif', description: 'Atteindre 100 000 vues cumulées en 7 jours', basePoints: 400, difficulty: 'Moyen', icon: Eye, color: 'from-blue-500 to-cyan-600' },
+    { id: 'elite-hard', title: 'Référent', description: 'Être mentionné par 5 autres créateurs Partnexx en 30j', basePoints: 850, difficulty: 'Difficile', icon: Star, color: 'from-orange-500 to-red-600' },
+  ],
+  champion: [
+    { id: 'champion-easy', title: 'Pilier', description: 'Publier du contenu 15 jours d\'affilée', basePoints: 300, difficulty: 'Facile', icon: Flame, color: 'from-green-500 to-emerald-600' },
+    { id: 'champion-medium', title: 'Top performer', description: 'Faire 500k vues cumulées en 30 jours', basePoints: 700, difficulty: 'Moyen', icon: TrendingUp, color: 'from-blue-500 to-cyan-600' },
+    { id: 'champion-hard', title: 'Empire', description: 'Signer 5 collaborations dans le mois via Partnexx', basePoints: 1500, difficulty: 'Difficile', icon: Crown, color: 'from-orange-500 to-red-600' },
+  ],
+  legende: [
+    { id: 'legende-easy', title: 'Inspiration', description: 'Mentor : aider 2 créateurs Bronze à atteindre Argent', basePoints: 500, difficulty: 'Facile', icon: Star, color: 'from-green-500 to-emerald-600' },
+    { id: 'legende-medium', title: 'Trendsetter', description: 'Lancer une tendance virale (250k+ vues partagées)', basePoints: 1200, difficulty: 'Moyen', icon: Flame, color: 'from-blue-500 to-cyan-600' },
+    { id: 'legende-hard', title: 'Icône', description: 'Faire 3 millions de vues sur un contenu en 7 jours', basePoints: 2500, difficulty: 'Difficile', icon: Trophy, color: 'from-orange-500 to-red-600' },
+  ],
+}
+
 const achievements = [
   { title: "Première Victoire", desc: "Complétez votre premier défi", unlocked: false, rarity: "common", icon: Target },
   { title: "Série de Feu", desc: "7 défis consécutifs réussis", unlocked: false, rarity: "rare", icon: Flame },
@@ -65,14 +95,14 @@ const achievements = [
   { title: "Pionnier IA", desc: "Premier à tester 5 nouvelles features IA", unlocked: false, rarity: "rare", icon: Brain },
 ]
 const exclusivePerks = [
-  { title: "Consultation IA Personnalisée", description: "Session 1h avec notre IA expert pour optimiser vos campagnes", cost: 150, icon: Brain, available: true, popularity: 94 },
+  { title: "Consultation IA Personnalisée", description: "Session 1h avec notre IA expert", cost: 150, icon: Brain, available: true, popularity: 94 },
   { title: "Accès Early Beta Features", description: "Testez les nouvelles fonctionnalités avant tout le monde", cost: 200, icon: Rocket, available: true, popularity: 89 },
   { title: "Mentor Personnel 1 Mois", description: "Accompagnement dédié par un Top 1% Partnexx", cost: 500, icon: Crown, available: false, popularity: 97, waitlist: 23 },
-  { title: "Event Privé Paris", description: "Soirée networking exclusive avec les élites", cost: 300, icon: Sparkles, available: true, popularity: 92, limited: "12 places" },
+  { title: "Event Privé Paris", description: "Soirée networking exclusive", cost: 300, icon: Sparkles, available: true, popularity: 92, limited: "12 places" },
 ]
 const premiumPerks = [
-  { title: "🔥 Boost Algorithme Premium", description: "Multipliez votre visibilité auprès des marques pendant 7 jours", cost: 400, icon: Flame, available: true, popularity: 96, premium: true },
-  { title: "🔥 Coaching Stratégique VIP", description: "3 sessions privées avec un consultant Partnexx Senior", cost: 800, icon: Brain, available: true, popularity: 91, premium: true },
+  { title: "🔥 Boost Algorithme Premium", description: "Multipliez votre visibilité pendant 7 jours", cost: 400, icon: Flame, available: true, popularity: 96, premium: true },
+  { title: "🔥 Coaching Stratégique VIP", description: "3 sessions privées avec un consultant Senior", cost: 800, icon: Brain, available: true, popularity: 91, premium: true },
 ]
 const aiInsights = [
   { title: "Prédiction de Croissance", value: "+347 points", timeframe: "30 prochains jours", confidence: 87, icon: TrendingUp },
@@ -81,6 +111,83 @@ const aiInsights = [
   { title: "Partenariat Optimal", value: "Fashion x Gaming", timeframe: "Q1 2025", confidence: 89, icon: Compass },
 ]
 
+/* ============================================================
+   Composant carte de défi
+   ============================================================ */
+function ChallengeCard({ challenge, accepted, status, onAccept, onComplete, scoreMultiplier, levelName, dailyLimitReached }) {
+  const Icon = challenge.icon
+  const completed = status?.status === 'completed'
+  const showBonusPreview = scoreMultiplier > 1 && !completed
+  const finalPoints = Math.round(challenge.basePoints * scoreMultiplier)
+
+  const difficultyConfig = {
+    'Facile': { color: 'bg-green-500/10 text-green-600 border-green-500/20' },
+    'Moyen': { color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+    'Difficile': { color: 'bg-red-500/10 text-red-600 border-red-500/20' },
+  }
+  const diffStyle = difficultyConfig[challenge.difficulty] || difficultyConfig['Facile']
+
+  return (
+    <Card className="group relative overflow-hidden hover:shadow-2xl transition-all hover:scale-105">
+      <div className={`absolute inset-0 bg-gradient-to-r ${challenge.color} opacity-5`} />
+
+      <CardHeader className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+          <div className={`p-3 rounded-xl bg-gradient-to-r ${challenge.color} shadow-lg`}>
+            <Icon className="h-6 w-6 text-white" />
+          </div>
+          <Badge variant="outline" className={`${diffStyle.color} font-bold`}>
+            {challenge.difficulty}
+          </Badge>
+        </div>
+        <CardTitle className="text-xl">{challenge.title}</CardTitle>
+      </CardHeader>
+
+      <CardContent className="relative z-10 space-y-4">
+        <p className="text-muted-foreground">{challenge.description}</p>
+
+        {accepted && (
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Progression</span>
+              <span>{status?.progress ?? 0}%</span>
+            </div>
+            <Progress value={status?.progress ?? 0} className="h-2" />
+          </div>
+        )}
+
+        <div className="bg-primary/10 rounded-lg p-3 border border-primary/20">
+          <div className="flex items-center gap-2">
+            <Gift className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium text-primary">+{challenge.basePoints} pts</span>
+          </div>
+          {showBonusPreview && (
+            <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1">
+              <Sparkle className="h-3 w-3" />
+              Avec ton niveau {levelName} : +{finalPoints} pts ({challenge.basePoints} × {scoreMultiplier})
+            </p>
+          )}
+        </div>
+
+        <Button
+          onClick={() => onAccept(challenge)}
+          disabled={accepted || (dailyLimitReached && !accepted)}
+          className={`w-full ${completed ? 'bg-green-600' : accepted ? 'bg-green-600/80' : `bg-gradient-to-r ${challenge.color}`} text-white font-bold`}
+        >
+          {completed ? <><CheckCircle className="h-4 w-4 mr-2" />Complété ✓</> : accepted ? <><Target className="h-4 w-4 mr-2" />En cours...</> : dailyLimitReached ? <><Lock className="h-4 w-4 mr-2" />Déjà fait aujourd'hui</> : <><PlayCircle className="h-4 w-4 mr-2" />Relever le Défi</>}
+        </Button>
+
+        {accepted && !completed && (
+          <Button variant="outline" onClick={() => onComplete(challenge)} className="w-full border-green-500/50 text-green-600 hover:bg-green-500/10 font-bold">
+            <CheckCircle className="h-4 w-4 mr-2" />
+            ✅ Marquer comme complété (TEST)
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function PartnextScoreSection({ user }) {
   const router = useRouter()
   const {
@@ -88,35 +195,25 @@ export default function PartnextScoreSection({ user }) {
     progress: levelProgress, pointsToNextLevel,
     profileCompletion, isProfileComplete,
     canAccess, getRequiredLevel, loading: levelLoading,
-  } = useUserLevel(user?.id)
+    scoreMultiplier, awardPoints,
+  } = useLevel()
 
   const [animatedScore, setAnimatedScore] = useState(0)
   const [showCelebration, setShowCelebration] = useState(false)
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [selectedChallenge, setSelectedChallenge] = useState('daily')
-  const [liveUpdates, setLiveUpdates] = useState(0)
   const [leaderboard, setLeaderboard] = useState([])
   const [selectedLevelKey, setSelectedLevelKey] = useState(null)
-
-  // Défis persistés via Supabase
   const [acceptedChallenges, setAcceptedChallenges] = useState(new Map())
 
   useEffect(() => {
     if (!selectedLevelKey) setSelectedLevelKey(level?.key || 'bronze')
   }, [level, selectedLevelKey])
 
-  // Fetch + Realtime user_challenges
   useEffect(() => {
     if (!user?.id) return
     const fetchUserChallenges = async () => {
-      const { data, error } = await supabase
-        .from('user_challenges')
-        .select('*')
-        .eq('user_id', user.id)
-      if (error) {
-        console.warn('Failed to fetch user_challenges', error)
-        return
-      }
+      const { data, error } = await supabase.from('user_challenges').select('*').eq('user_id', user.id)
+      if (error) { console.warn(error); return }
       const map = new Map()
       data?.forEach(c => map.set(c.challenge_id, c))
       setAcceptedChallenges(map)
@@ -125,19 +222,11 @@ export default function PartnextScoreSection({ user }) {
 
     const channelName = `user-challenges:${user.id}:${Math.random().toString(36).slice(2, 8)}`
     const channel = supabase.channel(channelName)
-    channel.on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'user_challenges',
-      filter: `user_id=eq.${user.id}`,
-    }, (payload) => {
+    channel.on('postgres_changes', { event: '*', schema: 'public', table: 'user_challenges', filter: `user_id=eq.${user.id}` }, (payload) => {
       setAcceptedChallenges(prev => {
         const next = new Map(prev)
-        if (payload.eventType === 'DELETE') {
-          next.delete(payload.old.challenge_id)
-        } else {
-          next.set(payload.new.challenge_id, payload.new)
-        }
+        if (payload.eventType === 'DELETE') next.delete(payload.old.challenge_id)
+        else next.set(payload.new.challenge_id, payload.new)
         return next
       })
     })
@@ -148,20 +237,11 @@ export default function PartnextScoreSection({ user }) {
   useEffect(() => {
     if (!user?.id) return
     const fetchLeaderboard = async () => {
-      const { data } = await supabase
-        .from('influencers')
-        .select('id, display_name, ai_score, user_id')
-        .order('ai_score', { ascending: false })
-        .limit(10)
+      const { data } = await supabase.from('influencers').select('id, display_name, ai_score, user_id').order('ai_score', { ascending: false }).limit(10)
       if (data) setLeaderboard(data)
     }
     fetchLeaderboard()
-  }, [user?.id])
-
-  useEffect(() => {
-    const interval = setInterval(() => setLiveUpdates(prev => prev + Math.floor(Math.random() * 5) + 1), 3000)
-    return () => clearInterval(interval)
-  }, [])
+  }, [user?.id, score])
 
   useEffect(() => {
     if (score <= 0) { setAnimatedScore(0); return }
@@ -169,27 +249,11 @@ export default function PartnextScoreSection({ user }) {
     let current = 0
     const timer = setInterval(() => {
       current += increment
-      if (current >= score) {
-        setAnimatedScore(score)
-        clearInterval(timer)
-        setShowCelebration(true)
-        setTimeout(() => setShowCelebration(false), 4000)
-      } else setAnimatedScore(Math.floor(current))
+      if (current >= score) { setAnimatedScore(score); clearInterval(timer); setShowCelebration(true); setTimeout(() => setShowCelebration(false), 4000) }
+      else setAnimatedScore(Math.floor(current))
     }, duration / steps)
     return () => clearInterval(timer)
   }, [score])
-
-  const canDoDailyChallenges = canAccess('dailyChallenges')
-  const canDoWeeklyChallenges = canAccess('weeklyChallenges')
-  const canDoMonthlyChallenges = canAccess('monthlyChallenges')
-
-  useEffect(() => {
-    if (selectedChallenge === 'monthly' && !canDoMonthlyChallenges) {
-      setSelectedChallenge(canDoWeeklyChallenges ? 'weekly' : 'daily')
-    } else if (selectedChallenge === 'weekly' && !canDoWeeklyChallenges) {
-      setSelectedChallenge('daily')
-    }
-  }, [selectedChallenge, canDoWeeklyChallenges, canDoMonthlyChallenges])
 
   const canAccessMarketplace = canAccess('marketplace')
   const canAccessPremiumMarketplace = canAccess('premiumMarketplace')
@@ -197,51 +261,51 @@ export default function PartnextScoreSection({ user }) {
   const marketplaceProgress = marketplaceRequiredLevel ? Math.min((score / marketplaceRequiredLevel.threshold) * 100, 100) : 0
   const pointsToMarketplace = marketplaceRequiredLevel ? Math.max(0, marketplaceRequiredLevel.threshold - score) : 0
 
-  // Accepter un défi avec insertion Supabase
-  const handleAcceptChallenge = async (challenge, type) => {
-    if (!user?.id) return
+  /* ============ Défis du niveau actuel ============ */
+  const currentLevelChallenges = level ? CHALLENGES_BY_LEVEL[level.key] || [] : []
 
-    const optimistic = {
-      challenge_id: challenge.id,
-      challenge_type: type,
-      challenge_title: challenge.title,
-      challenge_reward: challenge.reward,
-      status: 'in_progress',
-      progress: 0,
-      accepted_at: new Date().toISOString(),
-    }
-    setAcceptedChallenges(prev => {
-      const next = new Map(prev)
-      next.set(challenge.id, optimistic)
-      return next
+  /* ============ Vérif limite 1 défi/difficulté par 24h ============ */
+  const isDifficultyLockedToday = (difficulty) => {
+    // On regarde si un défi de cette difficulté a été complété/accepté dans les 24 dernières heures
+    const now = Date.now()
+    const dayAgo = now - 24 * 60 * 60 * 1000
+    return currentLevelChallenges.some(c => {
+      if (c.difficulty !== difficulty) return false
+      const status = acceptedChallenges.get(c.id)
+      if (!status) return false
+      const acceptedAt = new Date(status.accepted_at).getTime()
+      return acceptedAt > dayAgo && status.status === 'completed'
     })
+  }
+
+  const handleAcceptChallenge = async (challenge) => {
+    if (!user?.id) return
+    const optimistic = { challenge_id: challenge.id, challenge_type: challenge.difficulty.toLowerCase(), challenge_title: challenge.title, challenge_reward: `+${challenge.basePoints} pts`, status: 'in_progress', progress: 0, accepted_at: new Date().toISOString() }
+    setAcceptedChallenges(prev => { const next = new Map(prev); next.set(challenge.id, optimistic); return next })
 
     const { error } = await supabase.from('user_challenges').insert({
-      user_id: user.id,
-      challenge_id: challenge.id,
-      challenge_type: type,
-      challenge_title: challenge.title,
-      challenge_reward: challenge.reward,
-      status: 'in_progress',
-      progress: 0,
+      user_id: user.id, challenge_id: challenge.id, challenge_type: challenge.difficulty.toLowerCase(),
+      challenge_title: challenge.title, challenge_reward: `+${challenge.basePoints} pts`,
+      status: 'in_progress', progress: 0,
     })
-
     if (error) {
-      console.error('Failed to accept challenge', error)
-      setAcceptedChallenges(prev => {
-        const next = new Map(prev)
-        next.delete(challenge.id)
-        return next
-      })
-      if (error.code === '23505') {
-        toast.error('Tu as déjà accepté ce défi')
-      } else {
-        toast.error("Erreur : impossible d'accepter ce défi")
-      }
+      setAcceptedChallenges(prev => { const next = new Map(prev); next.delete(challenge.id); return next })
+      toast.error(error.code === '23505' ? 'Tu as déjà accepté ce défi' : "Erreur")
       return
     }
-
     toast.success(`Défi accepté : ${challenge.title} 🎯`)
+  }
+
+  const handleCompleteChallenge = async (challenge) => {
+    if (!user?.id) return
+    const { error: updateError } = await supabase.from('user_challenges')
+      .update({ status: 'completed', progress: 100, completed_at: new Date().toISOString() })
+      .eq('user_id', user.id).eq('challenge_id', challenge.id)
+    if (updateError) { toast.error(`Erreur : ${updateError.message}`); return }
+
+    await awardPoints(challenge.basePoints, 'challenge_completed', {
+      challenge_id: challenge.id, challenge_title: challenge.title, difficulty: challenge.difficulty,
+    })
   }
 
   const isAccepted = (id) => acceptedChallenges.has(id)
@@ -258,19 +322,12 @@ export default function PartnextScoreSection({ user }) {
     isUser: l.user_id === user?.id,
   }))
   const userInTop7 = top7.some(u => u.isUser)
-  const leaderboardWithUser = userInTop7 ? top7 : [
-    ...top7,
-    { rank: top7.length + 1, name: 'Vous', score, avatar: '🏆', trend: '+' + liveUpdates, badge: '🎖️', isUser: true }
-  ]
+  const leaderboardWithUser = userInTop7 ? top7 : [...top7, { rank: top7.length + 1, name: 'Vous', score, avatar: '🏆', trend: '+0', badge: '🎖️', isUser: true }]
 
   const selectedLevel = LEVELS.find(l => l.key === selectedLevelKey) || LEVELS[0]
   const selectedVisual = LEVEL_VISUALS[selectedLevel.key]
   const selectedLevelIndex = LEVELS.findIndex(l => l.key === selectedLevel.key)
   const isSelectedLevelUnlocked = currentLevelIndex >= 0 && selectedLevelIndex <= currentLevelIndex
-
-  const acceptedDailyCount = dailyChallenges.filter(c => isAccepted(c.id)).length
-  const acceptedWeeklyCount = weeklyChallenges.filter(c => isAccepted(c.id)).length
-  const acceptedMonthlyCount = monthlyChallenges.filter(c => isAccepted(c.id)).length
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -297,7 +354,7 @@ export default function PartnextScoreSection({ user }) {
             </div>
             <div>
               <h1 className="text-6xl font-black bg-gradient-to-r from-primary via-purple-500 via-pink-500 to-orange-500 bg-clip-text text-transparent drop-shadow-2xl">Partnexx Empire</h1>
-              <p className="text-xl text-muted-foreground mt-2">🚀 <span className="font-bold text-primary">Niveau {level?.name || 'Verrouillé'}</span> • Rang #{userRank} • +{liveUpdates} pts temps réel</p>
+              <p className="text-xl text-muted-foreground mt-2">🚀 <span className="font-bold text-primary">Niveau {level?.name || 'Verrouillé'}</span> • Rang #{userRank} • Multiplicateur x{scoreMultiplier}</p>
             </div>
           </div>
         </div>
@@ -306,7 +363,7 @@ export default function PartnextScoreSection({ user }) {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-6xl">
             <TabsList className="grid w-full grid-cols-6 bg-card/80 backdrop-blur-sm border-0 h-14 rounded-2xl shadow-2xl">
               <TabsTrigger value="dashboard" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-purple-500 data-[state=active]:text-white font-bold"><BarChart3 className="h-5 w-5 mr-2" />Dashboard</TabsTrigger>
-              <TabsTrigger value="challenges" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-red-500 data-[state=active]:text-white font-bold"><Gamepad2 className="h-5 w-5 mr-2" />Défis{acceptedChallenges.size > 0 && <Badge variant="secondary" className="ml-2 text-[10px] h-4 px-1.5">{acceptedChallenges.size}</Badge>}</TabsTrigger>
+              <TabsTrigger value="challenges" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-red-500 data-[state=active]:text-white font-bold"><Gamepad2 className="h-5 w-5 mr-2" />Défis</TabsTrigger>
               <TabsTrigger value="leaderboard" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-500 data-[state=active]:to-orange-500 data-[state=active]:text-white font-bold"><Trophy className="h-5 w-5 mr-2" />Classement</TabsTrigger>
               <TabsTrigger value="achievements" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-500 data-[state=active]:text-white font-bold"><Award className="h-5 w-5 mr-2" />Succès</TabsTrigger>
               <TabsTrigger value="ai-insights" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-500 data-[state=active]:text-white font-bold"><Brain className="h-5 w-5 mr-2" />IA Insights</TabsTrigger>
@@ -321,20 +378,10 @@ export default function PartnextScoreSection({ user }) {
                       <div className="text-center space-y-6">
                         <div className="relative inline-block">
                           <div className="text-9xl font-black bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent drop-shadow-2xl animate-pulse">{animatedScore.toLocaleString()}</div>
-                          <div className="absolute -top-4 -right-4 flex gap-2">
-                            <Flame className="h-10 w-10 text-orange-500 animate-bounce" />
-                            <Crown className="h-10 w-10 text-yellow-500 animate-pulse" />
-                          </div>
+                          <div className="absolute -top-4 -right-4 flex gap-2"><Flame className="h-10 w-10 text-orange-500 animate-bounce" /><Crown className="h-10 w-10 text-yellow-500 animate-pulse" /></div>
                         </div>
-                        <Badge className={`text-xl px-6 py-3 ${level ? `bg-gradient-to-r ${LEVEL_VISUALS[level.key].gradient}` : 'bg-gradient-to-r from-gray-400 to-gray-600'} text-white border-0 shadow-lg`}>
-                          {level ? `${level.emoji} ${level.name} Créateur • Rang #${userRank}` : '🔒 Profil incomplet'}
-                        </Badge>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-                          <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl p-4 border border-green-500/30"><div className="text-2xl font-bold text-green-600">94.2%</div><div className="text-sm text-green-600/80">Efficacité</div></div>
-                          <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl p-4 border border-blue-500/30"><div className="text-2xl font-bold text-blue-600">78.5%</div><div className="text-sm text-blue-600/80">Influence</div></div>
-                          <div className="bg-gradient-to-br from-purple-500/20 to-indigo-500/20 rounded-xl p-4 border border-purple-500/30"><div className="text-2xl font-bold text-purple-600">87.3%</div><div className="text-sm text-purple-600/80">IA Boost</div></div>
-                          <div className="bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-xl p-4 border border-orange-500/30"><div className="text-2xl font-bold text-orange-600">92.1%</div><div className="text-sm text-orange-600/80">Impact</div></div>
-                        </div>
+                        <Badge className={`text-xl px-6 py-3 ${level ? `bg-gradient-to-r ${LEVEL_VISUALS[level.key].gradient}` : 'bg-gradient-to-r from-gray-400 to-gray-600'} text-white border-0 shadow-lg`}>{level ? `${level.emoji} ${level.name} Créateur • Rang #${userRank}` : '🔒 Profil incomplet'}</Badge>
+
                         <div className="mt-10 space-y-6">
                           {!isProfileComplete && !levelLoading && (
                             <div className="bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 rounded-2xl p-6 space-y-4">
@@ -343,10 +390,11 @@ export default function PartnextScoreSection({ user }) {
                               <Button onClick={() => router.push('/dashboard/influencer?section=profil')} className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold"><Target className="h-4 w-4 mr-2" />Compléter mon profil</Button>
                             </div>
                           )}
+
                           <div className="bg-card/50 backdrop-blur-sm rounded-2xl p-6 border border-border">
                             <div className="flex justify-between items-center mb-6">
                               <h3 className="text-lg font-bold">Parcours de progression</h3>
-                              {nextLevel && level && (<span className="text-sm text-muted-foreground"><span className="font-bold text-primary">{pointsToNextLevel} pts</span> vers <span className="font-semibold">{nextLevel.name}</span></span>)}
+                              {nextLevel && level && (<span className="text-sm text-muted-foreground"><span className="font-bold text-primary">{pointsToNextLevel.toLocaleString()} pts</span> vers <span className="font-semibold">{nextLevel.name}</span></span>)}
                             </div>
                             <div className="relative">
                               <div className="absolute top-6 left-[6%] right-[6%] h-1 bg-muted rounded-full" />
@@ -368,6 +416,7 @@ export default function PartnextScoreSection({ user }) {
                               </div>
                             </div>
                           </div>
+
                           <Card className={`relative overflow-hidden bg-gradient-to-br ${selectedVisual.bgGradient} ${selectedVisual.borderColor} border-2 shadow-xl text-left`}>
                             <CardContent className="p-6 space-y-5">
                               <div className="flex items-start justify-between">
@@ -377,11 +426,9 @@ export default function PartnextScoreSection({ user }) {
                                 </div>
                                 <Badge variant="outline" className={`${selectedVisual.borderColor} ${selectedVisual.textColor} bg-transparent font-bold`}>FOCUS NIVEAU</Badge>
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {selectedVisual.perks.map((perk, i) => (<div key={i} className="bg-white/80 backdrop-blur-sm rounded-xl p-3 flex items-center gap-3 shadow-sm"><span className="text-xl">{perk.icon}</span><span className="text-sm font-medium text-foreground">{perk.label}</span></div>))}
-                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{selectedVisual.perks.map((perk, i) => (<div key={i} className="bg-white/80 backdrop-blur-sm rounded-xl p-3 flex items-center gap-3 shadow-sm"><span className="text-xl">{perk.icon}</span><span className="text-sm font-medium text-foreground">{perk.label}</span></div>))}</div>
                               <div className="flex justify-start"><div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r ${selectedVisual.gradient} ${!isSelectedLevelUnlocked && 'grayscale opacity-70'}`}><BarChart3 className="h-4 w-4 text-white" /><span className="text-sm font-bold text-white">{selectedVisual.tagline}</span></div></div>
-                              {!isSelectedLevelUnlocked && (<div className="bg-muted/50 rounded-lg p-3 text-center text-sm">🔒 <span className="font-semibold">{Math.max(0, selectedLevel.threshold - score)} points</span> requis pour débloquer ce niveau</div>)}
+                              {!isSelectedLevelUnlocked && (<div className="bg-muted/50 rounded-lg p-3 text-center text-sm">🔒 <span className="font-semibold">{Math.max(0, selectedLevel.threshold - score).toLocaleString()} points</span> requis pour débloquer ce niveau</div>)}
                             </CardContent>
                           </Card>
                         </div>
@@ -393,158 +440,86 @@ export default function PartnextScoreSection({ user }) {
                   <Card className="bg-gradient-to-br from-card to-primary/5 border-primary/20 shadow-xl">
                     <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" />Analytics Live</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="flex justify-between items-center"><span className="text-sm">Croissance 7j</span><span className="text-lg font-bold text-green-600">+15.8%</span></div>
+                      <div className="flex justify-between items-center"><span className="text-sm">Multiplicateur</span><span className="text-lg font-bold text-primary">x{scoreMultiplier}</span></div>
                       <div className="flex justify-between items-center"><span className="text-sm">Classement</span><span className="text-lg font-bold text-primary">#{userRank}/50k</span></div>
-                      <div className="flex justify-between items-center"><span className="text-sm">Prédiction IA</span><span className="text-lg font-bold text-purple-600">1150 pts</span></div>
+                      <div className="flex justify-between items-center"><span className="text-sm">Points totaux</span><span className="text-lg font-bold text-purple-600">{score.toLocaleString()}</span></div>
                       <Separator />
-                      <div className="text-center p-4 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg"><div className="text-xs text-muted-foreground">Mise à jour</div><div className="text-sm font-semibold">En temps réel • +{liveUpdates} pts</div></div>
+                      <div className="text-center p-4 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg"><div className="text-xs text-muted-foreground">Niveau actuel</div><div className="text-sm font-semibold">{level ? `${level.emoji} ${level.name}` : '🔒 Profil incomplet'}</div></div>
                     </CardContent>
                   </Card>
                 </div>
               </div>
             </TabsContent>
 
+            {/* ============ DÉFIS DU NIVEAU ACTUEL ============ */}
             <TabsContent value="challenges" className="space-y-8 mt-8">
               {!isProfileComplete && !levelLoading && (
                 <Card className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border-orange-500/30">
                   <CardContent className="p-12 text-center space-y-6">
                     <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center"><Lock className="h-10 w-10 text-white" /></div>
-                    <div><h2 className="text-3xl font-bold text-orange-700 mb-2">Défis verrouillés</h2><p className="text-muted-foreground">Complète ton profil à 100% pour accéder aux défis Partnexx et commencer à gagner des points.</p></div>
-                    <div className="max-w-md mx-auto space-y-3">
-                      <div className="flex justify-between text-sm font-semibold"><span>Profil complété</span><span className="text-orange-600">{profileCompletion}%</span></div>
-                      <div className="relative h-3 bg-orange-500/10 rounded-full overflow-hidden"><div className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-400 to-amber-500 rounded-full transition-all duration-1000" style={{ width: `${profileCompletion}%` }} /></div>
-                      <Button onClick={() => router.push('/dashboard/influencer?section=profil')} className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold"><Target className="h-4 w-4 mr-2" />Compléter mon profil</Button>
-                    </div>
+                    <div><h2 className="text-3xl font-bold text-orange-700 mb-2">Défis verrouillés</h2><p className="text-muted-foreground">Complète ton profil à 100% pour accéder aux défis Partnexx.</p></div>
+                    <Button onClick={() => router.push('/dashboard/influencer?section=profil')} className="bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold"><Target className="h-4 w-4 mr-2" />Compléter mon profil</Button>
                   </CardContent>
                 </Card>
               )}
 
-              {isProfileComplete && (
+              {isProfileComplete && level && (
                 <>
-                  <div className="flex justify-center">
-                    <div className="bg-card/80 backdrop-blur-sm border rounded-2xl p-2 shadow-xl flex flex-wrap gap-2">
-                      {canDoDailyChallenges && (
-                        <Button variant={selectedChallenge === 'daily' ? 'default' : 'ghost'} className={`rounded-xl px-6 ${selectedChallenge === 'daily' ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg' : ''}`} onClick={() => setSelectedChallenge('daily')}>
-                          <Calendar className="h-4 w-4 mr-2" />Défis Quotidiens
-                          {acceptedDailyCount > 0 && <Badge variant="secondary" className="ml-2 bg-white/30 text-white border-0 text-[10px]">{acceptedDailyCount}</Badge>}
-                        </Button>
+                  {/* Bannière niveau actuel */}
+                  <Card className={`bg-gradient-to-r ${LEVEL_VISUALS[level.key].gradient} border-0 text-white`}>
+                    <CardContent className="p-5 flex items-center justify-center gap-3 flex-wrap">
+                      <span className="text-3xl">{level.emoji}</span>
+                      <div className="text-center">
+                        <p className="text-sm opacity-90">Défis du niveau</p>
+                        <p className="text-xl font-black">{level.name}</p>
+                      </div>
+                      {scoreMultiplier > 1 && (
+                        <Badge className="bg-white/20 text-white border-white/30 backdrop-blur-md px-3 py-1.5">
+                          <Sparkle className="h-3 w-3 mr-1" />
+                          Bonus x{scoreMultiplier}
+                        </Badge>
                       )}
-                      {canDoWeeklyChallenges && (
-                        <Button variant={selectedChallenge === 'weekly' ? 'default' : 'ghost'} className={`rounded-xl px-6 ${selectedChallenge === 'weekly' ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg' : ''}`} onClick={() => setSelectedChallenge('weekly')}>
-                          <Clock className="h-4 w-4 mr-2" />Défis Hebdomadaires
-                          {acceptedWeeklyCount > 0 && <Badge variant="secondary" className="ml-2 bg-white/30 text-white border-0 text-[10px]">{acceptedWeeklyCount}</Badge>}
-                        </Button>
-                      )}
-                      {canDoMonthlyChallenges && (
-                        <Button variant={selectedChallenge === 'monthly' ? 'default' : 'ghost'} className={`rounded-xl px-6 ${selectedChallenge === 'monthly' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-lg' : ''}`} onClick={() => setSelectedChallenge('monthly')}>
-                          <Trophy className="h-4 w-4 mr-2" />Défis Mensuels
-                          {acceptedMonthlyCount > 0 && <Badge variant="secondary" className="ml-2 bg-white/30 text-white border-0 text-[10px]">{acceptedMonthlyCount}</Badge>}
-                        </Button>
-                      )}
-                    </div>
+                    </CardContent>
+                  </Card>
+
+                  <div className="text-center mb-4">
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">Tes 3 défis du jour 🎯</h2>
+                    <p className="text-muted-foreground mt-2 text-sm">1 défi de chaque difficulté par 24h • Adaptés à ton niveau actuel</p>
                   </div>
 
-                  {(!canDoWeeklyChallenges || !canDoMonthlyChallenges) && nextLevel && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {currentLevelChallenges.map((challenge) => (
+                      <ChallengeCard
+                        key={challenge.id}
+                        challenge={challenge}
+                        accepted={isAccepted(challenge.id)}
+                        status={getChallengeStatus(challenge.id)}
+                        onAccept={handleAcceptChallenge}
+                        onComplete={handleCompleteChallenge}
+                        scoreMultiplier={scoreMultiplier}
+                        levelName={level.name}
+                        dailyLimitReached={isDifficultyLockedToday(challenge.difficulty)}
+                      />
+                    ))}
+                  </div>
+
+                  {nextLevel && (
                     <Card className="bg-gradient-to-r from-primary/10 to-purple-500/10 border-primary/30">
                       <CardContent className="p-5 flex items-center justify-between flex-wrap gap-3">
-                        <div className="flex items-center gap-3"><div className="text-2xl">{nextLevel.emoji}</div><div><p className="text-sm font-semibold">Débloque les défis {!canDoWeeklyChallenges ? 'hebdomadaires' : 'mensuels'} en passant <span className="text-primary">{nextLevel.name}</span></p><p className="text-xs text-muted-foreground">Plus que {pointsToNextLevel} points</p></div></div>
-                        <div className="h-2 w-32 bg-muted rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-primary to-purple-500 transition-all" style={{ width: `${levelProgress}%` }} /></div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-2xl">{nextLevel.emoji}</div>
+                          <div>
+                            <p className="text-sm font-semibold">
+                              Atteins <span className="text-primary">{nextLevel.name}</span> pour débloquer 3 nouveaux défis
+                            </p>
+                            <p className="text-xs text-muted-foreground">Plus que {pointsToNextLevel.toLocaleString()} points</p>
+                          </div>
+                        </div>
+                        <div className="h-2 w-32 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-primary to-purple-500 transition-all" style={{ width: `${levelProgress}%` }} />
+                        </div>
                       </CardContent>
                     </Card>
-                  )}
-
-                  {selectedChallenge === 'daily' && canDoDailyChallenges && (
-                    <div className="grid gap-6">
-                      <div className="text-center mb-6"><h2 className="text-3xl font-bold bg-gradient-to-r from-green-500 to-emerald-500 bg-clip-text text-transparent">Défis Quotidiens 🌅</h2><p className="text-muted-foreground mt-2">Rechargés chaque jour à minuit</p></div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {dailyChallenges.map((c) => {
-                          const Icon = c.icon
-                          const accepted = isAccepted(c.id)
-                          const status = getChallengeStatus(c.id)
-                          const completed = status?.status === 'completed'
-                          return (
-                            <Card key={c.id} className="group relative overflow-hidden hover:shadow-2xl transition-all hover:scale-105">
-                              <div className={`absolute inset-0 bg-gradient-to-r ${c.color} opacity-5`} />
-                              <CardHeader className="relative z-10">
-                                <div className="flex items-center justify-between mb-4"><div className={`p-3 rounded-xl bg-gradient-to-r ${c.color} shadow-lg`}><Icon className="h-6 w-6 text-white" /></div><Badge variant={c.difficulty === 'Facile' ? 'secondary' : c.difficulty === 'Moyen' ? 'default' : 'destructive'}>{c.difficulty}</Badge></div>
-                                <CardTitle className="text-xl">{c.title}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="relative z-10 space-y-6">
-                                <p className="text-muted-foreground">{c.description}</p>
-                                {accepted && (<div className="space-y-2"><div className="flex justify-between text-sm"><span>Progression</span><span>{status?.progress ?? c.progress}%</span></div><Progress value={status?.progress ?? c.progress} className="h-2" /></div>)}
-                                <div className="bg-primary/10 rounded-lg p-3 border border-primary/20"><div className="flex items-center gap-2"><Gift className="h-4 w-4 text-primary" /><span className="text-sm font-medium text-primary">{c.reward}</span></div></div>
-                                <Button onClick={() => handleAcceptChallenge(c, 'daily')} disabled={accepted} className={`w-full ${completed ? 'bg-green-600' : accepted ? 'bg-green-600/80' : 'bg-gradient-to-r from-green-500 to-emerald-500'} text-white font-bold`}>
-                                  {completed ? <><CheckCircle className="h-4 w-4 mr-2" />Complété</> : accepted ? <><Target className="h-4 w-4 mr-2" />En cours...</> : <><PlayCircle className="h-4 w-4 mr-2" />Relever le Défi</>}
-                                </Button>
-                              </CardContent>
-                            </Card>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedChallenge === 'weekly' && canDoWeeklyChallenges && (
-                    <div className="grid gap-6">
-                      <div className="text-center mb-6"><h2 className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Défis Hebdomadaires 🔥</h2></div>
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {weeklyChallenges.map((c) => {
-                          const Icon = c.icon
-                          const accepted = isAccepted(c.id)
-                          const status = getChallengeStatus(c.id)
-                          const completed = status?.status === 'completed'
-                          return (
-                            <Card key={c.id} className="group relative overflow-hidden hover:shadow-2xl transition-all hover:scale-105">
-                              <div className={`absolute inset-0 bg-gradient-to-r ${c.color} opacity-5`} />
-                              {c.streak && <div className="absolute top-4 right-4 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs px-2 py-1 rounded-full font-bold z-20">🔥 Série {c.streak}</div>}
-                              <CardHeader className="relative z-10">
-                                <div className="flex items-center justify-between mb-4"><div className={`p-4 rounded-xl bg-gradient-to-r ${c.color} shadow-xl`}><Icon className="h-8 w-8 text-white" /></div><Badge variant={c.difficulty === 'Epic' ? 'destructive' : 'default'} className="text-sm">{c.difficulty}</Badge></div>
-                                <CardTitle className="text-xl">{c.title}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="relative z-10 space-y-6">
-                                <p className="text-muted-foreground">{c.description}</p>
-                                {accepted && (<div className="space-y-2"><div className="flex justify-between text-sm"><span>Progression</span><span>{status?.progress ?? c.progress}%</span></div><Progress value={status?.progress ?? c.progress} className="h-2" /></div>)}
-                                <div className="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg p-4 border border-primary/20"><div className="flex items-center gap-2"><Crown className="h-5 w-5 text-primary" /><span className="text-sm font-bold text-primary">{c.reward}</span></div></div>
-                                <Button onClick={() => handleAcceptChallenge(c, 'weekly')} disabled={accepted} className={`w-full ${completed ? 'bg-green-600' : accepted ? 'bg-orange-600/80' : `bg-gradient-to-r ${c.color}`} text-white font-bold py-3`}>
-                                  {completed ? <><CheckCircle className="h-5 w-5 mr-2" />Complété</> : accepted ? <><Target className="h-5 w-5 mr-2" />En cours...</> : <><Rocket className="h-5 w-5 mr-2" />Conquérir le Défi</>}
-                                </Button>
-                              </CardContent>
-                            </Card>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedChallenge === 'monthly' && canDoMonthlyChallenges && (
-                    <div className="grid gap-6">
-                      <div className="text-center mb-6"><h2 className="text-3xl font-bold bg-gradient-to-r from-purple-500 to-indigo-500 bg-clip-text text-transparent">Défis Légendaires 👑</h2></div>
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {monthlyChallenges.map((c) => {
-                          const Icon = c.icon
-                          const accepted = isAccepted(c.id)
-                          const status = getChallengeStatus(c.id)
-                          const completed = status?.status === 'completed'
-                          return (
-                            <Card key={c.id} className={`group relative overflow-hidden hover:shadow-2xl transition-all hover:scale-105 ${c.exclusive ? 'ring-2 ring-yellow-500/50' : ''}`}>
-                              <div className={`absolute inset-0 bg-gradient-to-r ${c.color} opacity-10`} />
-                              <CardHeader className="relative z-10">
-                                <div className="flex items-center justify-between mb-4"><div className={`p-4 rounded-xl bg-gradient-to-r ${c.color} shadow-xl`}><Icon className="h-8 w-8 text-white" /></div><Badge variant="destructive" className={`${c.difficulty === 'Légendaire' ? 'bg-gradient-to-r from-yellow-500 to-orange-500' : ''} text-sm font-bold`}>{c.difficulty}</Badge></div>
-                                <CardTitle className="text-xl">{c.title}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="relative z-10 space-y-6">
-                                <p className="text-muted-foreground">{c.description}</p>
-                                {accepted && (<div className="space-y-2"><div className="flex justify-between text-sm"><span>Progression</span><span>{status?.progress ?? c.progress}%</span></div><Progress value={status?.progress ?? c.progress} className="h-2" /></div>)}
-                                <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-lg p-4 border border-yellow-500/30"><div className="flex items-center gap-2"><Diamond className="h-5 w-5 text-yellow-600" /><span className="text-sm font-bold text-yellow-700">{c.reward}</span></div></div>
-                                <Button onClick={() => handleAcceptChallenge(c, 'monthly')} disabled={accepted} className={`w-full ${completed ? 'bg-green-600' : accepted ? 'bg-purple-600/80' : `bg-gradient-to-r ${c.color}`} text-white font-black py-4 text-lg`}>
-                                  {completed ? <><CheckCircle className="h-6 w-6 mr-2" />Complété</> : accepted ? <><Target className="h-6 w-6 mr-2" />En cours...</> : <><Crown className="h-6 w-6 mr-2" />Devenir Légende</>}
-                                </Button>
-                              </CardContent>
-                            </Card>
-                          )
-                        })}
-                      </div>
-                    </div>
                   )}
                 </>
               )}
@@ -552,7 +527,7 @@ export default function PartnextScoreSection({ user }) {
 
             <TabsContent value="leaderboard" className="space-y-8 mt-8">
               <Card className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border-yellow-500/30">
-                <CardHeader><CardTitle className="flex items-center gap-3 text-2xl"><Trophy className="h-8 w-8 text-yellow-600" />Classement Global Elite</CardTitle><p className="text-muted-foreground">🏆 Les légendes de Partnexx • Mis à jour en temps réel</p></CardHeader>
+                <CardHeader><CardTitle className="flex items-center gap-3 text-2xl"><Trophy className="h-8 w-8 text-yellow-600" />Classement Global Elite</CardTitle><p className="text-muted-foreground">🏆 Les légendes de Partnexx</p></CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     {leaderboardWithUser.map((u) => (
@@ -560,7 +535,7 @@ export default function PartnextScoreSection({ user }) {
                         <div className="flex items-center gap-4"><div className={`text-2xl font-black ${u.rank <= 3 ? 'text-yellow-600' : 'text-muted-foreground'}`}>#{u.rank}</div><div className="text-3xl">{u.avatar}</div></div>
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-1"><h4 className={`font-bold ${u.isUser ? 'text-primary text-lg' : ''}`}>{u.name}</h4><span className="text-2xl">{u.badge}</span>{u.rank <= 3 && <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">TOP 3</Badge>}{u.isUser && <Badge className="bg-gradient-to-r from-primary to-purple-500 text-white animate-pulse">VOUS</Badge>}</div>
-                          <div className="flex items-center gap-4"><span className="text-xl font-bold text-primary">{(u.score || 0).toLocaleString()} pts</span><span className="text-sm text-green-600 font-medium">{u.trend} cette semaine</span></div>
+                          <div className="flex items-center gap-4"><span className="text-xl font-bold text-primary">{(u.score || 0).toLocaleString()} pts</span></div>
                         </div>
                       </div>
                     ))}
@@ -595,7 +570,7 @@ export default function PartnextScoreSection({ user }) {
 
             <TabsContent value="ai-insights" className="space-y-8 mt-8">
               <Card className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border-cyan-500/30">
-                <CardHeader><CardTitle className="flex items-center gap-3 text-2xl"><Brain className="h-8 w-8 text-cyan-600" />Insights IA Avancés</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="flex items-center gap-3 text-2xl"><Brain className="h-8 w-8 text-cyan-600" />Insights IA</CardTitle></CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {aiInsights.map((insight, i) => {
@@ -626,43 +601,27 @@ export default function PartnextScoreSection({ user }) {
                 <Card className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border-orange-500/30">
                   <CardContent className="p-12 text-center space-y-6">
                     <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center"><Lock className="h-10 w-10 text-white" /></div>
-                    <div><h2 className="text-3xl font-bold text-orange-700 mb-2">Marketplace verrouillée</h2><p className="text-muted-foreground">Commence par compléter ton profil à 100% pour démarrer ton ascension Partnexx.</p></div>
-                    <Button onClick={() => router.push('/dashboard/influencer?section=profil')} className="bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold"><Target className="h-4 w-4 mr-2" />Compléter mon profil</Button>
+                    <div><h2 className="text-3xl font-bold text-orange-700 mb-2">Marketplace verrouillée</h2><p className="text-muted-foreground">Complète ton profil à 100%.</p></div>
+                    <Button onClick={() => router.push('/dashboard/influencer?section=profil')} className="bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold"><Target className="h-4 w-4 mr-2" />Compléter</Button>
                   </CardContent>
                 </Card>
               )}
-
               {isProfileComplete && !canAccessMarketplace && (
                 <Card className="bg-gradient-to-br from-cyan-500/10 to-sky-500/10 border-cyan-500/30">
                   <CardContent className="p-12 text-center space-y-6">
-                    <div className="relative inline-block">
-                      <div className="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-cyan-400 to-sky-500 flex items-center justify-center shadow-2xl"><ShoppingBag className="h-12 w-12 text-white" /></div>
-                      <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-card rounded-full flex items-center justify-center shadow-lg border-2 border-cyan-400"><Lock className="h-5 w-5 text-cyan-600" /></div>
-                    </div>
-                    <div><h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-500 to-sky-500 bg-clip-text text-transparent mb-2">Marketplace verrouillée</h2><p className="text-muted-foreground max-w-md mx-auto">La Marketplace exclusive Partnexx te permet d&apos;échanger tes points contre des avantages premium : consultations IA, accès beta, mentor personnel, events privés...</p></div>
-                    <div className="inline-flex items-center gap-3 bg-card rounded-2xl px-6 py-4 border-2 border-cyan-300 shadow-lg">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-sky-500 flex items-center justify-center text-2xl">💠</div>
-                      <div className="text-left"><div className="text-xs text-muted-foreground font-semibold">DÉBLOQUER À</div><div className="text-xl font-black text-cyan-700">Niveau Platine</div><div className="text-xs text-muted-foreground">{marketplaceRequiredLevel?.threshold.toLocaleString()} pts requis</div></div>
-                    </div>
-                    <div className="max-w-md mx-auto space-y-3">
-                      <div className="flex justify-between text-sm"><span className="font-semibold">Ta progression</span><span className="font-bold text-cyan-600">{score.toLocaleString()} / {marketplaceRequiredLevel?.threshold.toLocaleString()} pts</span></div>
-                      <div className="relative h-4 bg-cyan-500/10 rounded-full overflow-hidden"><div className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-400 to-sky-500 rounded-full transition-all duration-1000" style={{ width: `${marketplaceProgress}%` }} /></div>
-                      <p className="text-sm text-muted-foreground">Plus que <span className="font-bold text-cyan-600">{pointsToMarketplace.toLocaleString()} points</span> pour débloquer la Marketplace</p>
-                    </div>
-                    <Button onClick={() => setActiveTab('challenges')} className="bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-600 hover:to-sky-600 text-white font-bold"><Gamepad2 className="h-4 w-4 mr-2" />Faire des défis pour gagner des points</Button>
+                    <div className="relative inline-block"><div className="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-cyan-400 to-sky-500 flex items-center justify-center shadow-2xl"><ShoppingBag className="h-12 w-12 text-white" /></div><div className="absolute -bottom-2 -right-2 w-10 h-10 bg-card rounded-full flex items-center justify-center shadow-lg border-2 border-cyan-400"><Lock className="h-5 w-5 text-cyan-600" /></div></div>
+                    <div><h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-500 to-sky-500 bg-clip-text text-transparent mb-2">Marketplace verrouillée</h2><p className="text-muted-foreground max-w-md mx-auto">Débloque la Marketplace au niveau Platine.</p></div>
+                    <div className="inline-flex items-center gap-3 bg-card rounded-2xl px-6 py-4 border-2 border-cyan-300 shadow-lg"><div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-sky-500 flex items-center justify-center text-2xl">💠</div><div className="text-left"><div className="text-xs text-muted-foreground font-semibold">DÉBLOQUER À</div><div className="text-xl font-black text-cyan-700">Niveau Platine</div><div className="text-xs text-muted-foreground">{marketplaceRequiredLevel?.threshold.toLocaleString()} pts requis</div></div></div>
+                    <div className="max-w-md mx-auto space-y-3"><div className="flex justify-between text-sm"><span className="font-semibold">Progression</span><span className="font-bold text-cyan-600">{score.toLocaleString()} / {marketplaceRequiredLevel?.threshold.toLocaleString()} pts</span></div><div className="relative h-4 bg-cyan-500/10 rounded-full overflow-hidden"><div className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-400 to-sky-500 rounded-full transition-all duration-1000" style={{ width: `${marketplaceProgress}%` }} /></div><p className="text-sm text-muted-foreground">Plus que <span className="font-bold text-cyan-600">{pointsToMarketplace.toLocaleString()} points</span></p></div>
+                    <Button onClick={() => setActiveTab('challenges')} className="bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-600 hover:to-sky-600 text-white font-bold"><Gamepad2 className="h-4 w-4 mr-2" />Faire des défis</Button>
                   </CardContent>
                 </Card>
               )}
-
               {isProfileComplete && canAccessMarketplace && (
                 <>
-                  {canAccessPremiumMarketplace && (
-                    <Card className="bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-pink-500/10 border-teal-400/40">
-                      <CardContent className="p-4 flex items-center justify-center gap-3 flex-wrap"><Flame className="h-6 w-6 text-teal-600 animate-pulse" /><span className="font-bold bg-gradient-to-r from-teal-600 to-pink-600 bg-clip-text text-transparent text-lg">Marketplace Premium débloquée</span><Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0">DIAMANT</Badge></CardContent>
-                    </Card>
-                  )}
+                  {canAccessPremiumMarketplace && (<Card className="bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-pink-500/10 border-teal-400/40"><CardContent className="p-4 flex items-center justify-center gap-3 flex-wrap"><Flame className="h-6 w-6 text-teal-600 animate-pulse" /><span className="font-bold bg-gradient-to-r from-teal-600 to-pink-600 bg-clip-text text-transparent text-lg">Marketplace Premium débloquée</span><Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0">DIAMANT</Badge></CardContent></Card>)}
                   <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
-                    <CardHeader><CardTitle className="flex items-center gap-3 text-2xl"><Gift className="h-8 w-8 text-pink-600" />Marketplace Exclusif</CardTitle><p className="text-muted-foreground">💎 Vous avez {score.toLocaleString()} points à dépenser</p></CardHeader>
+                    <CardHeader><CardTitle className="flex items-center gap-3 text-2xl"><Gift className="h-8 w-8 text-pink-600" />Marketplace Exclusif</CardTitle><p className="text-muted-foreground">💎 {score.toLocaleString()} points à dépenser</p></CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {exclusivePerks.map((p, i) => {
@@ -692,20 +651,14 @@ export default function PartnextScoreSection({ user }) {
                                 <div className="flex items-start gap-4 mb-4"><div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-3 rounded-xl shadow-lg"><Icon className="h-6 w-6 text-white" /></div><div className="flex-1"><div className="flex items-center gap-2 mb-1"><h4 className="font-bold text-lg">{p.title}</h4><Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-[10px]">PREMIUM</Badge></div><p className="text-muted-foreground text-sm">{p.description}</p></div></div>
                                 <div className="flex items-center justify-between mb-3"><div className="flex items-center gap-2"><Coins className="h-5 w-5 text-teal-600" /><span className={`text-xl font-bold ${canAfford ? 'text-teal-600' : 'text-red-500'}`}>{p.cost} points</span></div><Badge variant="secondary">{p.popularity}% populaire</Badge></div>
                                 {!canAfford && <p className="text-xs text-red-500 mb-2">Il vous manque {p.cost - score} points</p>}
-                                <Button className={`w-full font-bold ${canAfford ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white' : 'bg-muted text-muted-foreground'}`} disabled={!canAfford} onClick={() => toast.success(`${p.title} échangé ! 🔥`)}>
-                                  {canAfford ? <><Gem className="h-4 w-4 mr-2" />Échanger</> : <><Clock className="h-4 w-4 mr-2" />Points insuffisants</>}
-                                </Button>
+                                <Button className={`w-full font-bold ${canAfford ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white' : 'bg-muted text-muted-foreground'}`} disabled={!canAfford} onClick={() => toast.success(`${p.title} échangé ! 🔥`)}>{canAfford ? <><Gem className="h-4 w-4 mr-2" />Échanger</> : <><Clock className="h-4 w-4 mr-2" />Points insuffisants</>}</Button>
                               </CardContent>
                             </Card>
                           )
                         })}
                       </div>
                       <Separator className="my-8" />
-                      <div className="text-center p-6 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-2xl border border-primary/20">
-                        <h3 className="text-xl font-bold mb-2">💰 Vos Points Disponibles</h3>
-                        <div className="text-4xl font-black bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">{score.toLocaleString()} points</div>
-                        <p className="text-muted-foreground mt-2">Gagnez plus de points en complétant des défis</p>
-                      </div>
+                      <div className="text-center p-6 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-2xl border border-primary/20"><h3 className="text-xl font-bold mb-2">💰 Vos Points Disponibles</h3><div className="text-4xl font-black bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">{score.toLocaleString()} points</div><p className="text-muted-foreground mt-2">Gagnez plus de points en complétant des défis</p></div>
                     </CardContent>
                   </Card>
                 </>
