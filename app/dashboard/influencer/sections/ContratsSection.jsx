@@ -15,6 +15,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { toast } from 'sonner'
 import { useLevel } from "@/lib/context/LevelContext"
 import LevelGate from '@/components/LevelGate'
+import PaymentSetup from '@/components/PaymentSetup'
 
 const getStatusColor = (status) => {
   switch (status) {
@@ -764,6 +765,9 @@ export default function ContratsSection({ contracts = [], transactions = [], use
       sectionTitle="Contrats & Paiements"
       sectionDescription="Gestion Contractuelle • Suivi des Paiements • Historique Complet"
     >
+      <div className="mb-6">
+        <PaymentSetup user={user} />
+      </div>
       <ContratsContent contracts={contracts} transactions={transactions} user={user} />
     </LevelGate>
   )
