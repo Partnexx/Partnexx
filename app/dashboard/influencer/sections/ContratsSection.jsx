@@ -10,9 +10,10 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { useState } from 'react'
-import { Search, Calendar, DollarSign, FileText, Download, CreditCard, Brain, CheckCircle, Clock, AlertCircle, Eye, Shield, TrendingUp, Lock, Wallet, Send, BarChart3 } from 'lucide-react'
+import { Search, Calendar, DollarSign, FileText, Download, CreditCard, Brain, CheckCircle, Clock, AlertCircle, Eye, Shield, TrendingUp, Lock, Wallet, Send, BarChart3, Receipt } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { toast } from 'sonner'
+import supabase from '@/lib/supabase'
 import { useLevel } from "@/lib/context/LevelContext"
 import LevelGate from '@/components/LevelGate'
 import PaymentSetup from '@/components/PaymentSetup'
@@ -402,6 +403,35 @@ function PaiementsTab({ transactions = [], user }) {
     toast.success('Export CSV téléchargé')
   }
 
+const handleDownloadAnnualReport = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('Tu dois être connecté pour télécharger ton récap')
+        return
+      }
+      const year = new Date().getFullYear()
+      const res = await fetch(`/api/influencer/annual-report?year=${year}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Erreur lors du téléchargement')
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `recap-partnexx-${year}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Récap annuel téléchargé !')
+    } catch (e) {
+      console.error(e)
+      toast.error(e.message || 'Erreur lors du téléchargement')
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* ============ CARTE RETRAIT (Bronze) ============ */}
@@ -706,6 +736,25 @@ function PaiementsTab({ transactions = [], user }) {
           ))
         )}
       </div>
+
+      {/* ============ CARTE FISCALITÉ (récap annuel art. 242 bis) ============ */}
+      <Card className="border-blue-500/30 bg-gradient-to-br from-blue-500/5 to-indigo-500/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Receipt className="h-5 w-5 text-blue-600" />
+            Fiscalité
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Télécharge ton récapitulatif annuel de revenus pour ta déclaration d'impôts. PARTNEXX déclare également tes revenus à l'administration fiscale (DAC7).
+          </p>
+          <Button onClick={handleDownloadAnnualReport} variant="outline" className="gap-2">
+            <Download className="h-4 w-4" />
+            Télécharger mon récap {new Date().getFullYear()}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }
