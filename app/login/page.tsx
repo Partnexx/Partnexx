@@ -40,6 +40,8 @@ export default function LoginPage() {
     window.location.href = '/dashboard/influencer'
   } else if (profile?.role === 'brand') {
     window.location.href = '/dashboard/brand'
+  } else if (profile?.role === 'admin') {
+    window.location.href = '/dashboard/admin'
   } else {
     window.location.href = '/'
   }

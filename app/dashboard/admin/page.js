@@ -1056,6 +1056,153 @@ const campaigns = dbCampaigns.length > 0 ? dbCampaigns.map(c => ({
 // ═══════════════════════════════════════════════════════════════════════════════
 // PAGE: PAIEMENTS
 // ═══════════════════════════════════════════════════════════════════════════════
+const PageFiscalite = ({ theme: t, dac7Report = [], fetchDac7Report, dbLoading = false }) => {
+  const th = themes[t]
+  const currentYear = new Date().getFullYear()
+  const [year, setYear] = useState(currentYear)
+  const [loadingReport, setLoadingReport] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    setLoadingReport(true)
+    Promise.resolve(fetchDac7Report?.(year)).finally(() => {
+      if (active) setLoadingReport(false)
+    })
+    return () => { active = false }
+  }, [year, fetchDac7Report])
+
+  const fmt = (n) => `${(Number(n) || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+
+  const totals = dac7Report.reduce((acc, r) => ({
+    brut: acc.brut + (Number(r.total_brut) || 0),
+    recu: acc.recu + (Number(r.total_recu_createur) || 0),
+    commission: acc.commission + (Number(r.total_commission_partnexx) || 0),
+    transactions: acc.transactions + (Number(r.nb_transactions) || 0),
+  }), { brut: 0, recu: 0, commission: 0, transactions: 0 })
+
+  const handleExport = () => {
+    const headers = ['Créateur', 'Email', 'Statut', 'Transactions', 'Revenus bruts', 'Reçu créateur', 'Commission Partnexx']
+    const rows = dac7Report.map(r => [
+      r.creator_name || '—',
+      r.creator_email || '—',
+      r.business_type || 'Non défini',
+      r.nb_transactions,
+      fmt(r.total_brut),
+      fmt(r.total_recu_createur),
+      fmt(r.total_commission_partnexx),
+    ])
+    exportToPDF(
+      `Rapport DAC7 ${year}`,
+      headers,
+      rows,
+      `rapport-dac7-${year}.pdf`
+    )
+  }
+
+  const cardStyle = { background: th.card, border: `1px solid ${th.border}`, borderRadius: 14, padding: 20 }
+  const SEUIL_PARTICULIER = 760
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: th.text, marginBottom: 4 }}>Fiscalité — Rapport DAC7</h1>
+          <p style={{ fontSize: 13, color: th.textMuted }}>
+            Revenus des créateurs à déclarer à la DGFiP (avant le 31 janvier {year + 1}).
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <select
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            style={{ padding: '8px 14px', borderRadius: 10, border: `1px solid ${th.border}`, background: th.inputBg, color: th.text, fontSize: 13, cursor: 'pointer' }}
+          >
+            {[currentYear, currentYear - 1, currentYear - 2].map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <button
+            onClick={handleExport}
+            disabled={dac7Report.length === 0}
+            style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: dac7Report.length === 0 ? th.border : '#3b6ef6', color: '#fff', fontSize: 13, fontWeight: 600, cursor: dac7Report.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <Icon name="download" size={15} color="#fff" /> Exporter le rapport
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
+        {[
+          { label: 'Créateurs concernés', value: dac7Report.length, color: '#3b6ef6' },
+          { label: 'Transactions', value: totals.transactions, color: '#8b5cf6' },
+          { label: 'Volume total brut', value: fmt(totals.brut), color: '#06b6d4' },
+          { label: 'Reversé aux créateurs', value: fmt(totals.recu), color: '#10b981' },
+          { label: 'Commissions Partnexx', value: fmt(totals.commission), color: '#f59e0b' },
+        ].map((s, i) => (
+          <div key={i} style={cardStyle}>
+            <div style={{ fontSize: 12, color: th.textMuted, marginBottom: 6 }}>{s.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={cardStyle}>
+        {loadingReport || dbLoading ? (
+          <div style={{ textAlign: 'center', padding: 40, color: th.textMuted, fontSize: 14 }}>Chargement du rapport…</div>
+        ) : dac7Report.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: th.textMuted, fontSize: 14 }}>
+            Aucun revenu créateur déclarable pour {year}.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: `2px solid ${th.border}` }}>
+                  {['Créateur', 'Email', 'Statut', 'Transactions', 'Revenus bruts', 'Reçu créateur', 'Commission'].map((h, i) => (
+                    <th key={i} style={{ padding: '10px 12px', textAlign: i > 2 ? 'right' : 'left', fontSize: 11, fontWeight: 700, color: th.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dac7Report.map((r, i) => {
+                  const isParticulierOverLimit = r.business_type === 'individual' && Number(r.total_recu_createur) > SEUIL_PARTICULIER
+                  return (
+                    <tr key={i} style={{ borderBottom: `1px solid ${th.border}` }}>
+                      <td style={{ padding: '12px', fontSize: 13, fontWeight: 600, color: th.text }}>
+                        {r.creator_name || '—'}
+                        {isParticulierOverLimit && (
+                          <span title="Particulier au-dessus du seuil 760€/an" style={{ marginLeft: 6, fontSize: 11, color: '#ef4444' }}>⚠️</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '12px', fontSize: 13, color: th.textMuted }}>{r.creator_email || '—'}</td>
+                      <td style={{ padding: '12px', fontSize: 12, color: th.textMuted }}>
+                        {r.business_type === 'individual' ? 'Particulier'
+                          : r.business_type === 'auto_entrepreneur' ? 'Auto-entrepreneur'
+                          : r.business_type === 'company' ? 'Société'
+                          : 'Non défini'}
+                      </td>
+                      <td style={{ padding: '12px', fontSize: 13, color: th.text, textAlign: 'right' }}>{r.nb_transactions}</td>
+                      <td style={{ padding: '12px', fontSize: 13, color: th.text, textAlign: 'right' }}>{fmt(r.total_brut)}</td>
+                      <td style={{ padding: '12px', fontSize: 13, fontWeight: 600, color: '#10b981', textAlign: 'right' }}>{fmt(r.total_recu_createur)}</td>
+                      <td style={{ padding: '12px', fontSize: 13, color: '#f59e0b', textAlign: 'right' }}>{fmt(r.total_commission_partnexx)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div style={{ ...cardStyle, background: t === 'dark' ? '#1a2332' : '#eff3ff', border: `1px solid ${th.accent}33` }}>
+        <div style={{ fontSize: 12, color: th.textMuted, lineHeight: 1.6 }}>
+          💡 <strong style={{ color: th.text }}>Rappel DAC7</strong> — Ce rapport doit être transmis à la DGFiP une fois par an, avant le 31 janvier {year + 1}, au format XML (DPI_OECD). Le ⚠️ signale les créateurs « Particulier » dépassant 760 €/an, qui devraient passer auto-entrepreneur. Déclaration délégable à Stripe.
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const PagePayments = ({ theme: t, dbTransactions = [], dbLoading = false, onRelease }) => {
   const th = themes[t]
   const [tab, setTab] = useState('overview')
@@ -4982,6 +5129,7 @@ const Sidebar = ({ activePage, setPage, theme: t, toggleTheme }) => {
       items: [
         { id: 'campaigns', label: 'Campagnes', icon: 'campaign' },
         { id: 'payments', label: 'Paiements', icon: 'payment' },
+        { id: 'fiscalite', label: 'Fiscalité', icon: 'dollar' },
         { id: 'litiges', label: 'Litiges', icon: 'dispute' },
       ]
     },
@@ -5100,6 +5248,8 @@ export default function AdminDashboard() {
     updateMarketingContent,
     deleteMarketingContent, 
     publishMarketingContent,
+    dac7Report,
+    fetchDac7Report,
  } = useAdminData()
  
   const renderPage = () => {
@@ -5139,6 +5289,14 @@ export default function AdminDashboard() {
           dbTransactions={transactions}
           dbLoading={loading}
           onRelease={releaseTransaction}
+        />
+      )
+      case 'fiscalite': return (
+        <PageFiscalite
+          theme={theme}
+          dac7Report={dac7Report}
+          fetchDac7Report={fetchDac7Report}
+          dbLoading={loading}
         />
       )
       case 'litiges': return (
