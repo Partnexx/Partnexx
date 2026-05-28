@@ -32,7 +32,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'creatorId (user_id) requis' }, { status: 400 })
     }
 
-    // ===== Récupération du plan de la marque =====
+    // ===== Récupération du plan de la marque (+ pays/TVA pour autoliquidation) =====
     const { data: brand, error: brandError } = await supabaseAdmin
       .from('brands')
       .select('subscription_plan')
@@ -43,6 +43,10 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Marque introuvable' }, { status: 404 })
     }
     const brandPlan = (brand.subscription_plan || 'trial').toLowerCase()
+
+    // Autoliquidation : pour l'instant toujours false (marques FR).
+    // Plus tard : true si marque UE hors France avec n° TVA intracommunautaire valide.
+    const vatExempt = false
 
     // ===== Récupération du créateur (id + score) à partir du user_id =====
     const { data: influencer, error: influencerError } = await supabaseAdmin
@@ -57,12 +61,15 @@ export async function POST(req) {
     const influencerRowId = influencer.id // ← l'id à utiliser pour la FK
     const isLegend = (influencer.ai_score || 0) >= 100000
 
-    // ===== Calcul de la commission avec bonus Légende éventuel =====
-    const breakdown = calculateCommission(brandPlan, isLegend, amount)
+    // ===== Calcul de la commission avec TVA + bonus Légende éventuel =====
+    const breakdown = calculateCommission(brandPlan, isLegend, amount, { vatExempt })
 
-    // ===== Création du PaymentIntent Stripe =====
+    // ===== Montant total facturé à la marque (créateur + commission TTC) =====
+    const brandTotal = breakdown.brandTotal
+
+    // ===== Création du PaymentIntent Stripe (la marque paie le total TTC) =====
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // en centimes
+      amount: Math.round(brandTotal * 100), // total TTC en centimes
       currency: 'eur',
       metadata: {
         campaignId: campaignId || '',
@@ -71,6 +78,9 @@ export async function POST(req) {
         influencerRowId,
         brandPlan,
         isLegend: isLegend ? 'true' : 'false',
+        commission_ht: String(breakdown.commissionHT),
+        vat: String(breakdown.vat),
+        commission_ttc: String(breakdown.commissionTTC),
         description: description || 'Paiement collaboration Partnexx',
       },
       description: description || 'Paiement collaboration Partnexx',
@@ -85,7 +95,7 @@ export async function POST(req) {
       type: 'payment',
       status: 'pending',
       amount,
-      platform_fee: breakdown.partnexxCut,
+      platform_fee: breakdown.partnexxCutHT, // marge HT PARTNEXX
       influencer_amount: breakdown.creatorReceives,
       currency: 'EUR',
       stripe_payment_intent_id: paymentIntent.id,
@@ -94,9 +104,16 @@ export async function POST(req) {
         brand_plan: brandPlan,
         is_legend: isLegend,
         marque_rate: breakdown.marqueRate,
-        total_commission: breakdown.totalCommission,
-        partnexx_cut: breakdown.partnexxCut,
+        // Détail commission + TVA
+        commission_ht: breakdown.commissionHT,
+        vat_rate: breakdown.vatRate,
+        vat: breakdown.vat,
+        commission_ttc: breakdown.commissionTTC,
+        partnexx_cut_ht: breakdown.partnexxCutHT,
         creator_bonus: breakdown.creatorBonus,
+        creator_receives: breakdown.creatorReceives,
+        brand_total: breakdown.brandTotal,
+        vat_exempt: vatExempt,
         creator_user_id: creatorId,
         calculated_at: new Date().toISOString(),
       },

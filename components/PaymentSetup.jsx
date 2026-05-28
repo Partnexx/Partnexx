@@ -47,14 +47,14 @@ export default function PaymentSetup({ user }) {
   const [selectedType, setSelectedType] = useState(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [fiscalAccepted, setFiscalAccepted] = useState(false)
 
-  // Charger les infos de l'influenceur au montage
   useEffect(() => {
     if (!user?.id) return
     async function fetchInfluencer() {
       const { data, error } = await supabase
         .from('influencers')
-        .select('id, stripe_account_id, business_type')
+        .select('id, stripe_account_id, business_type, fiscal_terms_accepted_at')
         .eq('user_id', user.id)
         .single()
       if (error) {
@@ -62,6 +62,7 @@ export default function PaymentSetup({ user }) {
       } else {
         setInfluencer(data)
         if (data.business_type) setSelectedType(data.business_type)
+        if (data.fiscal_terms_accepted_at) setFiscalAccepted(true)
       }
       setLoading(false)
     }
@@ -73,12 +74,22 @@ export default function PaymentSetup({ user }) {
       toast.error('Choisis un statut juridique')
       return
     }
+    if (!fiscalAccepted) {
+      toast.error('Tu dois accepter les conditions fiscales')
+      return
+    }
     if (!influencer?.id) {
       toast.error('Profil créateur introuvable')
       return
     }
     setSubmitting(true)
     try {
+      // Enregistrer l'acceptation des conditions fiscales (horodatée)
+      await supabase
+        .from('influencers')
+        .update({ fiscal_terms_accepted_at: new Date().toISOString() })
+        .eq('id', influencer.id)
+
       const res = await fetch('/api/stripe/connect/onboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -97,7 +108,6 @@ export default function PaymentSetup({ user }) {
     }
   }
 
-  // ===== Loading =====
   if (loading) {
     return (
       <Card>
@@ -108,9 +118,6 @@ export default function PaymentSetup({ user }) {
     )
   }
 
-  // ===== ÉTAT 1 : compte créé ET onboarding en cours (stripe_account_id présent mais on ne sait pas si "verified") =====
-  // Pour l'instant on considère qu'un compte existe = configuration en cours/terminée
-  // (Plus tard on lira account.charges_enabled via un webhook)
   if (influencer?.stripe_account_id) {
     return (
       <Card className="border-orange-200 bg-orange-50/30">
@@ -137,7 +144,6 @@ export default function PaymentSetup({ user }) {
     )
   }
 
-  // ===== ÉTAT 2 : pas de compte Stripe → choix du statut =====
   return (
     <Card>
       <CardHeader>
@@ -189,11 +195,28 @@ export default function PaymentSetup({ user }) {
           })}
         </div>
 
+        <label className="flex items-start gap-3 p-4 rounded-xl border border-border bg-muted/30 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={fiscalAccepted}
+            onChange={(e) => setFiscalAccepted(e.target.checked)}
+            className="mt-1 w-4 h-4 flex-shrink-0 accent-primary cursor-pointer"
+          />
+          <span className="text-sm text-foreground/80 leading-relaxed">
+            Je reconnais être seul responsable de mes obligations fiscales et sociales liées aux revenus perçus via PARTNEXX. Je comprends que PARTNEXX déclarera mes revenus à l'administration fiscale conformément à la réglementation (DAC7).
+          </span>
+        </label>
+
         <div className="text-xs text-muted-foreground border-t pt-3">
           💡 Pas encore Auto-entrepreneur ? Tu pourras le devenir en 24h via notre partenaire LegalPlace (bientôt disponible).
         </div>
 
-        <Button onClick={handleContinue} disabled={!selectedType || submitting} className="w-full" size="lg">
+        <Button
+          onClick={handleContinue}
+          disabled={!selectedType || !fiscalAccepted || submitting}
+          className="w-full"
+          size="lg"
+        >
           {submitting ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
