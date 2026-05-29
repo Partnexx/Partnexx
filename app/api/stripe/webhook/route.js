@@ -46,12 +46,30 @@ export async function POST(req) {
         break
       }
 
-      case 'transfer.created': {
+        case 'transfer.created': {
         const transfer = event.data.object
         await handleTransferCreated(transfer)
         break
       }
-
+      case 'checkout.session.completed': {
+        const session = event.data.object
+        if (session.mode === 'subscription') {
+          await handleSubscriptionCheckoutCompleted(session)
+        }
+        break
+      }
+      case 'customer.subscription.updated': {
+        await handleSubscriptionUpdated(event.data.object)
+        break
+      }
+      case 'customer.subscription.deleted': {
+        await handleSubscriptionDeleted(event.data.object)
+        break
+      }
+      case 'invoice.paid': {
+        await handleInvoicePaid(event.data.object)
+        break
+      }
       default:
         console.log(`ℹ️ Événement non géré: ${event.type}`)
     }
@@ -218,5 +236,108 @@ async function handleTransferCreated(transfer) {
     console.log(`✅ Transaction ${transactionId} → released`)
   } else {
     console.warn(`⚠️ Pas de transaction_id dans metadata du transfer ${transfer.id}`)
+  }
+}
+
+// ============================================================
+// HANDLERS ABONNEMENTS (Stripe Subscriptions + Invoicing)
+// ============================================================
+
+async function handleSubscriptionCheckoutCompleted(session) {
+  console.log(`🎉 Abonnement créé via Checkout: ${session.id}`)
+  const brandId = session.metadata?.brand_id || session.subscription_data?.metadata?.brand_id
+  if (!session.subscription) {
+    console.warn('⚠️ Pas de subscription dans la session Checkout')
+    return
+  }
+  // Récupérer le détail de l'abonnement pour avoir les infos complètes
+  const subscription = await stripe.subscriptions.retrieve(session.subscription)
+  const plan = subscription.metadata?.plan || null
+  const period = subscription.metadata?.period || null
+  const periodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end * 1000).toISOString()
+    : null
+
+  // Trouver la brand : via metadata, sinon via stripe_customer_id
+  let finalBrandId = brandId
+  if (!finalBrandId && session.customer) {
+    const { data: b } = await supabase
+      .from('brands')
+      .select('id')
+      .eq('stripe_customer_id', session.customer)
+      .single()
+    finalBrandId = b?.id
+  }
+  if (!finalBrandId) {
+    console.error('❌ Impossible de trouver la brand pour la subscription')
+    return
+  }
+
+  await supabase
+    .from('brands')
+    .update({
+      subscription_plan: plan,
+      subscription_period: period,
+      subscription_status: subscription.status,
+      stripe_subscription_id: subscription.id,
+      subscription_current_period_end: periodEnd,
+      subscription_cancel_at_period_end: subscription.cancel_at_period_end || false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', finalBrandId)
+
+  console.log(`✅ Brand ${finalBrandId} abonnée au plan ${plan} (${period})`)
+}
+
+async function handleSubscriptionUpdated(subscription) {
+  console.log(`🔄 Abonnement mis à jour: ${subscription.id} — status ${subscription.status}`)
+  const periodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end * 1000).toISOString()
+    : null
+
+  await supabase
+    .from('brands')
+    .update({
+      subscription_status: subscription.status,
+      subscription_current_period_end: periodEnd,
+      subscription_cancel_at_period_end: subscription.cancel_at_period_end || false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('stripe_subscription_id', subscription.id)
+}
+
+async function handleSubscriptionDeleted(subscription) {
+  console.log(`🛑 Abonnement annulé: ${subscription.id}`)
+  await supabase
+    .from('brands')
+    .update({
+      subscription_status: 'canceled',
+      subscription_plan: 'trial',
+      subscription_period: null,
+      stripe_subscription_id: null,
+      subscription_current_period_end: null,
+      subscription_cancel_at_period_end: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('stripe_subscription_id', subscription.id)
+}
+
+async function handleInvoicePaid(invoice) {
+  console.log(`🧾 Facture payée: ${invoice.id} — ${(invoice.amount_paid / 100).toFixed(2)}€`)
+  // Stripe Invoicing a déjà généré et envoyé la facture par email à la marque.
+  // Ici on met juste à jour l'état d'abonnement (utile pour les renouvellements mensuels/annuels).
+  if (invoice.subscription) {
+    const subscription = await stripe.subscriptions.retrieve(invoice.subscription)
+    const periodEnd = subscription.current_period_end
+      ? new Date(subscription.current_period_end * 1000).toISOString()
+      : null
+    await supabase
+      .from('brands')
+      .update({
+        subscription_status: subscription.status,
+        subscription_current_period_end: periodEnd,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('stripe_subscription_id', subscription.id)
   }
 }
