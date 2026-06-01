@@ -1,4 +1,253 @@
 'use client'
-export default function ParametresSection() {
-  return <div className="p-8 text-center text-muted-foreground">Gestion des paramètres — en construction...</div>
+
+import { useEffect, useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
+
+export default function ParametresSection({ user: userProp }) {
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState(null) // { type: 'success' | 'error', text }
+  const [brandId, setBrandId] = useState(null)
+  const [form, setForm] = useState({
+    company_name: '',
+    address: '',
+    zip: '',
+    city: '',
+    country: 'France',
+    siret: '',
+    vat_number: '',
+  })
+
+  // ===== Chargement de la marque =====
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      try {
+        // 1. Récupérer l'user (depuis la prop ou via la session)
+        let userId = userProp?.id
+        if (!userId) {
+          const { data } = await supabase.auth.getUser()
+          userId = data?.user?.id
+        }
+        if (!userId) {
+          if (!cancelled) {
+            setMessage({ type: 'error', text: 'Utilisateur non connecté.' })
+            setLoading(false)
+          }
+          return
+        }
+
+        // 2. Récupérer la marque liée à cet user
+        const { data: brand, error } = await supabase
+          .from('brands')
+          .select('id, company_name, address, zip, city, country, siret, vat_number')
+          .eq('user_id', userId)
+          .single()
+
+        if (error || !brand) {
+          if (!cancelled) {
+            setMessage({ type: 'error', text: 'Profil marque introuvable.' })
+            setLoading(false)
+          }
+          return
+        }
+
+        if (!cancelled) {
+          setBrandId(brand.id)
+          setForm({
+            company_name: brand.company_name || '',
+            address: brand.address || '',
+            zip: brand.zip || '',
+            city: brand.city || '',
+            country: brand.country || 'France',
+            siret: brand.siret || '',
+            vat_number: brand.vat_number || '',
+          })
+          setLoading(false)
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setMessage({ type: 'error', text: 'Erreur de chargement : ' + (e.message || '') })
+          setLoading(false)
+        }
+      }
+    }
+
+    load()
+    return () => { cancelled = true }
+  }, [userProp])
+
+  function update(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  // ===== Sauvegarde =====
+  async function handleSave() {
+    if (!brandId) return
+    setSaving(true)
+    setMessage(null)
+
+    const { error } = await supabase
+      .from('brands')
+      .update({
+        address: form.address.trim() || null,
+        zip: form.zip.trim() || null,
+        city: form.city.trim() || null,
+        country: form.country.trim() || null,
+        siret: form.siret.trim() || null,
+        vat_number: form.vat_number.trim() || null,
+      })
+      .eq('id', brandId)
+
+    setSaving(false)
+
+    if (error) {
+      setMessage({ type: 'error', text: 'Erreur lors de la sauvegarde : ' + error.message })
+    } else {
+      setMessage({ type: 'success', text: 'Coordonnées de facturation enregistrées ✓' })
+    }
+  }
+
+  // ===== Rendu =====
+  if (loading) {
+    return (
+      <div className="p-8 text-center text-gray-400">Chargement…</div>
+    )
+  }
+
+  const inputClass =
+    'w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/20'
+  const labelClass = 'mb-1.5 block text-sm font-medium text-gray-700'
+
+  return (
+    <div className="mx-auto max-w-2xl p-6">
+      {/* En-tête */}
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-gray-900">Coordonnées de facturation</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Ces informations apparaissent sur les factures que vous recevez (commission PARTNEXX et factures créateurs).
+        </p>
+      </div>
+
+      {/* Carte formulaire */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        {/* Nom (lecture seule) */}
+        <div className="mb-5">
+          <label className={labelClass}>Raison sociale</label>
+          <input
+            type="text"
+            value={form.company_name}
+            disabled
+            className={inputClass + ' cursor-not-allowed bg-gray-50 text-gray-500'}
+          />
+          <p className="mt-1 text-xs text-gray-400">Le nom de votre marque (non modifiable ici).</p>
+        </div>
+
+        {/* Adresse */}
+        <div className="mb-5">
+          <label className={labelClass}>Adresse</label>
+          <input
+            type="text"
+            value={form.address}
+            onChange={(e) => update('address', e.target.value)}
+            placeholder="12 rue de la Paix"
+            className={inputClass}
+          />
+        </div>
+
+        {/* Code postal + Ville */}
+        <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label className={labelClass}>Code postal</label>
+            <input
+              type="text"
+              value={form.zip}
+              onChange={(e) => update('zip', e.target.value)}
+              placeholder="75002"
+              className={inputClass}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelClass}>Ville</label>
+            <input
+              type="text"
+              value={form.city}
+              onChange={(e) => update('city', e.target.value)}
+              placeholder="Paris"
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        {/* Pays */}
+        <div className="mb-5">
+          <label className={labelClass}>Pays</label>
+          <input
+            type="text"
+            value={form.country}
+            onChange={(e) => update('country', e.target.value)}
+            placeholder="France"
+            className={inputClass}
+          />
+        </div>
+
+        {/* SIRET */}
+        <div className="mb-5">
+          <label className={labelClass}>
+            SIRET <span className="font-normal text-gray-400">(facultatif)</span>
+          </label>
+          <input
+            type="text"
+            value={form.siret}
+            onChange={(e) => update('siret', e.target.value)}
+            placeholder="123 456 789 00012"
+            className={inputClass}
+          />
+        </div>
+
+        {/* N° TVA */}
+        <div className="mb-6">
+          <label className={labelClass}>
+            N° TVA intracommunautaire <span className="font-normal text-gray-400">(facultatif)</span>
+          </label>
+          <input
+            type="text"
+            value={form.vat_number}
+            onChange={(e) => update('vat_number', e.target.value)}
+            placeholder="FR12345678901"
+            className={inputClass}
+          />
+        </div>
+
+        {/* Message */}
+        {message && (
+          <div
+            className={
+              'mb-4 rounded-lg border px-4 py-3 text-sm ' +
+              (message.type === 'success'
+                ? 'border-green-200 bg-green-50 text-green-700'
+                : 'border-red-200 bg-red-50 text-red-700')
+            }
+          >
+            {message.text}
+          </div>
+        )}
+
+        {/* Bouton */}
+        <button
+          onClick={handleSave}
+          disabled={saving || !brandId}
+          className="w-full rounded-lg bg-[#7C3AED] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#6D28D9] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {saving ? 'Enregistrement…' : 'Enregistrer'}
+        </button>
+      </div>
+    </div>
+  )
 }

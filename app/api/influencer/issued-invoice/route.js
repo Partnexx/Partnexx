@@ -96,6 +96,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 8,
   },
+  mandatText: { fontSize: 8.5, color: COLORS.primary, lineHeight: 1.45, fontWeight: 500 },
 
   // Référence
   refGrid: { flexDirection: 'row', gap: 8, marginBottom: 7 },
@@ -221,7 +222,12 @@ function IssuedInvoiceDocument({ data, partnexxLegal, logoUri }) {
         React.createElement(View, { style: styles.partyCard },
           React.createElement(Text, { style: styles.partyLabel }, 'CLIENT (acheteur)'),
           React.createElement(Text, { style: styles.partyName }, data.brand_name || '—'),
-          data.brand_industry && React.createElement(Text, { style: styles.partyLine }, data.brand_industry)
+          data.brand_address && React.createElement(Text, { style: styles.partyLine }, data.brand_address),
+          (data.brand_zip || data.brand_city) && React.createElement(Text, { style: styles.partyLine }, `${data.brand_zip || ''} ${data.brand_city || ''}`.trim()),
+          data.brand_country && React.createElement(Text, { style: styles.partyLine }, data.brand_country),
+          data.brand_siret && React.createElement(Text, { style: styles.partyLine }, `SIRET : ${data.brand_siret}`),
+          data.brand_vat && React.createElement(Text, { style: styles.partyLine }, `TVA : ${data.brand_vat}`),
+          !data.brand_address && data.brand_industry && React.createElement(Text, { style: styles.partyLine }, data.brand_industry)
         )
       ),
 
@@ -319,7 +325,7 @@ export async function GET(req) {
       .select(`
         id, amount, status, type, created_at, released_at, stripe_payment_intent_id,
         brand_id, influencer_id,
-        brands (id, company_name, industry, user_id),
+        brands (id, company_name, industry, user_id, address, zip, city, country, siret, vat_number),
         influencers (
           id, user_id, display_name, country, business_type, siret,
           tva_applicable, mandat_facturation_date,
@@ -411,6 +417,12 @@ export async function GET(req) {
       // Client (marque)
       brand_name: tx.brands?.company_name,
       brand_industry: tx.brands?.industry,
+      brand_address: tx.brands?.address,
+      brand_zip: tx.brands?.zip,
+      brand_city: tx.brands?.city,
+      brand_country: tx.brands?.country,
+      brand_siret: tx.brands?.siret,
+      brand_vat: tx.brands?.vat_number,
       // Prestation
       campaign_title: tx.collaborations?.campaigns?.title,
       tva_applicable: tvaApplicable,

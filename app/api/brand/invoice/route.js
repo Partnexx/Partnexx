@@ -419,7 +419,7 @@ export async function GET(req) {
     // 3. Trouver la marque associée à l'user
     const { data: brand, error: brandErr } = await supabaseAdmin
       .from('brands')
-      .select('id, company_name')
+      .select('id, company_name, address, zip, city, country, siret, vat_number')
       .eq('user_id', userId)
       .single()
     if (brandErr || !brand) {
@@ -493,11 +493,11 @@ export async function GET(req) {
       paid_date_display: paidDate ? paidDate.toLocaleDateString('fr-FR') : '',
       is_paid: isPaid,
       brand_name: brand.company_name || 'Marque',
-      brand_address: null,    // TODO: à remplir quand on stockera l'adresse marque
-      brand_zip_city: null,
-      brand_country: null,
-      brand_siret: null,
-      brand_vat: null,
+      brand_address: brand.address || null,
+      brand_zip_city: (brand.zip || brand.city) ? `${brand.zip || ''} ${brand.city || ''}`.trim() : null,
+      brand_country: brand.country || null,
+      brand_siret: brand.siret || null,
+      brand_vat: brand.vat_number || null,
       campaign_title: tx.collaborations?.campaigns?.title || '—',
       creator_handle: tx.influencers?.display_name ? `@${tx.influencers.display_name}` : null,
       creator_name: tx.influencers?.display_name,
