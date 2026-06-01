@@ -374,8 +374,20 @@ export async function GET(req) {
     const paidDate = tx.released_at ? new Date(tx.released_at) : null
     const isPaid = tx.status === 'released' || tx.status === 'in_escrow'
     const year = issueDate.getFullYear()
-    const shortId = tx.id.slice(0, 4).toUpperCase()
-    const invoiceNumber = `FAC-CREA-${year}-${shortId}`
+    const { data: invoiceNumber, error: invoiceNumberError } = await supabaseAdmin
+      .rpc('get_or_create_invoice_number', {
+        p_invoice_type: 'creator_to_brand',
+        p_transaction_id: tx.id,
+        p_brand_id: tx.brand_id,
+        p_influencer_id: tx.influencer_id,
+        p_amount_ht: amountHT,
+        p_amount_vat: amountVAT,
+        p_amount_ttc: amountTTC,
+      })
+    if (invoiceNumberError) {
+      console.error('Erreur génération N° facture créateur:', invoiceNumberError)
+      return NextResponse.json({ error: 'Erreur de numérotation' }, { status: 500 })
+    }
 
     const mandatDate = tx.influencers.mandat_facturation_date
       ? new Date(tx.influencers.mandat_facturation_date).toLocaleDateString('fr-FR')

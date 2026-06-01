@@ -455,10 +455,22 @@ export async function GET(req) {
     const paidDate = tx.released_at ? new Date(tx.released_at) : null
     const isPaid = tx.status === 'released' || tx.status === 'in_escrow'
 
-    // 7. N° de facture
+    // 7. N° de facture séquentiel (table invoices)
     const year = issueDate.getFullYear()
-    const shortId = tx.id.slice(0, 4).toUpperCase()
-    const invoiceNumber = `FAC-${year}-${shortId}`
+    const { data: invoiceNumber, error: invoiceNumberError } = await supabaseAdmin
+      .rpc('get_or_create_invoice_number', {
+        p_invoice_type: 'partnexx_commission',
+        p_transaction_id: tx.id,
+        p_brand_id: tx.brand_id,
+        p_influencer_id: tx.influencer_id,
+        p_amount_ht: commissionHT,
+        p_amount_vat: vat,
+        p_amount_ttc: commissionTTC,
+      })
+    if (invoiceNumberError) {
+      console.error('Erreur génération N° facture:', invoiceNumberError)
+      return NextResponse.json({ error: 'Erreur de numérotation' }, { status: 500 })
+    }
 
     // 8. Préparer les infos légales PARTNEXX (depuis env)
     const partnexxLegal = {
