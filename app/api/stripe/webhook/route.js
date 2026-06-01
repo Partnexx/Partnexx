@@ -11,6 +11,19 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// ============================================================
+// Helper : récupère la fin de période d'un abonnement.
+// Stripe a déplacé current_period_end de l'objet subscription
+// vers les items dans ses versions d'API récentes → on lit les 2.
+// ============================================================
+function getSubscriptionPeriodEnd(subscription) {
+  const ts =
+    subscription?.current_period_end ??
+    subscription?.items?.data?.[0]?.current_period_end ??
+    null
+  return ts ? new Date(ts * 1000).toISOString() : null
+}
+
 export async function POST(req) {
   const body = await req.text()
   const sig = req.headers.get('stripe-signature')
@@ -30,7 +43,7 @@ export async function POST(req) {
 
       case 'payment_intent.succeeded': {
         const pi = event.data.object
-        await handlePaymentSucceeded(pi, req)
+        await handlePaymentSucceeded(pi)
         break
       }
 
@@ -46,7 +59,7 @@ export async function POST(req) {
         break
       }
 
-        case 'transfer.created': {
+      case 'transfer.created': {
         const transfer = event.data.object
         await handleTransferCreated(transfer)
         break
@@ -81,40 +94,10 @@ export async function POST(req) {
   return NextResponse.json({ received: true })
 }
 
-async function handlePaymentSucceeded(pi, req) {
+async function handlePaymentSucceeded(pi) {
   console.log(`💰 PaymentIntent réussi: ${pi.id} — ${pi.amount / 100}€`)
 
-  // Envoie email de notification escrow
-try {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://partnexx-three.vercel.app'
-  
-  // Récupère les emails de la marque et de l'influenceur
-  const [brandUser, influencerUser] = await Promise.all([
-    supabase.from('profiles').select('full_name').eq('id', row.brand_id).single(),
-    supabase.from('profiles').select('full_name').eq('id', row.influencer_id).single(),
-  ])
-
-  // Email à la marque
-  if (brandUser.data) {
-    await fetch(`${appUrl}/api/emails`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'payment_escrow',
-        to: 'perquindylan.fr@gmail.com', // remplacer par l'email réel de la marque
-        data: {
-          name: brandUser.data.full_name || 'Marque',
-          amount: pi.amount / 100,
-          campaignTitle: row.description || 'Campagne Partnexx',
-        }
-      })
-    })
-  }
-} catch (emailErr) {
-  console.error('❌ Erreur envoi email escrow:', emailErr.message)
-  // Non bloquant
-}
-
+  // 1. Passer la transaction en escrow
   const { data, error } = await supabase
     .from('transactions')
     .update({
@@ -130,15 +113,13 @@ try {
   }
 
   const row = data?.[0]
-
   if (!row) {
     console.warn(`⚠️ Aucune transaction trouvée pour PaymentIntent: ${pi.id}`)
     return
   }
-
   console.log(`✅ Transaction ${row.id} → in_escrow`)
 
-  // Passe la collaboration en in_progress
+  // 2. Passer la collaboration en in_progress
   if (row.collaboration_id) {
     const { error: collabError } = await supabase
       .from('collaborations')
@@ -153,7 +134,46 @@ try {
     else console.log(`✅ Collaboration ${row.collaboration_id} → in_progress`)
   }
 
-  // Génère les factures PDF automatiquement
+  // 3. Email de notification escrow à la marque (non bloquant)
+  try {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://partnexx-three.vercel.app'
+
+    const { data: brand } = await supabase
+      .from('brands')
+      .select('user_id, company_name')
+      .eq('id', row.brand_id)
+      .single()
+
+    let brandEmail = null
+    if (brand?.user_id) {
+      const { data: brandAuth } = await supabase.auth.admin.getUserById(brand.user_id)
+      brandEmail = brandAuth?.user?.email || null
+    }
+
+    if (brandEmail) {
+      await fetch(`${appUrl}/api/emails`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'payment_escrow',
+          to: brandEmail,
+          data: {
+            name: brand?.company_name || 'Marque',
+            amount: pi.amount / 100,
+            campaignTitle: row.description || 'Campagne Partnexx',
+          },
+        }),
+      })
+      console.log(`✅ Email escrow envoyé à ${brandEmail}`)
+    } else {
+      console.warn('⚠️ Email marque introuvable, email escrow non envoyé')
+    }
+  } catch (emailErr) {
+    console.error('❌ Erreur envoi email escrow:', emailErr.message)
+    // Non bloquant
+  }
+
+  // 4. Générer les factures PDF automatiquement (non bloquant)
   try {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://partnexx-three.vercel.app'
     const invoiceRes = await fetch(`${appUrl}/api/stripe/invoices`, {
@@ -240,25 +260,43 @@ async function handleTransferCreated(transfer) {
 }
 
 // ============================================================
-// HANDLERS ABONNEMENTS (Stripe Subscriptions + Invoicing)
+// HANDLERS ABONNEMENTS
+// On distingue 2 sortes d'abonnements via subscription.metadata.kind :
+//   - "contract_payout" → abonnement d'un CONTRAT récurrent (verse le créateur)
+//   - (sinon)           → abonnement de PLAN marque (Growth / Scale)
 // ============================================================
 
 async function handleSubscriptionCheckoutCompleted(session) {
   console.log(`🎉 Abonnement créé via Checkout: ${session.id}`)
-  const brandId = session.metadata?.brand_id || session.subscription_data?.metadata?.brand_id
   if (!session.subscription) {
     console.warn('⚠️ Pas de subscription dans la session Checkout')
     return
   }
-  // Récupérer le détail de l'abonnement pour avoir les infos complètes
   const subscription = await stripe.subscriptions.retrieve(session.subscription)
+
+  // === BRANCHE 1 : abonnement de CONTRAT récurrent ===
+  if (subscription.metadata?.kind === 'contract_payout') {
+    const contractId = subscription.metadata.contract_id
+    if (contractId) {
+      await supabase
+        .from('contracts')
+        .update({
+          stripe_subscription_id: subscription.id,
+          payout_active: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', contractId)
+      console.log(`✅ Abonnement contrat ${contractId} activé (${subscription.id})`)
+    }
+    return
+  }
+
+  // === BRANCHE 2 : abonnement de PLAN marque (comportement existant) ===
+  const brandId = session.metadata?.brand_id || null
   const plan = subscription.metadata?.plan || null
   const period = subscription.metadata?.period || null
-  const periodEnd = subscription.current_period_end
-    ? new Date(subscription.current_period_end * 1000).toISOString()
-    : null
+  const periodEnd = getSubscriptionPeriodEnd(subscription)
 
-  // Trouver la brand : via metadata, sinon via stripe_customer_id
   let finalBrandId = brandId
   if (!finalBrandId && session.customer) {
     const { data: b } = await supabase
@@ -291,9 +329,11 @@ async function handleSubscriptionCheckoutCompleted(session) {
 
 async function handleSubscriptionUpdated(subscription) {
   console.log(`🔄 Abonnement mis à jour: ${subscription.id} — status ${subscription.status}`)
-  const periodEnd = subscription.current_period_end
-    ? new Date(subscription.current_period_end * 1000).toISOString()
-    : null
+
+  // On ne touche que les abonnements de PLAN marque
+  if (subscription.metadata?.kind === 'contract_payout') return
+
+  const periodEnd = getSubscriptionPeriodEnd(subscription)
 
   await supabase
     .from('brands')
@@ -308,6 +348,22 @@ async function handleSubscriptionUpdated(subscription) {
 
 async function handleSubscriptionDeleted(subscription) {
   console.log(`🛑 Abonnement annulé: ${subscription.id}`)
+
+  // === BRANCHE : abonnement de CONTRAT → on coupe les versements ===
+  if (subscription.metadata?.kind === 'contract_payout') {
+    await supabase
+      .from('contracts')
+      .update({
+        payout_active: false,
+        stripe_subscription_id: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('stripe_subscription_id', subscription.id)
+    console.log(`✅ Versements du contrat coupés (abonnement ${subscription.id})`)
+    return
+  }
+
+  // === BRANCHE : abonnement de PLAN marque (comportement existant) ===
   await supabase
     .from('brands')
     .update({
@@ -324,20 +380,78 @@ async function handleSubscriptionDeleted(subscription) {
 
 async function handleInvoicePaid(invoice) {
   console.log(`🧾 Facture payée: ${invoice.id} — ${(invoice.amount_paid / 100).toFixed(2)}€`)
-  // Stripe Invoicing a déjà généré et envoyé la facture par email à la marque.
-  // Ici on met juste à jour l'état d'abonnement (utile pour les renouvellements mensuels/annuels).
-  if (invoice.subscription) {
-    const subscription = await stripe.subscriptions.retrieve(invoice.subscription)
-    const periodEnd = subscription.current_period_end
-      ? new Date(subscription.current_period_end * 1000).toISOString()
-      : null
-    await supabase
-      .from('brands')
-      .update({
-        subscription_status: subscription.status,
-        subscription_current_period_end: periodEnd,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('stripe_subscription_id', subscription.id)
+
+  // Récupérer l'id de la subscription (compatible anciennes ET nouvelles versions d'API)
+  const subId =
+    invoice.subscription ??
+    invoice.parent?.subscription_details?.subscription ??
+    invoice.lines?.data?.[0]?.subscription ??
+    null
+
+  if (!subId) return
+
+  const subscription = await stripe.subscriptions.retrieve(subId)
+
+  // === BRANCHE 1 : abonnement de CONTRAT → verser le créateur ===
+  if (subscription.metadata?.kind === 'contract_payout') {
+    await handleContractPayout(subscription, invoice)
+    return
   }
+
+  // === BRANCHE 2 : abonnement de PLAN marque (comportement existant) ===
+  const periodEnd = getSubscriptionPeriodEnd(subscription)
+  await supabase
+    .from('brands')
+    .update({
+      subscription_status: subscription.status,
+      subscription_current_period_end: periodEnd,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('stripe_subscription_id', subscription.id)
+}
+
+// Verse le créateur à chaque période payée d'un contrat récurrent.
+async function handleContractPayout(subscription, invoice) {
+  const contractId = subscription.metadata?.contract_id
+  const influencerId = subscription.metadata?.influencer_id
+  const creatorReceives = Number(subscription.metadata?.creator_receives) || 0
+
+  console.log(`🔁 Versement contrat ${contractId} via facture ${invoice.id} — ${creatorReceives}€`)
+
+  if (!influencerId || creatorReceives <= 0) {
+    console.warn('⚠️ Métadonnées contrat incomplètes, versement ignoré')
+    return
+  }
+
+  // Compte Stripe Connect du créateur
+  const { data: influencer } = await supabase
+    .from('influencers')
+    .select('stripe_account_id')
+    .eq('id', influencerId)
+    .single()
+
+  if (!influencer?.stripe_account_id) {
+    console.warn('⚠️ Créateur pas connecté à Stripe, versement impossible')
+    return
+  }
+
+  // Transfer IDEMPOTENT : un seul virement par facture (= par période)
+  const transfer = await stripe.transfers.create(
+    {
+      amount: Math.round(creatorReceives * 100),
+      currency: 'eur',
+      destination: influencer.stripe_account_id,
+      description: `Versement récurrent Partnexx — Contrat ${contractId}`,
+      metadata: { contract_id: contractId, invoice_id: invoice.id, kind: 'contract_payout' },
+    },
+    { idempotencyKey: `contract_payout_${invoice.id}` }
+  )
+
+  // Tracer la date du dernier versement sur le contrat
+  await supabase
+    .from('contracts')
+    .update({ last_released_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', contractId)
+
+  console.log(`✅ ${creatorReceives}€ versés au créateur (contrat ${contractId}, transfer ${transfer.id})`)
 }
