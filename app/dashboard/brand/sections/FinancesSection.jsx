@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Search, FileText, Download, CreditCard, CheckCircle, Clock,
-  AlertCircle, TrendingUp, Wallet, Receipt, ArrowDownToLine,
+  AlertCircle, TrendingUp, Wallet, Receipt, ArrowDownToLine, BarChart3,
+  User,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import supabase from '@/lib/supabase'
@@ -37,12 +38,13 @@ export default function FinancesSection({ user }) {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [downloadingInvoiceId, setDownloadingInvoiceId] = useState(null)
+  const [downloadingCreatorInvoiceId, setDownloadingCreatorInvoiceId] = useState(null)
+  const [downloadingReport, setDownloadingReport] = useState(false)
 
   useEffect(() => {
     const loadTransactions = async () => {
       if (!user) return
       try {
-        // Récupérer la brand
         const { data: brand } = await supabase
           .from('brands')
           .select('id')
@@ -52,7 +54,6 @@ export default function FinancesSection({ user }) {
           setLoading(false)
           return
         }
-        // Récupérer les transactions
         const { data: txs, error } = await supabase
           .from('transactions')
           .select(`
@@ -90,7 +91,6 @@ export default function FinancesSection({ user }) {
     .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
   const releasedCount = transactions.filter(t => t.status === 'released').length
 
-  // Filtrage
   const filtered = transactions.filter(t => {
     const search1 = (t.collaborations?.campaigns?.title || '').toLowerCase()
     const search2 = (t.influencers?.display_name || '').toLowerCase()
@@ -123,12 +123,75 @@ export default function FinancesSection({ user }) {
       a.download = `facture-partnexx-${transactionId.slice(0, 8)}.pdf`
       a.click()
       URL.revokeObjectURL(url)
-      toast.success('Facture téléchargée !')
+      toast.success('Facture PARTNEXX téléchargée !')
     } catch (e) {
       console.error(e)
       toast.error(e.message || 'Erreur')
     } finally {
       setDownloadingInvoiceId(null)
+    }
+  }
+
+  const handleDownloadCreatorInvoice = async (transactionId) => {
+    try {
+      setDownloadingCreatorInvoiceId(transactionId)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('Tu dois être connecté')
+        return
+      }
+      const res = await fetch(`/api/influencer/issued-invoice?transactionId=${transactionId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Erreur lors du téléchargement')
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `facture-createur-${transactionId.slice(0, 8)}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Facture créateur téléchargée !')
+    } catch (e) {
+      console.error(e)
+      toast.error(e.message || 'Erreur')
+    } finally {
+      setDownloadingCreatorInvoiceId(null)
+    }
+  }
+
+  const handleDownloadAnnualReport = async () => {
+    try {
+      setDownloadingReport(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('Tu dois être connecté')
+        return
+      }
+      const year = new Date().getFullYear()
+      const res = await fetch(`/api/brand/annual-report?year=${year}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Erreur lors du téléchargement')
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `bilan-marque-partnexx-${year}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Bilan annuel téléchargé !')
+    } catch (e) {
+      console.error(e)
+      toast.error(e.message || 'Erreur')
+    } finally {
+      setDownloadingReport(false)
     }
   }
 
@@ -142,6 +205,8 @@ export default function FinancesSection({ user }) {
       </div>
     )
   }
+
+  const currentYear = new Date().getFullYear()
 
   return (
     <div className="space-y-6 p-6">
@@ -204,6 +269,33 @@ export default function FinancesSection({ user }) {
         </Card>
       </div>
 
+      {/* CARTE BILAN ANNUEL */}
+      <Card className="border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-violet-500/5">
+        <CardContent className="p-6">
+          <div className="flex items-start gap-4 flex-wrap">
+            <div className="p-3 rounded-xl bg-purple-500/10">
+              <BarChart3 className="h-6 w-6 text-purple-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-lg mb-1">Bilan annuel d&apos;investissement</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Télécharge le récapitulatif PDF de tes dépenses en influence pour l&apos;année {currentYear} :
+                campagnes, créateurs activés, top investissements et répartition mensuelle.
+              </p>
+              <Button
+                onClick={handleDownloadAnnualReport}
+                disabled={downloadingReport}
+                variant="outline"
+                className="gap-2 border-purple-500/30 hover:bg-purple-500/10"
+              >
+                <Download className="h-4 w-4" />
+                {downloadingReport ? 'Génération...' : `Télécharger mon bilan ${currentYear}`}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* INFO FACTURES */}
       <Card className="border-blue-500/30 bg-gradient-to-br from-blue-500/5 to-indigo-500/5">
         <CardContent className="p-6">
@@ -212,11 +304,14 @@ export default function FinancesSection({ user }) {
               <FileText className="h-6 w-6 text-blue-600" />
             </div>
             <div className="flex-1">
-              <h3 className="font-bold text-lg mb-1">Tes factures de commission</h3>
+              <h3 className="font-bold text-lg mb-1">Tes 2 factures par collaboration</h3>
               <p className="text-sm text-muted-foreground mb-2">
-                Pour chaque collaboration payée, télécharge la facture officielle PARTNEXX (commission de service).
-                La prestation du créateur fait l&apos;objet d&apos;une facturation séparée.
+                Pour chaque collaboration, télécharge les <strong>2 factures</strong> nécessaires à ta comptabilité :
               </p>
+              <ul className="text-sm text-muted-foreground space-y-1 ml-1 mb-2">
+                <li>🟢 <strong>Facture créateur</strong> — la prestation du créateur (par mandat de facturation)</li>
+                <li>🟣 <strong>Facture PARTNEXX</strong> — la commission de service (mise en relation)</li>
+              </ul>
               <p className="text-xs text-muted-foreground">
                 💡 Les factures de ton abonnement PARTNEXX (Growth/Scale) sont envoyées séparément par email.
               </p>
@@ -310,23 +405,36 @@ export default function FinancesSection({ user }) {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <div className="text-right">
                         <p className="text-xl font-bold">
                           {brandTotal.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} €
                         </p>
                         <p className="text-xs text-muted-foreground">Payé (TTC)</p>
                       </div>
+                      {(tx.status === 'released' || tx.status === 'in_escrow') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 whitespace-nowrap border-green-500/30 hover:bg-green-500/10"
+                          onClick={() => handleDownloadCreatorInvoice(tx.id)}
+                          disabled={downloadingCreatorInvoiceId === tx.id}
+                          title="Facture du créateur (prestation)"
+                        >
+                          <User className="h-3.5 w-3.5 text-green-600" />
+                          {downloadingCreatorInvoiceId === tx.id ? '...' : 'Facture créateur'}
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
-                        className="gap-1.5 whitespace-nowrap"
+                        className="gap-1.5 whitespace-nowrap border-purple-500/30 hover:bg-purple-500/10"
                         onClick={() => handleDownloadInvoice(tx.id)}
                         disabled={downloadingInvoiceId === tx.id}
-                        title="Télécharger la facture de commission"
+                        title="Facture PARTNEXX (commission)"
                       >
-                        <ArrowDownToLine className="h-3.5 w-3.5" />
-                        {downloadingInvoiceId === tx.id ? '...' : 'Facture'}
+                        <ArrowDownToLine className="h-3.5 w-3.5 text-purple-600" />
+                        {downloadingInvoiceId === tx.id ? '...' : 'Facture PARTNEXX'}
                       </Button>
                     </div>
                   </div>

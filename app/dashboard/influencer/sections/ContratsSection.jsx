@@ -328,6 +328,7 @@ function PaiementsTab({ transactions = [], user }) {
   const [holderName, setHolderName] = useState("")
   const [withdrawLoading, setWithdrawLoading] = useState(false)
   const [downloadingReceiptId, setDownloadingReceiptId] = useState(null)
+  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState(null)
 
   const filtered = transactions.filter(t => {
     const matchSearch = search === "" ||
@@ -456,6 +457,37 @@ function PaiementsTab({ transactions = [], user }) {
       toast.error(e.message || 'Erreur lors du téléchargement')
     } finally {
       setDownloadingReceiptId(null)
+    }
+  }
+
+  const handleDownloadIssuedInvoice = async (transactionId) => {
+    try {
+      setDownloadingInvoiceId(transactionId)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('Tu dois être connecté')
+        return
+      }
+      const res = await fetch(`/api/influencer/issued-invoice?transactionId=${transactionId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Erreur lors du téléchargement')
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `facture-${transactionId.slice(0, 8)}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Facture téléchargée !')
+    } catch (e) {
+      console.error(e)
+      toast.error(e.message || 'Erreur')
+    } finally {
+      setDownloadingInvoiceId(null)
     }
   }
 
@@ -748,13 +780,26 @@ function PaiementsTab({ transactions = [], user }) {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <div className="text-right">
                       <p className={`text-xl font-bold ${tx.status === "released" ? "text-green-600" : "text-orange-500"}`}>
                         {tx.status === "released" ? "+" : ""}{parseFloat(tx.influencer_amount || 0).toLocaleString()}€
                       </p>
                       <p className="text-xs text-muted-foreground">{tx.currency || 'EUR'}</p>
                     </div>
+                    {(tx.status === "released" || tx.status === "in_escrow") && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 whitespace-nowrap"
+                        onClick={() => handleDownloadIssuedInvoice(tx.id)}
+                        disabled={downloadingInvoiceId === tx.id}
+                        title="Télécharger ma facture (envoyée à la marque)"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        {downloadingInvoiceId === tx.id ? '...' : 'Facture'}
+                      </Button>
+                    )}
                     {tx.status === "released" && (
                       <Button
                         variant="outline"
@@ -762,7 +807,7 @@ function PaiementsTab({ transactions = [], user }) {
                         className="gap-1.5 whitespace-nowrap"
                         onClick={() => handleDownloadReceipt(tx.id)}
                         disabled={downloadingReceiptId === tx.id}
-                        title="Télécharger le reçu"
+                        title="Télécharger le reçu de paiement"
                       >
                         <Receipt className="h-3.5 w-3.5" />
                         {downloadingReceiptId === tx.id ? '...' : 'Reçu'}

@@ -133,12 +133,15 @@ function OnboardingInner() {
       }).eq('id', userId)
 
       if (role === 'influencer') {
-        await supabase.from('influencers').update({
+       await supabase.from('influencers').update({
           display_name: form.username,
           niche: [form.category],
           languages: [form.language],
           country: form.country,
           subscription_plan: form.plan,
+          mandat_facturation_accepte: true,
+          mandat_facturation_date: new Date().toISOString(),
+          mandat_facturation_version: 'v1.0',
         }).eq('user_id', userId)
 
         const socials = [
@@ -519,7 +522,22 @@ function OnboardingInner() {
         {step === 6 && (
           <div>
             {[
-              { key: 'cgv', label: <span>J'accepte les <a href="#" style={{ color: '#a855f7' }}>Conditions Générales d'Utilisation</a> et la <a href="#" style={{ color: '#a855f7' }}>Politique de confidentialité</a> de Partnexx *</span> },
+              {
+                key: 'cgv',
+                label: role === 'influencer' ? (
+                  <span>
+                    J'accepte les <a href="/cgu" target="_blank" style={{ color: '#a855f7', fontWeight: 600 }}>Conditions Générales d'Utilisation</a> de PARTNEXX, qui incluent notamment :
+                    <div style={{ marginTop: '0.5rem', padding: '0.6rem 0.75rem', background: 'rgba(168,85,247,0.05)', borderLeft: '3px solid #a855f7', borderRadius: '6px', fontSize: '0.78rem', lineHeight: 1.5 }}>
+                      • Le <a href="/cgu-mandat-facturation" target="_blank" style={{ color: '#a855f7', fontWeight: 600 }}>mandat de facturation</a> autorisant PARTNEXX à émettre mes factures pour mon compte (art. 289-I-2 CGI)<br />
+                      • Les conditions de paiement et de commission selon mon niveau<br />
+                      • La déclaration automatique de mes revenus à la DGFiP (DAC7)
+                    </div>
+                    <span style={{ display: 'block', marginTop: '0.4rem', fontSize: '0.75rem', color: '#718096' }}>*Acceptation obligatoire pour utiliser PARTNEXX</span>
+                  </span>
+                ) : (
+                  <span>J'accepte les <a href="/cgu" target="_blank" style={{ color: '#a855f7' }}>Conditions Générales d'Utilisation</a> et la <a href="/privacy" target="_blank" style={{ color: '#a855f7' }}>Politique de confidentialité</a> de PARTNEXX *</span>
+                )
+              },
               { key: 'newsletter', label: "J'accepte de recevoir les actualités et offres de Partnexx (optionnel)" },
             ].map(item => (
               <div key={item.key} className="ob-check" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '1rem', cursor: 'pointer', padding: '0.5rem', transition: 'background 0.15s' }} onClick={() => set(item.key, !form[item.key])}>

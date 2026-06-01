@@ -1,0 +1,10 @@
+[33m9385b2c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge remote-tracking branch 'origin/dylan-brand-partenaires'
+[33m6c3040f[m feat: factures commission marques + section finances dashboard
+[33mcf70391[m[33m ([m[1;31morigin/dylan-brand-partenaires[m[33m)[m Theme landing growth spark (glow-orb, gradients, container) + thème dashboard violet stable
+[33mec1fafa[m feat: stripe subscriptions + receipts createurs
+[33ma8342e9[m feat(fiscal): recap annuel PDF design pro (react-pdf + signature + 1 page)
+[33m6743d88[m feat(fiscal): recap annuel PDF (route API + bouton dashboard + pdf-lib)
+[33m60a7179[m Fix theme Tailwind v4 (thème violet Lovable) + correction onglets Analytics
+[33mbd65911[m feat(fiscal): alerte seuil 760 + parcours statut (j'ai deja / creer LegalPlace) dans PaymentSetup
+[33mb131b93[m feat(fiscal): rapport DAC7 admin + fix routage login admin
+[33ma66e463[m feat(fiscal): case à cocher fiscale + gestion TVA sur commissions
