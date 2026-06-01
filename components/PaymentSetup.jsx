@@ -5,11 +5,12 @@ import supabase from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { User, Briefcase, Building2, ExternalLink, CheckCircle, AlertCircle, Loader2, Rocket, Info } from 'lucide-react'
+import { User, Briefcase, Building2, ExternalLink, CheckCircle, AlertCircle, Loader2, Rocket, Info, Receipt } from 'lucide-react'
 import { toast } from 'sonner'
 
 const LEGALPLACE_URL = 'https://www.legalplace.fr/' // TODO: remplacer par ton lien d'affilié
 const SEUIL_PARTICULIER = 760 // seuil légal annuel pour le statut Particulier
+const SEUIL_FRANCHISE_TVA = 94300 // seuil franchise TVA prestations services 2026
 
 const BUSINESS_TYPES = [
   {
@@ -45,14 +46,12 @@ const BUSINESS_TYPES = [
   },
 ]
 
-// Libellés du bouton "j'ai déjà mon statut" selon le type sélectionné
 const ALREADY_LABELS = {
   individual: 'Continuer en Particulier',
   auto_entrepreneur: "J'ai déjà mon auto-entreprise",
   company: "J'ai déjà ma société",
 }
 
-// Libellés du bouton "je veux créer" selon le type sélectionné
 const CREATE_LABELS = {
   individual: 'Je veux créer mon entreprise (LegalPlace)',
   auto_entrepreneur: 'Je veux créer mon auto-entreprise (LegalPlace)',
@@ -65,6 +64,7 @@ export default function PaymentSetup({ user }) {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [fiscalAccepted, setFiscalAccepted] = useState(false)
+  const [tvaApplicable, setTvaApplicable] = useState(false)
   const [ytdRevenue, setYtdRevenue] = useState(0)
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export default function PaymentSetup({ user }) {
     async function fetchInfluencer() {
       const { data, error } = await supabase
         .from('influencers')
-        .select('id, stripe_account_id, business_type, fiscal_terms_accepted_at')
+        .select('id, stripe_account_id, business_type, fiscal_terms_accepted_at, tva_applicable')
         .eq('user_id', user.id)
         .single()
       if (error) {
@@ -83,8 +83,8 @@ export default function PaymentSetup({ user }) {
       setInfluencer(data)
       if (data.business_type) setSelectedType(data.business_type)
       if (data.fiscal_terms_accepted_at) setFiscalAccepted(true)
+      if (data.tva_applicable) setTvaApplicable(true)
 
-      // Récupérer le cumul annuel pour la logique du seuil 760€
       const { data: revenue, error: revError } = await supabase
         .rpc('get_creator_ytd_revenue', { p_influencer_id: data.id })
       if (revError) {
@@ -100,6 +100,20 @@ export default function PaymentSetup({ user }) {
   const overLimit = ytdRevenue >= SEUIL_PARTICULIER
   const isParticulier = selectedType === 'individual'
   const particulierBlocked = isParticulier && overLimit
+
+  // TVA possible uniquement pour auto-entrepreneur et société (jamais pour particulier)
+  const canBeTvaApplicable = selectedType === 'auto_entrepreneur' || selectedType === 'company'
+
+  // Ajustement automatique de tva_applicable selon le statut sélectionné
+  useEffect(() => {
+    if (selectedType === 'individual' && tvaApplicable) {
+      // Particulier : jamais de TVA, on décoche
+      setTvaApplicable(false)
+    } else if (selectedType === 'company' && !influencer?.tva_applicable) {
+      // Société : pré-cocher par défaut (sauf si déjà sauvegardé décoché en base)
+      setTvaApplicable(true)
+    }
+  }, [selectedType])
 
   const handleContinue = async () => {
     if (!selectedType) {
@@ -120,10 +134,13 @@ export default function PaymentSetup({ user }) {
     }
     setSubmitting(true)
     try {
-      // Enregistrer l'acceptation des conditions fiscales (horodatée)
+      // Enregistrer les paramètres fiscaux
       await supabase
         .from('influencers')
-        .update({ fiscal_terms_accepted_at: new Date().toISOString() })
+        .update({
+          fiscal_terms_accepted_at: new Date().toISOString(),
+          tva_applicable: canBeTvaApplicable ? tvaApplicable : false,
+        })
         .eq('id', influencer.id)
 
       const res = await fetch('/api/stripe/connect/onboard', {
@@ -246,6 +263,46 @@ export default function PaymentSetup({ user }) {
             <p className="text-sm text-red-900 leading-relaxed">
               Tu as dépassé le seuil de 760 €/an en tant que Particulier ({ytdRevenue.toLocaleString('fr-FR')} €). Pour continuer à recevoir tes gains, tu dois créer un statut (auto-entrepreneur le plus souvent). On t'accompagne ci-dessous.
             </p>
+          </div>
+        )}
+
+        {/* Bloc TVA : visible uniquement pour auto-entrepreneur et société */}
+        {canBeTvaApplicable && (
+          <div className="rounded-xl border border-orange-200 bg-orange-50/40 p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <Receipt className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-sm text-orange-900 mb-1">Régime de TVA</h4>
+                <p className="text-xs text-orange-900/80 leading-relaxed">
+                  {selectedType === 'auto_entrepreneur' ? (
+                    <>
+                      En auto-entrepreneur, tu bénéficies par défaut de la <strong>franchise en base de TVA</strong> (art. 293 B du CGI) tant que ton CA reste sous {SEUIL_FRANCHISE_TVA.toLocaleString('fr-FR')}€/an. Tes factures n'affichent pas de TVA.
+                    </>
+                  ) : (
+                    <>
+                      En tant que société, tu es <strong>normalement assujetti à la TVA à 20%</strong>. Tu dois cocher la case ci-dessous pour que tes factures affichent la TVA correctement.
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-orange-200 bg-white cursor-pointer hover:bg-orange-50/50 transition">
+              <input
+                type="checkbox"
+                checked={tvaApplicable}
+                onChange={(e) => setTvaApplicable(e.target.checked)}
+                className="mt-0.5 w-4 h-4 flex-shrink-0 accent-orange-600 cursor-pointer"
+              />
+              <div className="flex-1">
+                <span className="text-sm font-medium text-foreground block mb-1">
+                  Je suis assujetti à la TVA (20%)
+                </span>
+                <span className="text-xs text-muted-foreground leading-relaxed block">
+                  ⚠️ <strong>Ne coche cette case que si tu es réellement assujetti</strong> (auto-entrepreneur au-dessus du seuil de franchise, ou société). Cocher par erreur peut entraîner une fausse facturation, illégale.
+                </span>
+              </div>
+            </label>
           </div>
         )}
 
