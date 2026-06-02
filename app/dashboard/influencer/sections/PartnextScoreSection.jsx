@@ -417,16 +417,16 @@ export default function PartnextScoreSection({ user }) {
                             </div>
                           </div>
 
-                          <Card className={`relative overflow-hidden bg-gradient-to-br ${selectedVisual.bgGradient} ${selectedVisual.borderColor} border-2 shadow-xl text-left`}>
+                          <Card className={`relative overflow-hidden bg-gradient-to-br ${selectedVisual.bgGradient} ${selectedVisual.borderColor} border-2 shadow-xl text-left dark:from-muted/40 dark:via-muted/40 dark:to-muted/40 dark:border-border`}>
                             <CardContent className="p-6 space-y-5">
                               <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-4">
                                   <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${selectedVisual.gradient} flex items-center justify-center text-3xl shadow-lg ${!isSelectedLevelUnlocked && 'grayscale opacity-70'}`}>{isSelectedLevelUnlocked ? selectedLevel.emoji : <Lock className="h-7 w-7 text-white" />}</div>
-                                  <div><div className="text-xs font-bold text-muted-foreground tracking-wider">NIVEAU</div><div className={`text-2xl font-black ${selectedVisual.textColor}`}>{selectedLevel.name}</div></div>
+                                  <div><div className="text-xs font-bold text-muted-foreground tracking-wider">NIVEAU</div><div className={`text-2xl font-black ${selectedVisual.textColor} dark:text-foreground`}>{selectedLevel.name}</div></div>
                                 </div>
-                                <Badge variant="outline" className={`${selectedVisual.borderColor} ${selectedVisual.textColor} bg-transparent font-bold`}>FOCUS NIVEAU</Badge>
+                                <Badge variant="outline" className={`${selectedVisual.borderColor} ${selectedVisual.textColor} bg-transparent font-bold dark:text-foreground`}>FOCUS NIVEAU</Badge>
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{selectedVisual.perks.map((perk, i) => (<div key={i} className="bg-white/80 backdrop-blur-sm rounded-xl p-3 flex items-center gap-3 shadow-sm"><span className="text-xl">{perk.icon}</span><span className="text-sm font-medium text-foreground">{perk.label}</span></div>))}</div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{selectedVisual.perks.map((perk, i) => (<div key={i} className="bg-white/80 dark:bg-white/10 backdrop-blur-sm rounded-xl p-3 flex items-center gap-3 shadow-sm"><span className="text-xl">{perk.icon}</span><span className="text-sm font-medium text-foreground">{perk.label}</span></div>))}</div>
                               <div className="flex justify-start"><div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r ${selectedVisual.gradient} ${!isSelectedLevelUnlocked && 'grayscale opacity-70'}`}><BarChart3 className="h-4 w-4 text-white" /><span className="text-sm font-bold text-white">{selectedVisual.tagline}</span></div></div>
                               {!isSelectedLevelUnlocked && (<div className="bg-muted/50 rounded-lg p-3 text-center text-sm">🔒 <span className="font-semibold">{Math.max(0, selectedLevel.threshold - score).toLocaleString()} points</span> requis pour débloquer ce niveau</div>)}
                             </CardContent>

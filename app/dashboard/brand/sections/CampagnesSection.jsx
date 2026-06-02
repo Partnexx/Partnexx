@@ -96,6 +96,41 @@ function CreateCampaignWizard({ brandId, onCreated }) {
       budget_per_influencer_min: parseFloat(form.amountPerContent || 0) || null,
       budget_per_influencer_max: parseFloat(form.amountPerContent || 0) || null,
       commission_rate: parseFloat(form.commissionRate || 0) || null,
+      campaign_type: form.campaignType || null,
+      payout_amount:
+        form.campaignType === 'ambassadeur' ? (parseFloat(form.monthlyAmount || 0) || null) :
+        form.campaignType === 'placement' ? ((parseFloat(form.amountPerContent || 0) * parseFloat(form.numberOfContents || 0)) || null) :
+        null,
+      payout_frequency: form.campaignType === 'ambassadeur' ? 'monthly' : null,
+      payout_duration_months: form.campaignType === 'ambassadeur' ? (parseInt(form.collaborationDuration) || null) : null,
+      campaign_type: form.campaignType || null,
+      payout_amount:
+        form.campaignType === 'ambassadeur' ? (parseFloat(form.monthlyAmount || 0) || null) :
+        form.campaignType === 'placement' ? ((parseFloat(form.amountPerContent || 0) * parseFloat(form.numberOfContents || 0)) || null) :
+        null,
+      payout_frequency: form.campaignType === 'ambassadeur' ? 'monthly' : null,
+      payout_duration_months: form.campaignType === 'ambassadeur' ? (parseInt(form.collaborationDuration) || null) : null,
+      campaign_type: form.campaignType || null,
+      payout_amount:
+        form.campaignType === 'ambassadeur' ? (parseFloat(form.monthlyAmount || 0) || null) :
+        form.campaignType === 'placement' ? ((parseFloat(form.amountPerContent || 0) * parseFloat(form.numberOfContents || 0)) || null) :
+        null,
+      payout_frequency: form.campaignType === 'ambassadeur' ? 'monthly' : null,
+      payout_duration_months: form.campaignType === 'ambassadeur' ? (parseInt(form.collaborationDuration) || null) : null,
+      campaign_type: form.campaignType || null,
+      payout_amount:
+        form.campaignType === 'ambassadeur' ? (parseFloat(form.monthlyAmount || 0) || null) :
+        form.campaignType === 'placement' ? ((parseFloat(form.amountPerContent || 0) * parseFloat(form.numberOfContents || 0)) || null) :
+        null,
+      payout_frequency: form.campaignType === 'ambassadeur' ? 'monthly' : null,
+      payout_duration_months: form.campaignType === 'ambassadeur' ? (parseInt(form.collaborationDuration) || null) : null,
+      campaign_type: form.campaignType || null,
+      payout_amount:
+        form.campaignType === 'ambassadeur' ? (parseFloat(form.monthlyAmount || 0) || null) :
+        form.campaignType === 'placement' ? ((parseFloat(form.amountPerContent || 0) * parseFloat(form.numberOfContents || 0)) || null) :
+        null,
+      payout_frequency: form.campaignType === 'ambassadeur' ? 'monthly' : null,
+      payout_duration_months: form.campaignType === 'ambassadeur' ? (parseInt(form.collaborationDuration) || null) : null,
       start_date: form.startDate || null,
       end_date: form.indefiniteDuration ? null : (form.endDate || null),
       application_deadline: form.submissionDeadline || null,

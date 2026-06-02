@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useState } from 'react'
-import { Brain, Shield, Bell, CreditCard, Crown, Star, CheckCircle, Download, ExternalLink, MessageCircle, Settings, LogOut, AlertCircle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Brain, Shield, Bell, CreditCard, Crown, Star, CheckCircle, Download, ExternalLink, MessageCircle, Settings, LogOut, AlertCircle, Eye, EyeOff, Copy, KeyRound, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import supabase from '@/lib/supabase'
@@ -25,6 +25,20 @@ const HelpCircle = ({ className }) => <svg className={className} viewBox="0 0 24
 const Trash = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
 const Cookie = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"/><path d="M8.5 8.5v.01M16 15.5v.01M12 12v.01"/></svg>
 const AlertTriangle = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg>
+
+// Calcule la force d'un mot de passe → largeur de barre + label + couleurs
+function getPasswordStrength(pw) {
+  if (!pw) return { pct: 0, label: '', barClass: '', textClass: '' }
+  let s = 0
+  if (pw.length >= 6) s++
+  if (pw.length >= 10) s++
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) s++
+  if (/[0-9]/.test(pw)) s++
+  if (/[^A-Za-z0-9]/.test(pw)) s++
+  if (s <= 2) return { pct: 33, label: 'Faible', barClass: 'bg-red-500', textClass: 'text-red-500' }
+  if (s === 3) return { pct: 66, label: 'Moyen', barClass: 'bg-amber-500', textClass: 'text-amber-500' }
+  return { pct: 100, label: 'Fort', barClass: 'bg-green-500', textClass: 'text-green-500' }
+}
 
 function Toggle({ checked, onChange, disabled }) {
   return (
@@ -47,8 +61,75 @@ export default function ParametresSection({ user, profile }) {
   const [theme, setTheme] = useState("light")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [notifTypes, setNotifTypes] = useState({
+    opportunity: true, message: true, collab: true, payment: true, review: true, deadline: false,
+  })
+  const [frequency, setFrequency] = useState('daily')
+  const loadedRef = useRef(false)
+
+  // Charge les préférences cookies sauvegardées (côté navigateur)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('partnexx_cookies')
+      if (saved) setCookies(JSON.parse(saved))
+    } catch (e) { /* ignore */ }
+  }, [])
+
+  // Charge les préférences de notifications
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('partnexx_notifs')
+      if (saved) {
+        const p = JSON.parse(saved)
+        if (p.channels) setNotifications(p.channels)
+        if (p.types) setNotifTypes(p.types)
+        if (typeof p.dnd === 'boolean') setDnd(p.dnd)
+        if (p.frequency) setFrequency(p.frequency)
+      }
+    } catch (e) { /* ignore */ }
+    loadedRef.current = true
+  }, [])
+
+  // Sauvegarde auto des préférences de notifications
+  useEffect(() => {
+    if (!loadedRef.current) return
+    try {
+      localStorage.setItem('partnexx_notifs', JSON.stringify({ channels: notifications, types: notifTypes, dnd, frequency }))
+    } catch (e) { /* ignore */ }
+  }, [notifications, notifTypes, dnd, frequency])
+
+  // Applique le thème (clair / sombre / auto) sur la page
+  const applyTheme = (t) => {
+    if (typeof document === 'undefined') return
+    const root = document.documentElement
+    if (t === 'dark') root.classList.add('dark')
+    else if (t === 'light') root.classList.remove('dark')
+    else {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      root.classList.toggle('dark', prefersDark)
+    }
+  }
+
+  // Charge + applique le thème sauvegardé
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('partnexx_theme') || 'light'
+      setTheme(saved)
+      applyTheme(saved)
+    } catch (e) { /* ignore */ }
+  }, [])
+
+  const handleThemeChange = (t) => {
+    setTheme(t)
+    applyTheme(t)
+    try { localStorage.setItem('partnexx_theme', t) } catch (e) { /* ignore */ }
+    toast.success(`Thème ${t === 'light' ? 'Clair' : t === 'dark' ? 'Sombre' : 'Auto'} activé`)
+  }
 
   const handleApplyPromo = () => {
     if (!promoCode.trim()) { toast.error("Veuillez entrer un code promo"); return }
@@ -70,9 +151,215 @@ export default function ParametresSection({ user, profile }) {
     setChangingPassword(false)
   }
 
+  const handleCopyId = () => {
+    if (!user?.id) return
+    navigator.clipboard.writeText(user.id)
+    toast.success("Identifiant copié !")
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  // Télécharge un fichier dans le navigateur
+  const downloadFile = (content, filename, type) => {
+    const blob = new Blob([content], { type })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Récupère TOUTES les données de l'utilisateur (réutilisé par PDF + JSON)
+  const fetchAllUserData = async () => {
+    const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    const { data: inf } = await supabase.from('influencers').select('*').eq('user_id', user.id).single()
+    let social = [], collabs = [], reviews = []
+    if (inf?.id) {
+      const [sRes, cRes] = await Promise.allSettled([
+        supabase.from('social_accounts').select('*').eq('influencer_id', inf.id),
+        supabase.from('collaborations').select('*, campaigns(title), brands(company_name)').eq('influencer_id', inf.id),
+      ])
+      social = sRes.status === 'fulfilled' ? (sRes.value.data || []) : []
+      collabs = cRes.status === 'fulfilled' ? (cRes.value.data || []) : []
+    }
+    const rRes = await supabase.from('reviews').select('*, collaborations(id, campaigns(title))').eq('reviewee_id', user.id)
+    reviews = rRes.data || []
+    return { prof, inf, social, collabs, reviews }
+  }
+
+  // Export complet des données du compte (RGPD) au format JSON
+  const handleDownloadData = async () => {
+    if (!user?.id) { toast.error("Non connecté"); return }
+    setExporting(true)
+    try {
+      const { prof, inf, social, collabs, reviews } = await fetchAllUserData()
+      const payload = {
+        exported_at: new Date().toISOString(),
+        account: { email: user?.email, id: user?.id },
+        profile: prof || null,
+        influencer: inf || null,
+        social_accounts: social,
+        collaborations: collabs,
+        reviews: reviews,
+      }
+      downloadFile(JSON.stringify(payload, null, 2), 'mes-donnees-partnexx.json', 'application/json')
+      toast.success("Tes données ont été téléchargées 📦")
+    } catch (err) {
+      toast.error("Erreur : " + (err.message || 'export échoué'))
+    }
+    setExporting(false)
+  }
+
+  // Export PDF lisible et complet des données du compte (multi-pages)
+  const handleDownloadPdf = async () => {
+    if (!user?.id) { toast.error("Non connecté"); return }
+    setExporting(true)
+    try {
+      const { prof, inf, social, collabs, reviews } = await fetchAllUserData()
+
+      // Import dynamique (évite tout souci côté serveur)
+      const mod = await import('jspdf')
+      const JsPDF = mod.jsPDF || mod.default
+      const doc = new JsPDF()
+      const margin = 16
+      const pageH = doc.internal.pageSize.getHeight()
+      let y = 20
+
+      const ensureSpace = (need = 10) => { if (y + need > pageH - 16) { doc.addPage(); y = 20 } }
+      const heading = (txt) => {
+        ensureSpace(18); y += 4
+        doc.setFontSize(14); doc.setTextColor(124, 58, 237); doc.setFont(undefined, 'bold')
+        doc.text(txt, margin, y); doc.setFont(undefined, 'normal'); y += 6
+        doc.setDrawColor(228); doc.line(margin, y - 1, 194, y - 1); y += 4
+      }
+      const subtitle = (txt) => {
+        ensureSpace(8)
+        doc.setFontSize(11); doc.setTextColor(70); doc.setFont(undefined, 'bold')
+        doc.text(txt, margin, y); doc.setFont(undefined, 'normal'); y += 6
+      }
+      const line = (label, value) => {
+        const txt = (value === null || value === undefined || value === '') ? '—' : String(value)
+        const wrapped = doc.splitTextToSize(txt, 118)
+        ensureSpace(6 * wrapped.length)
+        doc.setFontSize(10); doc.setTextColor(120); doc.text(label, margin, y)
+        doc.setTextColor(30); doc.text(wrapped, margin + 52, y)
+        y += 6 * wrapped.length
+      }
+
+      // En-tête
+      doc.setFontSize(22); doc.setTextColor(124, 58, 237); doc.setFont(undefined, 'bold')
+      doc.text('Partnexx', margin, y); y += 8
+      doc.setFont(undefined, 'normal'); doc.setFontSize(13); doc.setTextColor(60)
+      doc.text('Export de mes données', margin, y); y += 6
+      doc.setFontSize(10); doc.setTextColor(140)
+      doc.text(`Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`, margin, y); y += 2
+
+      heading('Compte')
+      line('Email', user?.email)
+      line('Identifiant', user?.id)
+
+      heading('Profil')
+      line('Nom', inf?.display_name || prof?.full_name)
+      line("Nom d'utilisateur", prof?.username)
+      line('Pays', inf?.country)
+      line('Niches', Array.isArray(inf?.niche) ? inf.niche.join(', ') : inf?.niche)
+      line('Types de contenu', Array.isArray(inf?.content_types) ? inf.content_types.join(', ') : inf?.content_types)
+      line('Tarif minimum', inf?.min_budget != null ? `${inf.min_budget} EUR` : null)
+      line('Bio', prof?.bio)
+
+      heading('Statistiques')
+      line('Score Partnexx', inf?.ai_score)
+      line('Revenus totaux', inf?.total_earned != null ? `${inf.total_earned} EUR` : null)
+      line('Collaborations', inf?.collaborations_count)
+      line('Note moyenne', inf?.avg_rating != null ? `${inf.avg_rating} / 5` : null)
+
+      heading(`Réseaux connectés (${social.length})`)
+      if (social.length === 0) line('Statut', 'Aucun réseau connecté')
+      else social.forEach((s, i) => {
+        subtitle(`${i + 1}. ${String(s.platform || '').toUpperCase()}`)
+        line('   Pseudo', s.handle)
+        line('   Lien', s.profile_url)
+        line('   Abonnés', s.followers_count)
+        line('   Engagement', s.engagement_rate != null ? `${s.engagement_rate} %` : null)
+      })
+
+      heading(`Collaborations (${collabs.length})`)
+      if (collabs.length === 0) line('Statut', 'Aucune collaboration')
+      else collabs.forEach((c, i) => {
+        subtitle(`${i + 1}. ${c.campaigns?.title || 'Campagne'}`)
+        line('   Marque', c.brands?.company_name)
+        line('   Statut', c.status)
+        line('   Date', c.created_at ? new Date(c.created_at).toLocaleDateString('fr-FR') : null)
+      })
+
+      heading(`Avis reçus (${reviews.length})`)
+      if (reviews.length === 0) line('Statut', 'Aucun avis')
+      else reviews.forEach((r, i) => {
+        subtitle(`${i + 1}. ${r.collaborations?.campaigns?.title || 'Collaboration'}`)
+        line('   Note', r.rating != null ? `${r.rating} / 5` : null)
+        line('   Commentaire', r.comment)
+        line('   Date', r.created_at ? new Date(r.created_at).toLocaleDateString('fr-FR') : null)
+      })
+
+      // Pieds de page numérotés
+      const pages = doc.internal.getNumberOfPages()
+      for (let p = 1; p <= pages; p++) {
+        doc.setPage(p)
+        doc.setFontSize(9); doc.setTextColor(165)
+        doc.text(`Partnexx — Export de données — Page ${p}/${pages}`, margin, pageH - 8)
+      }
+
+      doc.save('mes-donnees-partnexx.pdf')
+      toast.success("PDF téléchargé 📄")
+    } catch (err) {
+      toast.error("Erreur PDF : " + (err.message || 'export échoué'))
+    }
+    setExporting(false)
+  }
+
+  // Export de l'historique des collaborations au format CSV
+  const handleExportHistory = async () => {
+    if (!user?.id) { toast.error("Non connecté"); return }
+    setExporting(true)
+    try {
+      const { data: inf } = await supabase.from('influencers').select('id').eq('user_id', user.id).single()
+      let collabs = []
+      if (inf?.id) {
+        const { data: c } = await supabase
+          .from('collaborations')
+          .select('*, campaigns(title), brands(company_name)')
+          .eq('influencer_id', inf.id)
+        collabs = c || []
+      }
+      if (collabs.length === 0) { toast.info("Aucune collaboration à exporter pour l'instant"); setExporting(false); return }
+      const rows = [['Campagne', 'Marque', 'Statut', 'Date']]
+      collabs.forEach(c => rows.push([
+        (c.campaigns?.title || '').replace(/;/g, ','),
+        (c.brands?.company_name || '').replace(/;/g, ','),
+        c.status || '',
+        c.created_at ? new Date(c.created_at).toLocaleDateString('fr-FR') : '',
+      ]))
+      const csv = '\ufeff' + rows.map(r => r.join(';')).join('\n')
+      downloadFile(csv, 'historique-collaborations.csv', 'text/csv;charset=utf-8;')
+      toast.success("Historique exporté 📊")
+    } catch (err) {
+      toast.error("Erreur : " + (err.message || 'export échoué'))
+    }
+    setExporting(false)
+  }
+
+  // Sauvegarde les préférences cookies (côté navigateur)
+  const handleSavePreferences = () => {
+    try {
+      localStorage.setItem('partnexx_cookies', JSON.stringify(cookies))
+      toast.success("Préférences enregistrées ✅")
+    } catch (e) {
+      toast.error("Impossible d'enregistrer les préférences")
+    }
   }
 
   const handleDeleteAccount = async () => {
@@ -85,6 +372,9 @@ export default function ParametresSection({ user, profile }) {
     toast.error("Suppression de compte — contactez support@partnexx.fr")
     setDeletingAccount(false)
   }
+
+  const strength = getPasswordStrength(newPassword)
+  const passwordsMatch = confirmPassword.length > 0 && newPassword === confirmPassword
 
   const tabs = [
     { value: "security", label: "Sécurité", icon: Shield, color: "from-red-500 to-red-600" },
@@ -121,208 +411,334 @@ export default function ParametresSection({ user, profile }) {
           ))}
         </TabsList>
 
-        {/* SÉCURITÉ */}
+        {/* ═══════════════ SÉCURITÉ ═══════════════ */}
         <TabsContent value="security" className="space-y-6">
-          <Card className="border-red-500/20 bg-gradient-to-br from-red-500/5 to-background">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-3"><Shield className="h-6 w-6 text-red-500" />Centre de Sécurité</CardTitle>
-                <Badge className="bg-red-500 text-white">Compte Sécurisé</Badge>
-              </div>
-            </CardHeader>
-          </Card>
 
-          {/* Compte actuel */}
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Mail className="h-5 w-5 text-blue-500" />Compte Supabase</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <div className="p-3 bg-muted/50 rounded-lg border">
-                <p className="text-xs text-muted-foreground mb-1">Email du compte</p>
-                <p className="font-semibold">{user?.email || 'Non connecté'}</p>
-                <p className="text-xs text-green-600 flex items-center gap-1 mt-1"><CheckCircle className="h-3 w-3" />Email vérifié</p>
-              </div>
-              <div className="p-3 bg-muted/50 rounded-lg border">
-                <p className="text-xs text-muted-foreground mb-1">ID utilisateur</p>
-                <p className="font-mono text-xs text-muted-foreground">{user?.id || '—'}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Changer mot de passe */}
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-5 w-5 text-red-500" />Changer le mot de passe</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-2">
-                <label className="text-xs font-semibold">Nouveau mot de passe</label>
-                <Input type="password" placeholder="Nouveau mot de passe" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="h-9 text-sm" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-semibold">Confirmer le mot de passe</label>
-                <Input type="password" placeholder="Confirmer le mot de passe" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-9 text-sm" />
-              </div>
-              <Button onClick={handleChangePassword} disabled={changingPassword} className="w-full" size="sm">
-                {changingPassword ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Mise à jour...</> : "Mettre à jour le mot de passe"}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Sessions */}
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Laptop className="h-5 w-5 text-cyan-500" />Session active</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Laptop className="h-4 w-4" />
+          {/* Bannière statut */}
+          <Card className="border-0 overflow-hidden bg-gradient-to-br from-red-500/10 via-orange-500/5 to-background shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center shadow-lg shrink-0">
+                    <Shield className="h-7 w-7 text-white" />
+                  </div>
                   <div>
-                    <p className="font-semibold text-sm">Session actuelle</p>
-                    <p className="text-xs text-muted-foreground">{user?.email} • Maintenant</p>
+                    <h2 className="text-xl font-bold">Centre de Sécurité</h2>
+                    <p className="text-sm text-muted-foreground">Gère ton mot de passe et tes connexions</p>
                   </div>
                 </div>
-                <Badge variant="secondary" className="text-xs">Actuelle</Badge>
+                <Badge className="bg-green-500/15 text-green-600 border border-green-500/30 gap-1.5 px-3 py-1.5 self-start sm:self-auto">
+                  <CheckCircle className="h-4 w-4" />Compte sécurisé
+                </Badge>
               </div>
-              <Button variant="destructive" onClick={handleLogout} className="w-full" size="sm">
-                <LogOut className="h-4 w-4 mr-2" />Se déconnecter
+              <div className="flex flex-wrap gap-2 mt-5">
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-background/70 border rounded-full px-3 py-1.5">
+                  <CheckCircle className="h-3.5 w-3.5 text-green-500" />Email vérifié
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-background/70 border rounded-full px-3 py-1.5">
+                  <CheckCircle className="h-3.5 w-3.5 text-green-500" />Mot de passe actif
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-background/70 border rounded-full px-3 py-1.5 text-muted-foreground">
+                  <Smartphone className="h-3.5 w-3.5" />Double authentification — bientôt
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Infos du compte */}
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Mail className="h-5 w-5 text-blue-500" />Informations du compte</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between gap-3 p-4 bg-muted/40 rounded-xl border">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground mb-0.5">Email</p>
+                  <p className="font-semibold truncate">{user?.email || 'Non connecté'}</p>
+                </div>
+                <Badge className="bg-green-500/15 text-green-600 border border-green-500/30 gap-1 shrink-0"><CheckCircle className="h-3 w-3" />Vérifié</Badge>
+              </div>
+              <div className="flex items-center justify-between gap-3 p-4 bg-muted/40 rounded-xl border">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground mb-0.5">Identifiant utilisateur</p>
+                  <p className="font-mono text-xs text-muted-foreground truncate">{user?.id || '—'}</p>
+                </div>
+                <Button variant="outline" size="lg" onClick={handleCopyId} className="shrink-0 gap-1.5 h-11 rounded-xl"><Copy className="h-4 w-4" />Copier</Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Changer le mot de passe */}
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><KeyRound className="h-5 w-5 text-red-500" />Changer le mot de passe</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Nouveau mot de passe</label>
+                <div className="relative">
+                  <Input type={showNew ? 'text' : 'password'} placeholder="Au moins 6 caractères" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="pr-10 h-11" />
+                  <button type="button" onClick={() => setShowNew(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                    {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {newPassword && (
+                  <div className="space-y-1 pt-1">
+                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all duration-300 ${strength.barClass}`} style={{ width: `${strength.pct}%` }} />
+                    </div>
+                    <p className={`text-xs font-medium ${strength.textClass}`}>Sécurité : {strength.label}</p>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Confirmer le mot de passe</label>
+                <div className="relative">
+                  <Input type={showConfirm ? 'text' : 'password'} placeholder="Retape le mot de passe" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="pr-10 h-11" />
+                  <button type="button" onClick={() => setShowConfirm(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                    {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {confirmPassword && (
+                  <p className={`text-xs font-medium flex items-center gap-1 ${passwordsMatch ? 'text-green-500' : 'text-red-500'}`}>
+                    {passwordsMatch ? <><CheckCircle className="h-3 w-3" />Les mots de passe correspondent</> : <><AlertCircle className="h-3 w-3" />Les mots de passe ne correspondent pas</>}
+                  </p>
+                )}
+              </div>
+              <Button onClick={handleChangePassword} disabled={changingPassword} size="lg" className="w-full h-12 rounded-xl text-sm font-semibold bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white shadow-md">
+                {changingPassword ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Mise à jour...</> : <><KeyRound className="h-5 w-5 mr-2" />Mettre à jour le mot de passe</>}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Session active */}
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Laptop className="h-5 w-5 text-cyan-500" />Session active</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-xl bg-muted/40 gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shrink-0">
+                    <Laptop className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm truncate">Cet appareil</p>
+                    <p className="text-xs text-muted-foreground truncate">{user?.email} • Connecté maintenant</p>
+                  </div>
+                </div>
+                <Badge variant="secondary" className="text-xs shrink-0">Actuelle</Badge>
+              </div>
+              <Button variant="outline" onClick={handleLogout} size="lg" className="w-full h-12 rounded-xl text-sm font-semibold border-2 border-red-500/30 text-red-600 hover:bg-red-500/10 hover:text-red-600">
+                <LogOut className="h-5 w-5 mr-2" />Se déconnecter
               </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* CONFIDENTIALITÉ */}
+        {/* ═══════════════ CONFIDENTIALITÉ (refaite + boutons fonctionnels) ═══════════════ */}
         <TabsContent value="privacy" className="space-y-6">
-          <Card className="border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-background">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-3"><ShieldCheck className="h-6 w-6 text-purple-500" />Confidentialité & Données</CardTitle>
-                <Badge className="bg-purple-500 text-white">Protégé</Badge>
+
+          {/* Bannière */}
+          <Card className="border-0 overflow-hidden bg-gradient-to-br from-purple-500/10 via-fuchsia-500/5 to-background shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-500 flex items-center justify-center shadow-lg shrink-0">
+                    <ShieldCheck className="h-7 w-7 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Confidentialité & Données</h2>
+                    <p className="text-sm text-muted-foreground">Gère tes cookies et récupère tes données</p>
+                  </div>
+                </div>
+                <Badge className="bg-purple-500/15 text-purple-600 border border-purple-500/30 gap-1.5 px-3 py-1.5 self-start sm:self-auto">
+                  <CheckCircle className="h-4 w-4" />Protégé
+                </Badge>
               </div>
-            </CardHeader>
+            </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Cookie className="h-5 w-5 text-purple-500" />Préférences Cookies</CardTitle></CardHeader>
-              <CardContent className="space-y-2">
-                {[
-                  { key: "essential", name: "Cookies essentiels", desc: "Nécessaires au fonctionnement", required: true, checked: true },
-                  { key: "analytics", name: "Cookies analytiques", desc: "Amélioration de l'expérience", required: false, checked: cookies.analytics },
-                  { key: "marketing", name: "Cookies marketing", desc: "Publicité personnalisée", required: false, checked: cookies.marketing },
-                ].map((cookie) => (
-                  <div key={cookie.key} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div><p className="font-semibold text-sm">{cookie.name}</p><p className="text-xs text-muted-foreground">{cookie.desc}</p></div>
-                    <Toggle checked={cookie.checked} disabled={cookie.required} onChange={(v) => !cookie.required && setCookies(prev => ({ ...prev, [cookie.key]: v }))} />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+          {/* Cookies */}
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Cookie className="h-5 w-5 text-purple-500" />Préférences Cookies</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {[
+                { key: "essential", name: "Cookies essentiels", desc: "Nécessaires au fonctionnement", required: true, checked: true },
+                { key: "analytics", name: "Cookies analytiques", desc: "Amélioration de l'expérience", required: false, checked: cookies.analytics },
+                { key: "marketing", name: "Cookies marketing", desc: "Publicité personnalisée", required: false, checked: cookies.marketing },
+              ].map((cookie) => (
+                <div key={cookie.key} className="flex items-center justify-between p-4 border rounded-xl bg-muted/30">
+                  <div><p className="font-semibold text-sm">{cookie.name}</p><p className="text-xs text-muted-foreground">{cookie.desc}</p></div>
+                  <Toggle checked={cookie.checked} disabled={cookie.required} onChange={(v) => !cookie.required && setCookies(prev => ({ ...prev, [cookie.key]: v }))} />
+                </div>
+              ))}
+              <Button onClick={handleSavePreferences} size="lg" className="w-full h-12 rounded-xl text-sm font-semibold mt-2 bg-gradient-to-r from-purple-500 to-fuchsia-500 hover:from-purple-600 hover:to-fuchsia-600 text-white shadow-md">
+                <CheckCircle className="h-5 w-5 mr-2" />Enregistrer mes préférences
+              </Button>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Download className="h-5 w-5 text-blue-500" />Gestion des données</CardTitle></CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start" size="sm" onClick={() => toast.info("Export disponible prochainement")}><Download className="h-4 w-4 mr-2" />Télécharger mes données</Button>
-                <Button variant="outline" className="w-full justify-start" size="sm" onClick={() => toast.info("Export disponible prochainement")}><ExternalLink className="h-4 w-4 mr-2" />Exporter mon historique</Button>
-                <Button variant="outline" className="w-full justify-start" size="sm" onClick={() => toast.info("Préférences sauvegardées")}><Settings className="h-4 w-4 mr-2" />Gérer mes préférences</Button>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Gestion des données — gros boutons fonctionnels */}
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Download className="h-5 w-5 text-blue-500" />Mes données</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <Button variant="outline" onClick={handleDownloadPdf} disabled={exporting} className="w-full h-auto py-4 rounded-xl gap-3 justify-start border-2 hover:border-rose-500/40 hover:bg-rose-500/5 transition-all">
+                <span className="w-10 h-10 rounded-xl bg-rose-500/15 flex items-center justify-center shrink-0"><FileText className="h-5 w-5 text-rose-500" /></span>
+                <span className="flex flex-col items-start text-left">
+                  <span className="text-sm font-semibold">Télécharger mes données (PDF)</span>
+                  <span className="text-xs text-muted-foreground font-normal">Document lisible — facile à lire</span>
+                </span>
+              </Button>
+              <Button variant="outline" onClick={handleDownloadData} disabled={exporting} className="w-full h-auto py-4 rounded-xl gap-3 justify-start border-2 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all">
+                <span className="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0"><Download className="h-5 w-5 text-blue-500" /></span>
+                <span className="flex flex-col items-start text-left">
+                  <span className="text-sm font-semibold">Télécharger mes données (JSON)</span>
+                  <span className="text-xs text-muted-foreground font-normal">Export complet RGPD — format technique</span>
+                </span>
+              </Button>
+              <Button variant="outline" onClick={handleExportHistory} disabled={exporting} className="w-full h-auto py-4 rounded-xl gap-3 justify-start border-2 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all">
+                <span className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0"><ExternalLink className="h-5 w-5 text-emerald-500" /></span>
+                <span className="flex flex-col items-start text-left">
+                  <span className="text-sm font-semibold">Exporter mon historique</span>
+                  <span className="text-xs text-muted-foreground font-normal">Tes collaborations au format CSV (Excel)</span>
+                </span>
+              </Button>
+            </CardContent>
+          </Card>
 
-          <Card className="border-red-500/30 bg-gradient-to-br from-red-500/5 to-background">
+          {/* Suppression compte */}
+          <Card className="border-red-500/30 bg-gradient-to-br from-red-500/5 to-background shadow-sm">
             <CardHeader><CardTitle className="flex items-center gap-2 text-red-600 text-base"><AlertTriangle className="h-5 w-5" />Suppression du compte</CardTitle></CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">Cette action est irréversible. Toutes vos données seront définitivement supprimées.</p>
-              <Button variant="destructive" className="w-full" size="sm" onClick={handleDeleteAccount}>
-                <Trash className="h-4 w-4 mr-2" />{deletingAccount ? "Cliquez à nouveau pour confirmer" : "Supprimer définitivement mon compte"}
+              <p className="text-sm text-muted-foreground mb-4">Cette action est irréversible. Toutes tes données seront définitivement supprimées.</p>
+              <Button variant="destructive" onClick={handleDeleteAccount} size="lg" className="w-full h-12 rounded-xl text-sm font-semibold">
+                <Trash className="h-5 w-5 mr-2" />{deletingAccount ? "Cliquez à nouveau pour confirmer" : "Supprimer définitivement mon compte"}
               </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* NOTIFICATIONS */}
+        {/* ═══════════════ NOTIFICATIONS (refaite + fonctionnelle) ═══════════════ */}
         <TabsContent value="notifications" className="space-y-6">
-          <Card className="border-blue-500/20 bg-gradient-to-br from-blue-500/5 to-background">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-3"><Bell className="h-6 w-6 text-blue-500" />Centre de Notifications</CardTitle>
-                <Badge className="bg-blue-500 text-white">Actives</Badge>
+
+          {/* Bannière */}
+          <Card className="border-0 overflow-hidden bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-background shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-lg shrink-0">
+                    <Bell className="h-7 w-7 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Centre de Notifications</h2>
+                    <p className="text-sm text-muted-foreground">Choisis ce que tu reçois et comment</p>
+                  </div>
+                </div>
+                <Badge className="bg-blue-500/15 text-blue-600 border border-blue-500/30 gap-1.5 px-3 py-1.5 self-start sm:self-auto">
+                  <CheckCircle className="h-4 w-4" />Sauvegarde auto
+                </Badge>
               </div>
-            </CardHeader>
+            </CardContent>
           </Card>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
+            {/* Canaux */}
+            <Card className="shadow-sm">
               <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Bell className="h-5 w-5 text-blue-500" />Canaux de notification</CardTitle></CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3">
                 {[
-                  { key: "push", name: "Notifications push", icon: Bell },
-                  { key: "email", name: "Notifications email", icon: Mail },
-                  { key: "sms", name: "Notifications SMS", icon: MessageCircle },
-                ].map(({ key, name, icon: Icon }) => (
-                  <div key={key} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3"><Icon className="h-4 w-4" /><span className="font-semibold text-sm">{name}</span></div>
+                  { key: "push", name: "Notifications push", desc: "Sur ton appareil", icon: Bell, color: "bg-blue-500/15 text-blue-500" },
+                  { key: "email", name: "Notifications email", desc: "Dans ta boîte mail", icon: Mail, color: "bg-purple-500/15 text-purple-500" },
+                  { key: "sms", name: "Notifications SMS", desc: "Par message texte", icon: MessageCircle, color: "bg-emerald-500/15 text-emerald-500" },
+                ].map(({ key, name, desc, icon: Icon, color }) => (
+                  <div key={key} className="flex items-center justify-between p-4 border rounded-xl bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${color}`}><Icon className="h-5 w-5" /></span>
+                      <div><p className="font-semibold text-sm">{name}</p><p className="text-xs text-muted-foreground">{desc}</p></div>
+                    </div>
                     <Toggle checked={notifications[key]} onChange={(v) => { setNotifications(prev => ({ ...prev, [key]: v })); toast.success(`${name} ${v ? 'activées' : 'désactivées'}`) }} />
                   </div>
                 ))}
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Settings className="h-5 w-5 text-purple-500" />Préférences</CardTitle></CardHeader>
+            {/* Préférences */}
+            <Card className="shadow-sm">
+              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Settings className="h-5 w-5 text-indigo-500" />Préférences</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <span className="font-semibold text-sm">Ne pas déranger</span>
+                <div className="flex items-center justify-between p-4 border rounded-xl bg-muted/30">
+                  <div><p className="font-semibold text-sm">Ne pas déranger</p><p className="text-xs text-muted-foreground">Coupe toutes les notifications</p></div>
                   <Toggle checked={dnd} onChange={(v) => { setDnd(v); toast.success(v ? "Mode silencieux activé" : "Notifications réactivées") }} />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold">Fréquence des résumés</label>
-                  <select className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm" onChange={() => toast.success("Préférence sauvegardée")}>
-                    <option>Temps réel</option>
-                    <option defaultValue>Quotidien</option>
-                    <option>Hebdomadaire</option>
+                <div className="space-y-2 p-4 border rounded-xl bg-muted/30">
+                  <label className="text-sm font-semibold">Fréquence des résumés</label>
+                  <select value={frequency} onChange={(e) => { setFrequency(e.target.value); toast.success("Fréquence enregistrée") }} className="w-full h-11 px-3 rounded-lg border border-input bg-background text-sm">
+                    <option value="realtime">Temps réel</option>
+                    <option value="daily">Quotidien</option>
+                    <option value="weekly">Hebdomadaire</option>
                   </select>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><MessageCircle className="h-5 w-5 text-purple-500" />Types de notifications</CardTitle></CardHeader>
+          {/* Types */}
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><MessageCircle className="h-5 w-5 text-indigo-500" />Types de notifications</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               {[
-                { title: "Nouvelle opportunité", enabled: true },
-                { title: "Message reçu", enabled: true },
-                { title: "Collaboration acceptée", enabled: true },
-                { title: "Paiement reçu", enabled: true },
-                { title: "Nouvel avis reçu", enabled: true },
-                { title: "Rappel de deadline", enabled: false },
-              ].map((notif, i) => (
-                <div key={i} className="flex items-center justify-between p-3 border rounded-lg gap-3">
-                  <span className="font-semibold text-sm flex-1">{notif.title}</span>
-                  <Toggle checked={notif.enabled} onChange={() => toast.success("Préférence mise à jour")} />
+                { key: "opportunity", title: "Nouvelle opportunité" },
+                { key: "message", title: "Message reçu" },
+                { key: "collab", title: "Collaboration acceptée" },
+                { key: "payment", title: "Paiement reçu" },
+                { key: "review", title: "Nouvel avis reçu" },
+                { key: "deadline", title: "Rappel de deadline" },
+              ].map(({ key, title }) => (
+                <div key={key} className="flex items-center justify-between p-4 border rounded-xl bg-muted/30 gap-3">
+                  <span className="font-semibold text-sm flex-1">{title}</span>
+                  <Toggle checked={!!notifTypes[key]} onChange={(v) => setNotifTypes(prev => ({ ...prev, [key]: v }))} />
                 </div>
               ))}
+              <p className="text-xs text-muted-foreground pt-2">Tes préférences sont enregistrées automatiquement.</p>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* APPARENCE */}
+        {/* ═══════════════ APPARENCE (refaite + thème appliqué) ═══════════════ */}
         <TabsContent value="appearance" className="space-y-6">
-          <Card className="border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-background">
-            <CardHeader><CardTitle className="flex items-center gap-3"><Palette className="h-6 w-6 text-amber-500" />Personnalisation</CardTitle></CardHeader>
+
+          {/* Bannière */}
+          <Card className="border-0 overflow-hidden bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-background shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shrink-0">
+                  <Palette className="h-7 w-7 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Personnalisation</h2>
+                  <p className="text-sm text-muted-foreground">Choisis l'apparence de ton espace</p>
+                </div>
+              </div>
+            </CardContent>
           </Card>
-          <Card>
-            <CardHeader><CardTitle className="text-base">Thème & Apparence</CardTitle></CardHeader>
-            <CardContent>
+
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="text-base">Thème</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
                   { key: "light", label: "Clair", sub: "Interface lumineuse", icon: Sun },
                   { key: "dark", label: "Sombre", sub: "Confort nocturne", icon: Moon },
-                  { key: "auto", label: "Auto", sub: "Adaptatif", icon: Monitor },
+                  { key: "auto", label: "Auto", sub: "Suit ton système", icon: Monitor },
                 ].map(({ key, label, sub, icon: Icon }) => (
-                  <div key={key} onClick={() => { setTheme(key); toast.success(`Thème ${label} activé`) }} className={`p-4 border-2 rounded-xl cursor-pointer hover:border-primary transition-colors ${theme === key ? 'border-primary bg-primary/5' : ''}`}>
-                    <div className="flex items-center gap-3 mb-2"><Icon className="h-5 w-5 text-primary" /><span className="font-semibold text-sm">{label}</span></div>
+                  <button key={key} type="button" onClick={() => handleThemeChange(key)} className={`text-left p-5 border-2 rounded-2xl cursor-pointer transition-all hover:shadow-md ${theme === key ? 'border-primary bg-primary/5 shadow-md' : 'border-border hover:border-primary/40'}`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shrink-0"><Icon className="h-5 w-5 text-white" /></span>
+                      {theme === key && <CheckCircle className="h-5 w-5 text-primary" />}
+                    </div>
+                    <p className="font-bold text-sm">{label}</p>
                     <p className="text-xs text-muted-foreground">{sub}</p>
-                  </div>
+                  </button>
                 ))}
               </div>
+              <p className="text-xs text-muted-foreground border-t pt-4">
+                ℹ️ Ton choix est mémorisé. Le mode sombre s'applique à toute l'interface (à condition que le thème sombre soit activé dans l'app).
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

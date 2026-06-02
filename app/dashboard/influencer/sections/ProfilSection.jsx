@@ -19,12 +19,15 @@ import LevelGate from '@/components/LevelGate'
 const YoutubeIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58a2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/></svg>
 const InstagramIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
 const TikTokIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.95a8.28 8.28 0 0 0 4.84 1.55V7.05a4.85 4.85 0 0 1-1.07-.36z"/></svg>
+const XIcon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
 
 const getPlatformIcon = (platform) => {
   switch (platform) {
     case 'instagram': return InstagramIcon
     case 'youtube': return YoutubeIcon
     case 'tiktok': return TikTokIcon
+    case 'x': return XIcon
+    case 'twitter': return XIcon
     default: return InstagramIcon
   }
 }
@@ -34,9 +37,19 @@ const getPlatformColor = (platform) => {
     case 'instagram': return 'from-pink-500 to-purple-600'
     case 'youtube': return 'from-red-500 to-red-600'
     case 'tiktok': return 'from-slate-700 to-slate-900'
+    case 'x': return 'from-slate-800 to-black'
+    case 'twitter': return 'from-slate-800 to-black'
     default: return 'from-primary to-accent'
   }
 }
+
+// Les 4 réseaux que le créateur peut connecter
+const ALL_PLATFORMS = [
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'tiktok', label: 'TikTok' },
+  { value: 'youtube', label: 'YouTube' },
+  { value: 'x', label: 'X (Twitter)' },
+]
 
 const LEVEL_VISUALS = {
   bronze: { gradient: 'from-orange-400 to-amber-600', title: 'Profil Vérifié' },
@@ -98,6 +111,13 @@ function ProfilContent({ user, profile: initialProfile, metrics }) {
   const [selectedNiches, setSelectedNiches] = useState([])
   const [selectedContentTypes, setSelectedContentTypes] = useState([])
   const [minBudget, setMinBudget] = useState('')
+
+  // ===== Connexion des réseaux sociaux (saisie manuelle pour l'instant) =====
+  const [connectingPlatform, setConnectingPlatform] = useState(null)
+  const [socialHandle, setSocialHandle] = useState('')
+  const [socialUrl, setSocialUrl] = useState('')
+  const [socialFollowers, setSocialFollowers] = useState('')
+  const [savingSocial, setSavingSocial] = useState(false)
 
   useEffect(() => {
     if (!user?.id) return
@@ -249,6 +269,53 @@ function ProfilContent({ user, profile: initialProfile, metrics }) {
     setSelectedContentTypes(prev =>
       prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
     )
+  }
+
+  // ===== Connexion / déconnexion d'un réseau social =====
+  const openConnect = (platform) => {
+    setConnectingPlatform(platform)
+    setSocialHandle('')
+    setSocialUrl('')
+    setSocialFollowers('')
+  }
+
+  const handleConnectSocial = async () => {
+    if (!influencer?.id) { toast.error("Profil créateur introuvable"); return }
+    if (!socialHandle.trim()) { toast.error("Renseigne ton @ / pseudo"); return }
+    setSavingSocial(true)
+    try {
+      const { data, error } = await supabase.from('social_accounts').insert({
+        influencer_id: influencer.id,
+        platform: connectingPlatform,
+        handle: socialHandle.trim(),
+        profile_url: socialUrl.trim() || null,
+        followers_count: socialFollowers === '' ? 0 : (parseInt(socialFollowers) || 0),
+        engagement_rate: 0,
+      }).select().single()
+
+      if (error) throw error
+
+      setSocialAccounts(prev => [...prev, data])
+      setConnectingPlatform(null)
+      toast.success("Réseau ajouté ! 🎉")
+    } catch (err) {
+      console.error('Connect social error', err)
+      toast.error(`Erreur : ${err.message || 'ajout échoué'}`)
+    }
+    setSavingSocial(false)
+  }
+
+  const handleDisconnectSocial = async (account) => {
+    if (!confirm(`Déconnecter ${account.platform} ?`)) return
+    try {
+      const { error } = await supabase.from('social_accounts').delete().eq('id', account.id)
+      if (error) throw error
+      setSocialAccounts(prev => prev.filter(a => a.id !== account.id))
+      toast.success("Réseau déconnecté")
+    } catch (err) {
+      console.error('Disconnect social error', err)
+      toast.error(`Erreur : ${err.message || 'suppression échouée'}`)
+    }
   }
 
   const handleSave = async () => {
@@ -708,36 +775,94 @@ function ProfilContent({ user, profile: initialProfile, metrics }) {
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-r from-primary to-accent rounded-lg"><TrendingUp className="h-5 w-5 text-white" /></div>
-                Plateformes connectées
+                Connecter mes réseaux
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+
+              {/* Boutons de connexion (réseaux pas encore ajoutés) */}
+              <div>
+                <p className="text-sm text-muted-foreground mb-3">Ajoute tes réseaux pour que les marques voient ta présence.</p>
+                <div className="flex flex-wrap gap-3">
+                  {ALL_PLATFORMS.filter(p => !socialAccounts.some(a => a.platform === p.value)).map(p => {
+                    const Icon = getPlatformIcon(p.value)
+                    const color = getPlatformColor(p.value)
+                    return (
+                      <Button key={p.value} variant="outline" onClick={() => openConnect(p.value)} className="gap-2">
+                        <div className={`w-6 h-6 rounded-full bg-gradient-to-r ${color} flex items-center justify-center`}><Icon className="h-3.5 w-3.5 text-white" /></div>
+                        Connecter {p.label}
+                      </Button>
+                    )
+                  })}
+                  {ALL_PLATFORMS.every(p => socialAccounts.some(a => a.platform === p.value)) && (
+                    <p className="text-sm text-muted-foreground">Tous tes réseaux sont connectés ✅</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Formulaire de connexion (saisie manuelle pour l'instant) */}
+              {connectingPlatform && (
+                <div className="rounded-2xl border-2 border-primary/30 p-5 bg-primary/5 space-y-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    {(() => { const Icon = getPlatformIcon(connectingPlatform); const color = getPlatformColor(connectingPlatform); return (<span className={`w-7 h-7 rounded-full bg-gradient-to-r ${color} flex items-center justify-center`}><Icon className="h-4 w-4 text-white" /></span>) })()}
+                    Connecter {ALL_PLATFORMS.find(p => p.value === connectingPlatform)?.label}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Ton @ / pseudo <span className="text-red-500">*</span></label>
+                      <Input value={socialHandle} onChange={(e) => setSocialHandle(e.target.value)} placeholder="@monpseudo" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Lien de ton profil</label>
+                      <Input value={socialUrl} onChange={(e) => setSocialUrl(e.target.value)} placeholder="https://..." />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Abonnés (optionnel)</label>
+                      <Input type="number" min="0" value={socialFollowers} onChange={(e) => setSocialFollowers(e.target.value)} placeholder="10000" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => setConnectingPlatform(null)} disabled={savingSocial}>Annuler</Button>
+                    <Button onClick={handleConnectSocial} disabled={savingSocial} className="bg-gradient-to-r from-primary to-purple-500 text-white">
+                      {savingSocial ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Ajout...</> : <><CheckCircle className="h-4 w-4 mr-2" />Connecter</>}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Liste des réseaux connectés */}
               {socialAccounts.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground"><p>Aucun compte social connecté</p></div>
+                <div className="text-center py-8 text-muted-foreground"><p>Aucun réseau connecté pour l&apos;instant</p></div>
               ) : (
-                socialAccounts.map((account) => {
-                  const Icon = getPlatformIcon(account.platform)
-                  const color = getPlatformColor(account.platform)
-                  return (
-                    <div key={account.id} className="rounded-2xl border p-5 bg-muted/30 hover:bg-muted/50 transition-all hover:shadow-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-14 h-14 rounded-full bg-gradient-to-r ${color} flex items-center justify-center shadow-lg`}><Icon className="h-7 w-7 text-white" /></div>
-                          <div>
-                            <h3 className="font-semibold capitalize">{account.platform}</h3>
-                            <p className="text-sm text-muted-foreground">{account.handle || 'Non renseigné'}</p>
-                            <p className="text-xs text-muted-foreground">{(account.followers_count || 0).toLocaleString()} followers • {parseFloat(account.engagement_rate || 0).toFixed(1)}% engagement</p>
+                <div className="space-y-4">
+                  {socialAccounts.map((account) => {
+                    const Icon = getPlatformIcon(account.platform)
+                    const color = getPlatformColor(account.platform)
+                    return (
+                      <div key={account.id} className="rounded-2xl border p-5 bg-muted/30 hover:bg-muted/50 transition-all hover:shadow-lg">
+                        <div className="flex items-center justify-between flex-wrap gap-3">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-14 h-14 rounded-full bg-gradient-to-r ${color} flex items-center justify-center shadow-lg`}><Icon className="h-7 w-7 text-white" /></div>
+                            <div>
+                              <h3 className="font-semibold capitalize">{account.platform}</h3>
+                              <p className="text-sm text-muted-foreground">{account.handle || 'Non renseigné'}</p>
+                              <p className="text-xs text-muted-foreground">{(account.followers_count || 0).toLocaleString()} followers • {parseFloat(account.engagement_rate || 0).toFixed(1)}% engagement</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge className="bg-green-500/10 text-green-600 border-green-500/20"><CheckCircle className="h-3 w-3 mr-1" />Connecté</Badge>
+                            <Button variant="outline" size="sm" onClick={() => handleDisconnectSocial(account)} className="text-red-600 hover:text-red-700"><Trash2 className="h-4 w-4 mr-1" />Déconnecter</Button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge className="bg-green-500/10 text-green-600 border-green-500/20"><CheckCircle className="h-3 w-3 mr-1" />Connecté</Badge>
-                          <Button variant="outline" size="sm" onClick={() => toast.info("Rafraîchissement disponible prochainement")}><RefreshCw className="h-4 w-4 mr-1" />Rafraîchir</Button>
-                        </div>
                       </div>
-                    </div>
-                  )
-                })
+                    )
+                  })}
+                </div>
               )}
+
+              <p className="text-xs text-muted-foreground border-t pt-4">
+                ℹ️ Pour l&apos;instant tu renseignes tes réseaux manuellement. La connexion automatique officielle (OAuth) arrivera plus tard.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
