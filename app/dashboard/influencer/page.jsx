@@ -5,7 +5,7 @@ import supabase from '@/lib/supabase'
 import { useInfluencerData } from '@/lib/hook/useInfluencerData'
 import { useNotifications } from '@/lib/hook/useNotifications'
 import dynamic from 'next/dynamic'
-import { Bell } from 'lucide-react'
+import { Bell, ChevronLeft, ChevronRight } from 'lucide-react'
 import LevelUpProvider from '@/components/LevelUpProvider'
 
 const AccueilSection = dynamic(() => import('./sections/AccueilSection'), { ssr: false })
@@ -90,21 +90,22 @@ export default function DashboardInfluencer() {
         {/* SIDEBAR */}
         <aside className={`fixed left-0 top-0 h-screen bg-card border-r border-border transition-all duration-300 flex flex-col z-50 overflow-y-auto ${sidebarCollapsed ? 'w-16' : 'w-64'}`}>
           {/* Header */}
-          <div className="p-3 border-b border-border flex items-center justify-between">
+          <div className={`p-3 border-b border-border flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
             {!sidebarCollapsed && (
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-bold">P</div>
+                <img src="/logo.png" alt="Partnexx" className="w-9 h-9 object-contain shrink-0" />
                 <div className="flex flex-col">
                   <span className="font-bold text-base bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Partnexx</span>
-                  <span className="text-[10px] text-muted-foreground leading-tight">Des idées qui connectent</span>
+                  <span className="text-[10px] text-muted-foreground leading-tight">Where Partnerships Begin</span>
                 </div>
               </div>
             )}
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors text-sm"
+              aria-label={sidebarCollapsed ? 'Agrandir le menu' : 'Réduire le menu'}
+              className="h-8 w-8 flex items-center justify-center rounded-lg border border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
             >
-              {sidebarCollapsed ? '▶' : '◀'}
+              {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
             </button>
           </div>
 
