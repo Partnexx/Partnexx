@@ -1,10 +1,11 @@
 'use client'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import supabase from '@/lib/supabase'
 
-export default function Onboarding() {
+function OnboardingInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -18,25 +19,40 @@ export default function Onboarding() {
     website: '',
     instagram: false, tiktok: false, youtube: false, linkedin: false,
     legalStatus: '', siret: '', portfolio: '', address: '', city: '', country2: '',
-    plan: '',
+    plan: '', period: 'monthly',
     cgv: false, newsletter: false,
   })
 
   const steps = ['Informations de base', 'Profil', 'Réseaux sociaux', 'Infos professionnelles', 'Paiement', 'Conditions', 'Finalisation']
 
   const influencerPlans = [
-    { id: 'free',    name: 'Gratuit',  price: '0€',  sub: 'Toujours gratuit', popular: false, features: ['Profil basique', '5 demandes/mois', 'Messagerie limitée', 'Support communautaire'] },
-    { id: 'creator', name: 'Créateur', price: '39€', sub: 'par mois',         popular: true,  features: ['Profil premium', 'Demandes illimitées', 'Analytics avancées', 'Support prioritaire', 'Badge vérifié'] },
-    { id: 'pro',     name: 'Pro',      price: '99€', sub: 'par mois',         popular: false, features: ['Tout du Créateur', 'Compte manager dédié', 'Négociation auto', 'Rapports détaillés', 'API access'] },
+    { id: 'free',    name: 'Gratuit',  priceMonthly: '0€',   priceYearly: '0€',    sub: 'Toujours gratuit', popular: false, features: ['Profil basique', '5 demandes/mois', 'Messagerie limitée', 'Support communautaire'] },
+    { id: 'creator', name: 'Créateur', priceMonthly: '39€',  priceYearly: '390€',  sub: 'par mois',         popular: true,  features: ['Profil premium', 'Demandes illimitées', 'Analytics avancées', 'Support prioritaire', 'Badge vérifié'] },
+    { id: 'pro',     name: 'Pro',      priceMonthly: '99€',  priceYearly: '990€',  sub: 'par mois',         popular: false, features: ['Tout du Créateur', 'Compte manager dédié', 'Négociation auto', 'Rapports détaillés', 'API access'] },
   ]
 
   const brandPlans = [
-    { id: 'starter', name: 'Starter', price: '59€',  sub: 'par mois', popular: false, features: ["Jusqu'à 3 campagnes/mois", "Base d'influenceurs", 'Dashboard basique', 'Support email'] },
-    { id: 'growth',  name: 'Growth',  price: '199€', sub: 'par mois', popular: true,  features: ['Campagnes illimitées', 'Recherche avancée', 'Analytics ROI', 'Support téléphonique', 'Intégrations'] },
-    { id: 'scale',   name: 'Scale',   price: '799€', sub: 'par mois', popular: false, features: ['Tout du Growth', 'Account manager', 'White-label', 'API complète', 'Formation équipe'] },
+    { id: 'trial',  name: 'Trial',  priceMonthly: '0€',    priceYearly: '0€',    sub: '1 campagne offerte', popular: false, features: ['1 campagne gratuite', 'Accès créateurs Bronze → Diamant', '18% de commission', 'Suivi des résultats'] },
+    { id: 'growth', name: 'Growth', priceMonthly: '119€',  priceYearly: '1188€', sub: 'par mois',           popular: true,  features: ['Campagnes illimitées', 'Matching optimisé', 'Notoriété Boost activable', '11% de commission'] },
+    { id: 'scale',  name: 'Scale',  priceMonthly: '299€',  priceYearly: '2988€', sub: 'par mois',           popular: false, features: ['Automatisation complète', 'Créateurs Élite/Champion/Légende', 'Priorisation campagnes', '7% de commission'] },
   ]
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
+
+  // Pré-remplir plan + période + role si query params (?plan=growth&period=yearly)
+  useEffect(() => {
+    const planParam = searchParams.get('plan')
+    const periodParam = searchParams.get('period')
+    if (planParam && ['trial', 'growth', 'scale'].includes(planParam)) {
+      setForm(f => ({
+        ...f,
+        plan: planParam,
+        period: periodParam === 'yearly' ? 'yearly' : 'monthly',
+      }))
+      setRole('brand')
+    }
+  }, [searchParams])
+
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
   const handleFile = (e, key, previewKey) => {
     const file = e.target.files[0]
@@ -117,12 +133,15 @@ export default function Onboarding() {
       }).eq('id', userId)
 
       if (role === 'influencer') {
-        await supabase.from('influencers').update({
+       await supabase.from('influencers').update({
           display_name: form.username,
           niche: [form.category],
           languages: [form.language],
           country: form.country,
           subscription_plan: form.plan,
+          mandat_facturation_accepte: true,
+          mandat_facturation_date: new Date().toISOString(),
+          mandat_facturation_version: 'v1.0',
         }).eq('user_id', userId)
 
         const socials = [
@@ -147,7 +166,33 @@ export default function Onboarding() {
           description: form.description,
           target_audience: form.targetAudience,
           subscription_plan: form.plan,
+          subscription_period: form.period,
         }).eq('user_id', userId)
+
+        // Si plan payant (Growth/Scale) → rediriger vers Stripe Checkout
+        if (form.plan === 'growth' || form.plan === 'scale') {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            const res = await fetch('/api/stripe/subscribe', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({
+                plan: form.plan,
+                period: form.period || 'monthly',
+              }),
+            })
+            const data = await res.json()
+            if (res.ok && data.url) {
+              window.location.href = data.url
+              return
+            }
+            console.error('Erreur Stripe:', data.error)
+          }
+        }
+
         router.push('/dashboard/creator')
       }
 
@@ -407,19 +452,69 @@ export default function Onboarding() {
 
         {/* ── ÉTAPE 5 ── */}
         {step === 5 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '0.75rem' }}>
-            {(role === 'influencer' ? influencerPlans : brandPlans).map(plan => (
-              <div key={plan.id} className="ob-plan" onClick={() => set('plan', plan.id)} style={{ border: `2px solid ${form.plan === plan.id ? '#a855f7' : '#e2e8f0'}`, borderRadius: '14px', padding: '1.25rem', cursor: 'pointer', background: form.plan === plan.id ? 'rgba(168,85,247,0.05)' : '#fff', position: 'relative', transition: 'all 0.2s', boxShadow: form.plan === plan.id ? '0 6px 20px rgba(168,85,247,0.15)' : 'none' }}>
-                {plan.popular && <div style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(90deg,#a855f7,#ec4899)', color: '#fff', fontSize: '0.62rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '100px', whiteSpace: 'nowrap' }}>⭐ Populaire</div>}
-                <div style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1a202c', marginBottom: '0.25rem' }}>{plan.name}</div>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 800, background: 'linear-gradient(135deg,#a855f7,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{plan.price}</div>
-                  <div style={{ fontSize: '0.7rem', color: '#a0aec0' }}>{plan.sub}</div>
+          <div>
+            {/* Toggle Mensuel / Annuel (uniquement pour les marques) */}
+            {role === 'brand' && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '100px', padding: '4px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                  <button
+                    onClick={() => set('period', 'monthly')}
+                    style={{
+                      padding: '0.5rem 1.2rem', borderRadius: '100px', border: 'none', cursor: 'pointer',
+                      background: form.period === 'monthly' ? 'linear-gradient(135deg,#a855f7,#ec4899)' : 'transparent',
+                      color: form.period === 'monthly' ? '#fff' : '#718096',
+                      fontWeight: 600, fontSize: '0.82rem', fontFamily: 'inherit', transition: 'all 0.2s',
+                    }}
+                  >
+                    Mensuel
+                  </button>
+                  <button
+                    onClick={() => set('period', 'yearly')}
+                    style={{
+                      padding: '0.5rem 1.2rem', borderRadius: '100px', border: 'none', cursor: 'pointer',
+                      background: form.period === 'yearly' ? 'linear-gradient(135deg,#a855f7,#ec4899)' : 'transparent',
+                      color: form.period === 'yearly' ? '#fff' : '#718096',
+                      fontWeight: 600, fontSize: '0.82rem', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s',
+                    }}
+                  >
+                    Annuel
+                    <span style={{
+                      fontSize: '0.6rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px',
+                      background: form.period === 'yearly' ? 'rgba(255,255,255,0.25)' : '#dcfce7',
+                      color: form.period === 'yearly' ? '#fff' : '#16a34a',
+                    }}>
+                      -17%
+                    </span>
+                  </button>
                 </div>
-                {plan.features.map((f, i) => <div key={i} style={{ fontSize: '0.72rem', color: '#718096', marginBottom: '0.3rem' }}>✓ {f}</div>)}
-                {form.plan === plan.id && <div style={{ marginTop: '0.75rem', textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: '#a855f7' }}>✓ Sélectionné</div>}
               </div>
-            ))}
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '0.75rem' }}>
+              {(role === 'influencer' ? influencerPlans : brandPlans).map(plan => {
+                const displayPrice = form.period === 'yearly' && plan.priceYearly && plan.id !== 'trial' && plan.id !== 'free'
+                  ? plan.priceYearly
+                  : plan.priceMonthly
+                const displayPeriod = form.period === 'yearly' && plan.id !== 'trial' && plan.id !== 'free' && plan.sub === 'par mois'
+                  ? 'par an'
+                  : plan.sub
+                return (
+                  <div key={plan.id} className="ob-plan" onClick={() => set('plan', plan.id)} style={{ border: `2px solid ${form.plan === plan.id ? '#a855f7' : '#e2e8f0'}`, borderRadius: '14px', padding: '1.25rem', cursor: 'pointer', background: form.plan === plan.id ? 'rgba(168,85,247,0.05)' : '#fff', position: 'relative', transition: 'all 0.2s', boxShadow: form.plan === plan.id ? '0 6px 20px rgba(168,85,247,0.15)' : 'none' }}>
+                    {plan.popular && <div style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(90deg,#a855f7,#ec4899)', color: '#fff', fontSize: '0.62rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '100px', whiteSpace: 'nowrap' }}>⭐ Populaire</div>}
+                    <div style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1a202c', marginBottom: '0.25rem' }}>{plan.name}</div>
+                      <div style={{ fontSize: '1.6rem', fontWeight: 800, background: 'linear-gradient(135deg,#a855f7,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{displayPrice}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#a0aec0' }}>{displayPeriod}</div>
+                      {form.period === 'yearly' && plan.id !== 'trial' && plan.id !== 'free' && (
+                        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#16a34a', marginTop: '0.25rem' }}>2 mois offerts</div>
+                      )}
+                    </div>
+                    {plan.features.map((f, i) => <div key={i} style={{ fontSize: '0.72rem', color: '#718096', marginBottom: '0.3rem' }}>✓ {f}</div>)}
+                    {form.plan === plan.id && <div style={{ marginTop: '0.75rem', textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: '#a855f7' }}>✓ Sélectionné</div>}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
 
@@ -427,7 +522,22 @@ export default function Onboarding() {
         {step === 6 && (
           <div>
             {[
-              { key: 'cgv', label: <span>J'accepte les <a href="#" style={{ color: '#a855f7' }}>Conditions Générales d'Utilisation</a> et la <a href="#" style={{ color: '#a855f7' }}>Politique de confidentialité</a> de Partnexx *</span> },
+              {
+                key: 'cgv',
+                label: role === 'influencer' ? (
+                  <span>
+                    J'accepte les <a href="/cgu" target="_blank" style={{ color: '#a855f7', fontWeight: 600 }}>Conditions Générales d'Utilisation</a> de PARTNEXX, qui incluent notamment :
+                    <div style={{ marginTop: '0.5rem', padding: '0.6rem 0.75rem', background: 'rgba(168,85,247,0.05)', borderLeft: '3px solid #a855f7', borderRadius: '6px', fontSize: '0.78rem', lineHeight: 1.5 }}>
+                      • Le <a href="/cgu-mandat-facturation" target="_blank" style={{ color: '#a855f7', fontWeight: 600 }}>mandat de facturation</a> autorisant PARTNEXX à émettre mes factures pour mon compte (art. 289-I-2 CGI)<br />
+                      • Les conditions de paiement et de commission selon mon niveau<br />
+                      • La déclaration automatique de mes revenus à la DGFiP (DAC7)
+                    </div>
+                    <span style={{ display: 'block', marginTop: '0.4rem', fontSize: '0.75rem', color: '#718096' }}>*Acceptation obligatoire pour utiliser PARTNEXX</span>
+                  </span>
+                ) : (
+                  <span>J'accepte les <a href="/cgu" target="_blank" style={{ color: '#a855f7' }}>Conditions Générales d'Utilisation</a> et la <a href="/privacy" target="_blank" style={{ color: '#a855f7' }}>Politique de confidentialité</a> de PARTNEXX *</span>
+                )
+              },
               { key: 'newsletter', label: "J'accepte de recevoir les actualités et offres de Partnexx (optionnel)" },
             ].map(item => (
               <div key={item.key} className="ob-check" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '1rem', cursor: 'pointer', padding: '0.5rem', transition: 'background 0.15s' }} onClick={() => set(item.key, !form[item.key])}>
@@ -451,20 +561,32 @@ export default function Onboarding() {
         {step === 7 && (
           <div style={{ textAlign: 'center' }}>
             <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg,#a855f7,#ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', fontSize: '1.8rem' }}>🎉</div>
-            <p style={{ color: '#718096', fontSize: '0.875rem', marginBottom: '2rem' }}>Votre compte est prêt à être créé. Cliquez sur "Créer mon compte" pour finaliser votre inscription.</p>
+            <p style={{ color: '#718096', fontSize: '0.875rem', marginBottom: '2rem' }}>
+              {role === 'brand' && (form.plan === 'growth' || form.plan === 'scale')
+                ? 'Après avoir cliqué sur le bouton ci-dessous, tu seras redirigé vers la page de paiement sécurisée Stripe pour finaliser ton abonnement.'
+                : 'Votre compte est prêt à être créé. Cliquez sur "Créer mon compte" pour finaliser votre inscription.'}
+            </p>
             <div style={{ background: '#f7f8fa', borderRadius: '12px', padding: '1.25rem', textAlign: 'left', marginBottom: '1rem' }}>
               <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1a202c', marginBottom: '1rem' }}>📋 Récapitulatif</div>
-              {[
-                { label: 'Type de compte', value: role === 'influencer' ? '🎨 Créateur de contenu' : '🚀 Marque / Agence' },
-                { label: 'Nom',            value: `${form.firstName} ${form.lastName}` },
-                { label: 'Email',          value: form.email },
-                { label: 'Plan',           value: `${(role === 'influencer' ? influencerPlans : brandPlans).find(p => p.id === form.plan)?.name || '-'} — 14 jours d'essai gratuit` },
-              ].map(item => (
-                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid #e2e8f0' }}>
-                  <span style={{ color: '#718096' }}>{item.label}</span>
-                  <span style={{ color: '#1a202c', fontWeight: 600 }}>{item.value}</span>
-                </div>
-              ))}
+              {(() => {
+                const plans = role === 'influencer' ? influencerPlans : brandPlans
+                const selectedPlan = plans.find(p => p.id === form.plan)
+                const planLabel = selectedPlan
+                  ? `${selectedPlan.name}${form.plan !== 'trial' && form.plan !== 'free' ? ` — ${form.period === 'yearly' ? selectedPlan.priceYearly + '/an' : selectedPlan.priceMonthly + '/mois'} (14j gratuits)` : ''}`
+                  : '-'
+                const items = [
+                  { label: 'Type de compte', value: role === 'influencer' ? '🎨 Créateur de contenu' : '🚀 Marque / Agence' },
+                  { label: 'Nom',            value: `${form.firstName} ${form.lastName}` },
+                  { label: 'Email',          value: form.email },
+                  { label: 'Plan',           value: planLabel },
+                ]
+                return items.map(item => (
+                  <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid #e2e8f0' }}>
+                    <span style={{ color: '#718096' }}>{item.label}</span>
+                    <span style={{ color: '#1a202c', fontWeight: 600 }}>{item.value}</span>
+                  </div>
+                ))
+              })()}
             </div>
           </div>
         )}
@@ -483,7 +605,13 @@ export default function Onboarding() {
           )}
           {step < 7
             ? <button className="ob-btn-primary" onClick={nextStep} style={{ ...btnPrimary, flex: 1 }}>Suivant →</button>
-            : <button className="ob-btn-primary" onClick={handleSubmit} disabled={loading} style={{ ...btnPrimary, flex: 1, opacity: loading ? 0.7 : 1 }}>{loading ? 'Création en cours...' : '🚀 Créer mon compte'}</button>
+            : <button className="ob-btn-primary" onClick={handleSubmit} disabled={loading} style={{ ...btnPrimary, flex: 1, opacity: loading ? 0.7 : 1 }}>
+                {loading
+                  ? 'Création en cours...'
+                  : (role === 'brand' && (form.plan === 'growth' || form.plan === 'scale'))
+                    ? '💳 Continuer vers le paiement'
+                    : '🚀 Créer mon compte'}
+              </button>
           }
         </div>
 
@@ -494,5 +622,14 @@ export default function Onboarding() {
         )}
       </div>
     </div>
+  )
+}
+import { Suspense } from 'react'
+
+export default function Onboarding() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#a8c8f8 0%,#c4a8f8 30%,#f8a8d8 70%,#f8c8e8 100%)' }}>Chargement…</div>}>
+      <OnboardingInner />
+    </Suspense>
   )
 }

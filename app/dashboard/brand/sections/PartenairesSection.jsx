@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,8 +10,16 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { UserPlus, Brain, TrendingUp, Star, MessageCircle, Calendar, Filter, Sparkles, Search, CheckCircle } from 'lucide-react'
+import { UserPlus, Brain, TrendingUp, Star, MessageCircle, Calendar, Filter, Sparkles, Search, CheckCircle, Lock, Crown } from 'lucide-react'
 import { toast } from 'sonner'
+import supabase from '@/lib/supabase'
+import {
+  getCreatorLevelFromScore,
+  canBrandAccessCreator,
+  isPremiumCreator,
+  planUnlocksPremium,
+  getRequiredPlanFor,
+} from '@/lib/access'
 
 const seedPartners = [
   { id: "1", name: "Marie Dubois", handle: "@greenbeauty", niche: "Beauté", score: 92, status: "actif", messages: 2, updatedAt: "Aujourd'hui", followers: 45200, engagement: 4.2, avgLikes: 1890, location: "Paris, FR", languages: ["Français", "Anglais"], tags: ["skincare", "organic", "wellness"], collaborations: 12, aiCompatibility: 95, trending: true, verified: true, type: "ambassadeur", contractStartDate: "2024-01-15", recentCampaigns: ["Campagne Printemps 2024", "Lancement Sérum"] },
@@ -36,17 +44,6 @@ const aiMatches = [
   { partnerId: "2", score: 88, reasons: ["Leader tech emergent", "Reviews authentiques", "Communauté engagée"], opportunity: "Lancement produit tech Q4" },
 ]
 
-const influencerDirectory = [
-  { id: "inf_1", name: "Tibo InShape", handle: "@tiboinshape", niche: "Fitness & Lifestyle", followers: 8500000, engagement: 7.8, avgLikes: 425000, avgComments: 3200, platform: "Instagram", location: "Paris, France", verified: true, bio: "Fitness entrepreneur, fondateur de la marque Shapeshake.", languages: ["Français", "Anglais"] },
-  { id: "inf_2", name: "Squeezie", handle: "@xsqueezie", niche: "Gaming & Divertissement", followers: 18200000, engagement: 9.2, avgLikes: 1200000, avgComments: 8500, platform: "YouTube", location: "Lyon, France", verified: true, bio: "Créateur de contenu gaming et divertissement.", languages: ["Français"] },
-  { id: "inf_3", name: "Norman Thavaud", handle: "@norman", niche: "Comédie & Lifestyle", followers: 12300000, engagement: 8.5, avgLikes: 850000, avgComments: 5200, platform: "YouTube", location: "Paris, France", verified: true, bio: "Créateur de contenu comique et lifestyle.", languages: ["Français"] },
-  { id: "inf_4", name: "Enjoy Phoenix", handle: "@enjoyphoenix", niche: "Beauté & Lifestyle", followers: 5800000, engagement: 6.3, avgLikes: 365000, avgComments: 2100, platform: "Instagram", location: "Paris, France", verified: true, bio: "Influenceuse beauté et lifestyle.", languages: ["Français", "Anglais"] },
-  { id: "inf_5", name: "Léna Situations", handle: "@lenasituations", niche: "Mode & Lifestyle", followers: 6200000, engagement: 7.1, avgLikes: 440000, avgComments: 3800, platform: "Instagram", location: "Paris, France", verified: true, bio: "Créatrice de mode et lifestyle.", languages: ["Français", "Anglais"] },
-  { id: "inf_6", name: "Hugo Décrypte", handle: "@hugodecrypte", niche: "Actualité & Info", followers: 4100000, engagement: 8.9, avgLikes: 365000, avgComments: 4200, platform: "TikTok", location: "Paris, France", verified: true, bio: "Journaliste et créateur de contenu d'actualité.", languages: ["Français"] },
-  { id: "inf_7", name: "McFly & Carlito", handle: "@mcflyetcarlito", niche: "Comédie & Entertainment", followers: 9800000, engagement: 10.2, avgLikes: 998000, avgComments: 7600, platform: "YouTube", location: "Paris, France", verified: true, bio: "Duo comique et créateurs de challenges.", languages: ["Français"] },
-  { id: "inf_8", name: "Inoxtag", handle: "@inoxtag", niche: "Gaming & Lifestyle", followers: 7300000, engagement: 11.5, avgLikes: 840000, avgComments: 5900, platform: "YouTube", location: "Paris, France", verified: true, bio: "Créateur de contenu gaming et lifestyle.", languages: ["Français"] },
-]
-
 const PARTNER_TYPES = [
   { value: "tous", label: "Tous", icon: "📊" },
   { value: "ambassadeur", label: "Ambassadeurs", icon: "👑" },
@@ -57,7 +54,19 @@ const PARTNER_TYPES = [
   { value: "ugc", label: "UGC", icon: "🎬" },
 ]
 
-const PartenairesSection = ({ setActiveSection }) => {
+// Mapping niveau → emoji + label affichable
+const LEVEL_DISPLAY = {
+  bronze: { emoji: '🥉', label: 'Bronze' },
+  argent: { emoji: '🥈', label: 'Argent' },
+  or: { emoji: '🥇', label: 'Or' },
+  platine: { emoji: '💠', label: 'Platine' },
+  diamant: { emoji: '🔥', label: 'Diamant' },
+  elite: { emoji: '⭐', label: 'Élite' },
+  champion: { emoji: '🚀', label: 'Champion' },
+  legende: { emoji: '🏆', label: 'Légende' },
+}
+
+const PartenairesSection = ({ setActiveSection, user }) => {
   const [q, setQ] = useState("")
   const [status, setStatus] = useState("all")
   const [viewMode, setViewMode] = useState("cards")
@@ -66,6 +75,45 @@ const PartenairesSection = ({ setActiveSection }) => {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedInfluencer, setSelectedInfluencer] = useState(null)
   const [activeTab, setActiveTab] = useState("tous")
+
+  // === NOUVEAU : vrais créateurs Supabase + plan de la marque ===
+  const [realInfluencers, setRealInfluencers] = useState([])
+  const [loadingInfluencers, setLoadingInfluencers] = useState(false)
+  const [brandPlan, setBrandPlan] = useState('trial')
+
+  // Charger plan marque + créateurs au montage
+  useEffect(() => {
+    if (!user?.id) return
+    async function loadData() {
+      setLoadingInfluencers(true)
+      try {
+        // 1. Plan de la marque
+        const { data: brand } = await supabase
+          .from('brands')
+          .select('subscription_plan')
+          .eq('user_id', user.id)
+          .single()
+        if (brand?.subscription_plan) setBrandPlan(brand.subscription_plan)
+
+        // 2. Créateurs réels (avec profil complet visible)
+        const { data: influencers, error } = await supabase
+          .from('influencers')
+          .select('id, display_name, niche, languages, country, content_types, ai_score, total_earned, collaborations_count, avg_rating, is_available')
+          .order('ai_score', { ascending: false })
+          .limit(50)
+        if (error) {
+          console.error('Erreur chargement créateurs:', error)
+        } else {
+          setRealInfluencers(influencers || [])
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoadingInfluencers(false)
+      }
+    }
+    loadData()
+  }, [user?.id])
 
   const data = useMemo(() => {
     return partners.filter((p) => {
@@ -76,24 +124,55 @@ const PartenairesSection = ({ setActiveSection }) => {
     })
   }, [q, status, partners, activeTab])
 
+  // === Annuaire enrichi avec niveau + verrouillage ===
   const filteredInfluencers = useMemo(() => {
-    if (!searchQuery.trim()) return influencerDirectory
+    const enriched = realInfluencers.map(inf => {
+      const levelKey = getCreatorLevelFromScore(inf.ai_score || 0)
+      const accessible = canBrandAccessCreator(brandPlan, levelKey)
+      return { ...inf, levelKey, accessible, isLocked: !accessible }
+    })
+
+    if (!searchQuery.trim()) return enriched
     const query = searchQuery.toLowerCase()
-    return influencerDirectory.filter(inf => inf.name.toLowerCase().includes(query) || inf.handle.toLowerCase().includes(query) || inf.niche.toLowerCase().includes(query))
-  }, [searchQuery])
+    return enriched.filter(inf =>
+      (inf.display_name || '').toLowerCase().includes(query) ||
+      (Array.isArray(inf.niche) ? inf.niche.join(' ') : '').toLowerCase().includes(query)
+    )
+  }, [searchQuery, realInfluencers, brandPlan])
 
   const handleAddPartner = () => {
-    if (!selectedInfluencer) { toast.error("Veuillez sélectionner un influenceur"); return }
+    if (!selectedInfluencer) { toast.error("Sélectionne un créateur"); return }
+    if (selectedInfluencer.isLocked) {
+      const reqPlan = getRequiredPlanFor(selectedInfluencer.levelKey)
+      toast.error(`Ce créateur est Premium. Plan ${reqPlan.toUpperCase()} requis pour le contacter.`)
+      return
+    }
     const partner = {
-      id: Date.now().toString(), name: selectedInfluencer.name, handle: selectedInfluencer.handle, niche: selectedInfluencer.niche,
-      score: Math.floor(Math.random() * 25) + 70, status: "prospect", messages: 0, updatedAt: "À l'instant",
-      followers: selectedInfluencer.followers, engagement: selectedInfluencer.engagement, avgLikes: selectedInfluencer.avgLikes,
-      location: selectedInfluencer.location, languages: selectedInfluencer.languages, tags: [selectedInfluencer.niche],
-      collaborations: 0, aiCompatibility: Math.floor(Math.random() * 25) + 70, trending: false, verified: selectedInfluencer.verified, type: "ambassadeur"
+      id: Date.now().toString(),
+      name: selectedInfluencer.display_name || 'Créateur',
+      handle: `@${(selectedInfluencer.display_name || 'creator').toLowerCase().replace(/\s+/g, '')}`,
+      niche: Array.isArray(selectedInfluencer.niche) ? selectedInfluencer.niche[0] || 'Lifestyle' : 'Lifestyle',
+      score: Math.min(100, Math.round((selectedInfluencer.ai_score || 0) / 1250)),
+      status: "prospect",
+      messages: 0,
+      updatedAt: "À l'instant",
+      followers: 0,
+      engagement: 0,
+      avgLikes: 0,
+      location: selectedInfluencer.country || '—',
+      languages: selectedInfluencer.languages || [],
+      tags: Array.isArray(selectedInfluencer.niche) ? selectedInfluencer.niche.slice(0, 3) : [],
+      collaborations: selectedInfluencer.collaborations_count || 0,
+      aiCompatibility: 85,
+      trending: false,
+      verified: true,
+      type: "ambassadeur"
     }
     setPartners([partner, ...partners])
-    setShowAddDialog(false); setSearchQuery(""); setSelectedInfluencer(null)
-    toast.success(`${selectedInfluencer.name} ajouté comme partenaire !`)
+    setShowAddDialog(false)
+    setSearchQuery("")
+    setSelectedInfluencer(null)
+    toast.success(`${partner.name} ajouté comme partenaire !`)
   }
 
   const getStatusBadge = (status) => {
@@ -115,6 +194,11 @@ const PartenairesSection = ({ setActiveSection }) => {
             <Badge className="bg-gradient-to-r from-primary to-accent text-white">
               <Brain className="h-3 w-3 mr-1" />IA Activée
             </Badge>
+            {planUnlocksPremium(brandPlan) && (
+              <Badge className="bg-gradient-to-r from-amber-400 to-orange-500 text-white">
+                <Crown className="h-3 w-3 mr-1" />Accès Premium
+              </Badge>
+            )}
           </div>
           <p className="text-muted-foreground">Matching intelligent • Analytics avancées • Partenariats optimisés</p>
         </div>
@@ -352,7 +436,7 @@ const PartenairesSection = ({ setActiveSection }) => {
         <div className="text-center py-16">
           <UserPlus className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
           <h3 className="text-xl font-semibold mb-2">Aucun partenaire trouvé</h3>
-          <p className="text-muted-foreground mb-4">Modifiez vos filtres ou ajoutez un nouveau partenaire</p>
+          <p className="text-muted-foreground mb-4">Modifie tes filtres ou ajoute un nouveau partenaire</p>
           <Button onClick={() => setShowAddDialog(true)} className="bg-gradient-to-r from-primary to-accent text-white">
             <UserPlus className="h-4 w-4 mr-2" />Ajouter un partenaire
           </Button>
@@ -366,76 +450,152 @@ const PartenairesSection = ({ setActiveSection }) => {
             <DialogTitle className="text-2xl flex items-center gap-2">
               <UserPlus className="w-6 h-6" />Ajouter un partenaire
             </DialogTitle>
-            <DialogDescription>Recherchez un influenceur dans notre répertoire et ajoutez-le comme partenaire</DialogDescription>
+            <DialogDescription>
+              Recherche un créateur dans notre annuaire PARTNEXX et ajoute-le comme partenaire.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6 py-4">
+            {/* Bandeau plan + restrictions */}
+            <div className={`flex items-start gap-3 p-3 rounded-xl border ${
+              planUnlocksPremium(brandPlan)
+                ? 'bg-amber-50 border-amber-200'
+                : 'bg-blue-50 border-blue-200'
+            }`}>
+              <div className={`p-2 rounded-lg ${
+                planUnlocksPremium(brandPlan) ? 'bg-amber-100' : 'bg-blue-100'
+              }`}>
+                {planUnlocksPremium(brandPlan)
+                  ? <Crown className="w-4 h-4 text-amber-600" />
+                  : <Lock className="w-4 h-4 text-blue-600" />
+                }
+              </div>
+              <div className="flex-1 text-sm">
+                <p className={`font-semibold ${
+                  planUnlocksPremium(brandPlan) ? 'text-amber-900' : 'text-blue-900'
+                }`}>
+                  Plan {brandPlan?.toUpperCase()} — {planUnlocksPremium(brandPlan) ? 'Accès Premium activé' : 'Accès Standard'}
+                </p>
+                <p className={`text-xs leading-relaxed ${
+                  planUnlocksPremium(brandPlan) ? 'text-amber-900/80' : 'text-blue-900/80'
+                }`}>
+                  {planUnlocksPremium(brandPlan)
+                    ? 'Tu peux contacter tous les créateurs (Bronze → Légende), y compris les profils Premium (Élite, Champion, Légende).'
+                    : 'Tu peux contacter les créateurs Bronze → Diamant. Les profils Premium (Élite, Champion, Légende) nécessitent le plan Scale.'
+                  }
+                </p>
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <label className="text-sm font-semibold">Rechercher un influenceur</label>
+              <label className="text-sm font-semibold">Rechercher un créateur</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input placeholder="Tibo InShape, Squeezie, Enjoy Phoenix..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+                <Input placeholder="Nom, niche..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold">Influenceurs disponibles ({filteredInfluencers.length})</label>
-              <div className="border rounded-lg max-h-72 overflow-y-auto divide-y">
+              <label className="text-sm font-semibold">
+                Créateurs disponibles ({filteredInfluencers.length})
+                {loadingInfluencers && <span className="ml-2 text-xs font-normal text-muted-foreground">Chargement...</span>}
+              </label>
+              <div className="border rounded-lg max-h-96 overflow-y-auto divide-y">
                 {filteredInfluencers.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground"><Search className="w-12 h-12 mx-auto mb-3 opacity-30" /><p>Aucun influenceur trouvé</p></div>
-                ) : filteredInfluencers.map((inf) => (
-                  <div key={inf.id} onClick={() => setSelectedInfluencer(inf)}
-                    className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${selectedInfluencer?.id === inf.id ? 'bg-primary/10 border-l-4 border-primary' : ''}`}>
-                    <div className="flex items-start gap-4">
-                      <Avatar className="w-12 h-12 border-2 border-primary/20">
-                        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-accent/20 font-semibold">
-                          {inf.name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold">{inf.name}</h4>
-                          {inf.verified && <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700"><CheckCircle className="w-3 h-3 mr-1" />Vérifié</Badge>}
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-2">{inf.handle}</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          <Badge variant="outline" className="text-xs">{inf.niche}</Badge>
-                          <Badge variant="outline" className="text-xs">{inf.platform}</Badge>
-                          <Badge variant="outline" className="text-xs">{(inf.followers / 1000000).toFixed(1)}M followers</Badge>
-                          <Badge variant="outline" className="text-xs">{inf.engagement}% engagement</Badge>
-                        </div>
-                      </div>
-                      {selectedInfluencer?.id === inf.id && (
-                        <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                          <CheckCircle className="w-4 h-4 text-white" />
-                        </div>
-                      )}
-                    </div>
+                  <div className="p-8 text-center text-muted-foreground">
+                    <Search className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p>{loadingInfluencers ? 'Chargement des créateurs...' : 'Aucun créateur trouvé'}</p>
                   </div>
-                ))}
+                ) : filteredInfluencers.map((inf) => {
+                  const level = LEVEL_DISPLAY[inf.levelKey] || LEVEL_DISPLAY.bronze
+                  const isLocked = inf.isLocked
+                  const isSelected = selectedInfluencer?.id === inf.id
+                  return (
+                    <div
+                      key={inf.id}
+                      onClick={() => !isLocked && setSelectedInfluencer(inf)}
+                      className={`p-4 transition-colors relative ${
+                        isLocked
+                          ? 'opacity-60 cursor-not-allowed bg-muted/30'
+                          : isSelected
+                            ? 'cursor-pointer bg-primary/10 border-l-4 border-primary'
+                            : 'cursor-pointer hover:bg-muted/50'
+                      }`}
+                    >
+                      <div className="flex items-start gap-4">
+                        <Avatar className="w-12 h-12 border-2 border-primary/20">
+                          <AvatarFallback className="bg-gradient-to-br from-primary/20 to-accent/20 font-semibold">
+                            {(inf.display_name || 'C').split(' ').map(n => n[0]).slice(0, 2).join('')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <h4 className="font-semibold">{inf.display_name || 'Créateur'}</h4>
+                            <Badge variant="secondary" className="text-xs">
+                              {level.emoji} {level.label}
+                            </Badge>
+                            {isPremiumCreator(inf.levelKey) && (
+                              <Badge className="text-xs bg-gradient-to-r from-amber-400 to-orange-500 text-white border-0">
+                                <Crown className="w-3 h-3 mr-1" />Premium
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {Array.isArray(inf.niche) && inf.niche.slice(0, 3).map((n, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">{n}</Badge>
+                            ))}
+                            {inf.country && <Badge variant="outline" className="text-xs">{inf.country}</Badge>}
+                            <Badge variant="outline" className="text-xs">Score : {inf.ai_score || 0}</Badge>
+                          </div>
+                        </div>
+                        {isLocked ? (
+                          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+                              <Lock className="w-4 h-4 text-amber-600" />
+                            </div>
+                            <span className="text-[10px] font-semibold text-amber-700 whitespace-nowrap">
+                              Plan {getRequiredPlanFor(inf.levelKey).toUpperCase()} requis
+                            </span>
+                          </div>
+                        ) : isSelected ? (
+                          <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                            <CheckCircle className="w-4 h-4 text-white" />
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              <p className="text-xs text-muted-foreground">💡 Cliquez pour sélectionner un influenceur</p>
+              <p className="text-xs text-muted-foreground">
+                💡 Les créateurs <strong>Premium</strong> (Élite/Champion/Légende) nécessitent le plan Scale.
+              </p>
             </div>
 
-            {selectedInfluencer && (
+            {selectedInfluencer && !selectedInfluencer.isLocked && (
               <div className="p-4 rounded-lg bg-primary/5 border-2 border-primary/20">
-                <h4 className="font-semibold mb-3 flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" />Influenceur sélectionné</h4>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />Créateur sélectionné
+                </h4>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-muted-foreground">Nom:</span><p className="font-medium">{selectedInfluencer.name}</p></div>
-                  <div><span className="text-muted-foreground">Plateforme:</span><p className="font-medium">{selectedInfluencer.platform}</p></div>
-                  <div><span className="text-muted-foreground">Followers:</span><p className="font-medium">{(selectedInfluencer.followers / 1000000).toFixed(1)}M</p></div>
-                  <div><span className="text-muted-foreground">Engagement:</span><p className="font-medium">{selectedInfluencer.engagement}%</p></div>
-                  <div><span className="text-muted-foreground">Localisation:</span><p className="font-medium">{selectedInfluencer.location}</p></div>
-                  <div><span className="text-muted-foreground">Niche:</span><p className="font-medium">{selectedInfluencer.niche}</p></div>
+                  <div><span className="text-muted-foreground">Nom :</span><p className="font-medium">{selectedInfluencer.display_name}</p></div>
+                  <div><span className="text-muted-foreground">Niveau :</span><p className="font-medium">{LEVEL_DISPLAY[selectedInfluencer.levelKey]?.emoji} {LEVEL_DISPLAY[selectedInfluencer.levelKey]?.label}</p></div>
+                  <div><span className="text-muted-foreground">Score :</span><p className="font-medium">{selectedInfluencer.ai_score || 0}</p></div>
+                  <div><span className="text-muted-foreground">Collaborations :</span><p className="font-medium">{selectedInfluencer.collaborations_count || 0}</p></div>
                 </div>
-                <div className="mt-3 pt-3 border-t"><p className="text-xs text-muted-foreground italic">{selectedInfluencer.bio}</p></div>
               </div>
             )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowAddDialog(false); setSearchQuery(""); setSelectedInfluencer(null) }}>Annuler</Button>
-            <Button onClick={handleAddPartner} disabled={!selectedInfluencer} className="bg-gradient-to-r from-primary to-accent text-white">
+            <Button variant="outline" onClick={() => { setShowAddDialog(false); setSearchQuery(""); setSelectedInfluencer(null) }}>
+              Annuler
+            </Button>
+            <Button
+              onClick={handleAddPartner}
+              disabled={!selectedInfluencer || selectedInfluencer.isLocked}
+              className="bg-gradient-to-r from-primary to-accent text-white"
+            >
               <UserPlus className="h-4 w-4 mr-2" />Ajouter comme partenaire
             </Button>
           </DialogFooter>

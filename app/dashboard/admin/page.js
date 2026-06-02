@@ -5130,6 +5130,7 @@ const Sidebar = ({ activePage, setPage, theme: t, toggleTheme }) => {
         { id: 'campaigns', label: 'Campagnes', icon: 'campaign' },
         { id: 'payments', label: 'Paiements', icon: 'payment' },
         { id: 'fiscalite', label: 'Fiscalité', icon: 'dollar' },
+        { id: 'fiscalite', label: 'Fiscalité', icon: 'dollar' },
         { id: 'litiges', label: 'Litiges', icon: 'dispute' },
       ]
     },

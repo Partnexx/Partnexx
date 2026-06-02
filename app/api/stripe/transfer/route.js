@@ -10,7 +10,18 @@ const supabaseAdmin = createClient(
 
 export async function POST(req) {
   try {
+    // 0. AUTH SYSTÈME : seul le process planifié (cron) qui connaît le secret peut appeler.
+    //    Empêche n'importe qui sur internet de déclencher un virement.
+    const authHeader = req.headers.get('authorization') || ''
+    const token = authHeader.replace('Bearer ', '').trim()
+    if (!process.env.CRON_SECRET || token !== process.env.CRON_SECRET) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+
     const { transactionId } = await req.json()
+    if (!transactionId) {
+      return NextResponse.json({ error: 'transactionId requis' }, { status: 400 })
+    }
 
     // 1. Récupérer la transaction
     const { data: tx } = await supabaseAdmin
@@ -20,11 +31,17 @@ export async function POST(req) {
       .single()
 
     if (!tx) return NextResponse.json({ error: 'Transaction introuvable' }, { status: 404 })
-    if (tx.status !== 'in_escrow' && tx.status !== 'released' && tx.status !== 'pending') {
-  return NextResponse.json({ error: 'Transaction pas encore en escrow' }, { status: 400 })
-}
 
-    // 2. Récupérer le stripe_account_id de l'influenceur
+    // 2. GARDE-FOU : on ne libère QUE ce qui est réellement en escrow.
+    //    Bloque les doubles paiements (released) et les paiements avant encaissement (pending).
+    if (tx.status !== 'in_escrow') {
+      return NextResponse.json(
+        { error: `Transaction non libérable (statut actuel: ${tx.status})` },
+        { status: 400 }
+      )
+    }
+
+    // 3. Récupérer le compte Stripe Connect du créateur
     const { data: influencer } = await supabaseAdmin
       .from('influencers')
       .select('stripe_account_id, user_id')
@@ -35,17 +52,28 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Influenceur pas encore connecté à Stripe' }, { status: 400 })
     }
 
-    // 3. Créer le transfer Stripe (85% du montant)
-    const transferAmount = Math.round((tx.influencer_amount || tx.amount * 0.85) * 100)
+    // 4. Montant à verser = montant COMPLET du créateur.
+    //    Modèle Option 3 (Malt/Comet) : la commission est payée EN PLUS par la marque,
+    //    donc le créateur touche 100% de son montant. (Avant : * 0.85, ce qui était l'ancien modèle.)
+    const transferAmount = Math.round((tx.influencer_amount ?? tx.amount) * 100)
+    if (!transferAmount || transferAmount <= 0) {
+      return NextResponse.json({ error: 'Montant de virement invalide' }, { status: 400 })
+    }
 
-const transfer = await stripe.transfers.create({
-  amount: transferAmount,
-  currency: 'eur',
-  destination: influencer.stripe_account_id,
-  description: `Virement Partnexx — Transaction ${tx.id}`,
-})
+    // 5. Créer le transfer — IDEMPOTENT : même appelé plusieurs fois pour la même
+    //    transaction, Stripe ne crée qu'un seul virement.
+    const transfer = await stripe.transfers.create(
+      {
+        amount: transferAmount,
+        currency: 'eur',
+        destination: influencer.stripe_account_id,
+        description: `Virement Partnexx — Transaction ${tx.id}`,
+        metadata: { transaction_id: tx.id },
+      },
+      { idempotencyKey: `transfer_${tx.id}` }
+    )
 
-    // 4. Mettre à jour la transaction
+    // 6. Mettre à jour la transaction
     await supabaseAdmin
       .from('transactions')
       .update({

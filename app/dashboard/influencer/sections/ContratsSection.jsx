@@ -10,11 +10,13 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { useState } from 'react'
-import { Search, Calendar, DollarSign, FileText, Download, CreditCard, Brain, CheckCircle, Clock, AlertCircle, Eye, Shield, TrendingUp, Lock, Wallet, Send, BarChart3 } from 'lucide-react'
+import { Search, Calendar, DollarSign, FileText, Download, CreditCard, Brain, CheckCircle, Clock, AlertCircle, Eye, Shield, TrendingUp, Lock, Wallet, Send, BarChart3, Receipt } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { toast } from 'sonner'
+import supabase from '@/lib/supabase'
 import { useLevel } from "@/lib/context/LevelContext"
 import LevelGate from '@/components/LevelGate'
+import PaymentSetup from '@/components/PaymentSetup'
 
 const getStatusColor = (status) => {
   switch (status) {
@@ -69,7 +71,7 @@ function ContratsTab({ contracts = [] }) {
   const [selectedContrat, setSelectedContrat] = useState(null)
 
   const filtered = contracts.filter(c => {
-    const matchSearch = search === "" || 
+    const matchSearch = search === "" ||
       c.id.toLowerCase().includes(search.toLowerCase()) ||
       (c.brands?.company_name || "").toLowerCase().includes(search.toLowerCase())
     const matchStatus = filterStatus === "all" || c.status === filterStatus
@@ -316,8 +318,8 @@ function ContratsTab({ contracts = [] }) {
 function PaiementsTab({ transactions = [], user }) {
   const { canAccess, score: userScore } = useLevel()
 
-  const canWithdraw = canAccess('withdrawals')               // Bronze (profil 100%)
-  const canAccessAdvancedHistory = canAccess('advancedRevenueHistory') // Platine (1000 pts)
+  const canWithdraw = canAccess('withdrawals')
+  const canAccessAdvancedHistory = canAccess('advancedRevenueHistory')
 
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
@@ -325,6 +327,8 @@ function PaiementsTab({ transactions = [], user }) {
   const [iban, setIban] = useState("")
   const [holderName, setHolderName] = useState("")
   const [withdrawLoading, setWithdrawLoading] = useState(false)
+  const [downloadingReceiptId, setDownloadingReceiptId] = useState(null)
+  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState(null)
 
   const filtered = transactions.filter(t => {
     const matchSearch = search === "" ||
@@ -337,10 +341,8 @@ function PaiementsTab({ transactions = [], user }) {
   const totalPending = transactions.filter(t => t.status === 'in_escrow').reduce((sum, t) => sum + parseFloat(t.influencer_amount || 0), 0)
   const totalAll = transactions.reduce((sum, t) => sum + parseFloat(t.influencer_amount || 0), 0)
 
-  // Montant disponible au retrait = totalReceived (released, pas encore retiré)
   const availableForWithdraw = totalReceived
 
-  // ===== Calcul du graphique 12 derniers mois (pour Platine) =====
   const last12Months = []
   const now = new Date()
   for (let i = 11; i >= 0; i--) {
@@ -356,7 +358,6 @@ function PaiementsTab({ transactions = [], user }) {
     last12Months.push({ month: monthLabel, revenue: total, key: monthKey })
   }
 
-  // Stats détaillées (Platine)
   const monthsWithRevenue = last12Months.filter(m => m.revenue > 0)
   const avgMonthly = monthsWithRevenue.length > 0
     ? monthsWithRevenue.reduce((sum, m) => sum + m.revenue, 0) / monthsWithRevenue.length
@@ -364,14 +365,12 @@ function PaiementsTab({ transactions = [], user }) {
   const bestMonth = last12Months.reduce((best, m) => m.revenue > (best?.revenue || 0) ? m : best, null)
   const totalLast12 = last12Months.reduce((sum, m) => sum + m.revenue, 0)
 
-  // ===== Handlers =====
   const handleWithdraw = async () => {
     if (!iban.trim() || !holderName.trim()) {
       toast.error("Renseigne ton IBAN et le titulaire du compte")
       return
     }
     setWithdrawLoading(true)
-    // TODO: brancher Stripe Connect ici plus tard
     await new Promise(r => setTimeout(r, 800))
     toast.success(`Demande de retrait de ${availableForWithdraw.toLocaleString()}€ envoyée ! Tu recevras les fonds sous 3-5 jours ouvrés.`)
     setWithdrawDialogOpen(false)
@@ -399,6 +398,97 @@ function PaiementsTab({ transactions = [], user }) {
     a.click()
     URL.revokeObjectURL(url)
     toast.success('Export CSV téléchargé')
+  }
+
+  const handleDownloadAnnualReport = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('Tu dois être connecté pour télécharger ton récap')
+        return
+      }
+      const year = new Date().getFullYear()
+      const res = await fetch(`/api/influencer/annual-report?year=${year}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Erreur lors du téléchargement')
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `recap-partnexx-${year}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Récap annuel téléchargé !')
+    } catch (e) {
+      console.error(e)
+      toast.error(e.message || 'Erreur lors du téléchargement')
+    }
+  }
+
+  const handleDownloadReceipt = async (transactionId) => {
+    try {
+      setDownloadingReceiptId(transactionId)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('Tu dois être connecté pour télécharger ton reçu')
+        return
+      }
+      const res = await fetch(`/api/influencer/receipt?transactionId=${transactionId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Erreur lors du téléchargement')
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `recu-partnexx-${transactionId.slice(0, 8)}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Reçu téléchargé !')
+    } catch (e) {
+      console.error(e)
+      toast.error(e.message || 'Erreur lors du téléchargement')
+    } finally {
+      setDownloadingReceiptId(null)
+    }
+  }
+
+  const handleDownloadIssuedInvoice = async (transactionId) => {
+    try {
+      setDownloadingInvoiceId(transactionId)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('Tu dois être connecté')
+        return
+      }
+      const res = await fetch(`/api/influencer/issued-invoice?transactionId=${transactionId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Erreur lors du téléchargement')
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `facture-${transactionId.slice(0, 8)}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Facture téléchargée !')
+    } catch (e) {
+      console.error(e)
+      toast.error(e.message || 'Erreur')
+    } finally {
+      setDownloadingInvoiceId(null)
+    }
   }
 
   return (
@@ -494,7 +584,7 @@ function PaiementsTab({ transactions = [], user }) {
         </DialogContent>
       </Dialog>
 
-      {/* ============ STATS BASIQUES (tout le monde) ============ */}
+      {/* ============ STATS BASIQUES ============ */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-green-500/5" />
@@ -533,7 +623,6 @@ function PaiementsTab({ transactions = [], user }) {
         </Card>
       </div>
 
-      {/* Barre progression */}
       {totalAll > 0 && (
         <Card>
           <CardContent className="p-6">
@@ -587,7 +676,6 @@ function PaiementsTab({ transactions = [], user }) {
           </CardHeader>
 
           <CardContent className="space-y-6">
-            {/* Stats détaillées */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 rounded-lg bg-muted/30 border">
                 <p className="text-xs text-muted-foreground mb-1">Revenu moyen / mois</p>
@@ -606,7 +694,6 @@ function PaiementsTab({ transactions = [], user }) {
               </div>
             </div>
 
-            {/* Graphique */}
             <div className="h-[300px] min-w-0">
               <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <AreaChart data={last12Months}>
@@ -668,19 +755,19 @@ function PaiementsTab({ transactions = [], user }) {
           filtered.map((tx) => (
             <Card key={tx.id} className="hover:shadow-md transition-all duration-200">
               <CardContent className="p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 flex-1">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className={`p-3 rounded-full ${tx.status === "released" ? "bg-green-500/10" : "bg-orange-500/10"}`}>
                       <CreditCard className={`h-5 w-5 ${tx.status === "released" ? "text-green-600" : "text-orange-500"}`} />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold">{tx.description || `Transaction #${tx.id.slice(0, 8)}`}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <p className="font-semibold truncate">{tx.description || `Transaction #${tx.id.slice(0, 8)}`}</p>
                         <Badge variant="outline" className={getPaymentStatusColor(tx.status)}>
                           {getPaymentStatusLabel(tx.status)}
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                         <span>{tx.type || 'Paiement'}</span>
                         <span>•</span>
                         <span>{new Date(tx.created_at).toLocaleDateString('fr-FR')}</span>
@@ -693,11 +780,39 @@ function PaiementsTab({ transactions = [], user }) {
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className={`text-xl font-bold ${tx.status === "released" ? "text-green-600" : "text-orange-500"}`}>
-                      {tx.status === "released" ? "+" : ""}{parseFloat(tx.influencer_amount || 0).toLocaleString()}€
-                    </p>
-                    <p className="text-xs text-muted-foreground">{tx.currency || 'EUR'}</p>
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <p className={`text-xl font-bold ${tx.status === "released" ? "text-green-600" : "text-orange-500"}`}>
+                        {tx.status === "released" ? "+" : ""}{parseFloat(tx.influencer_amount || 0).toLocaleString()}€
+                      </p>
+                      <p className="text-xs text-muted-foreground">{tx.currency || 'EUR'}</p>
+                    </div>
+                    {(tx.status === "released" || tx.status === "in_escrow") && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 whitespace-nowrap"
+                        onClick={() => handleDownloadIssuedInvoice(tx.id)}
+                        disabled={downloadingInvoiceId === tx.id}
+                        title="Télécharger ma facture (envoyée à la marque)"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        {downloadingInvoiceId === tx.id ? '...' : 'Facture'}
+                      </Button>
+                    )}
+                    {tx.status === "released" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 whitespace-nowrap"
+                        onClick={() => handleDownloadReceipt(tx.id)}
+                        disabled={downloadingReceiptId === tx.id}
+                        title="Télécharger le reçu de paiement"
+                      >
+                        <Receipt className="h-3.5 w-3.5" />
+                        {downloadingReceiptId === tx.id ? '...' : 'Reçu'}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -705,12 +820,31 @@ function PaiementsTab({ transactions = [], user }) {
           ))
         )}
       </div>
+
+      {/* ============ CARTE FISCALITÉ (récap annuel art. 242 bis) ============ */}
+      <Card className="border-blue-500/30 bg-gradient-to-br from-blue-500/5 to-indigo-500/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Receipt className="h-5 w-5 text-blue-600" />
+            Fiscalité
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Télécharge ton récapitulatif annuel de revenus pour ta déclaration d'impôts. PARTNEXX déclare également tes revenus à l'administration fiscale (DAC7).
+          </p>
+          <Button onClick={handleDownloadAnnualReport} variant="outline" className="gap-2">
+            <Download className="h-4 w-4" />
+            Télécharger mon récap {new Date().getFullYear()}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }
 
 /* ============================================================
-   COMPOSANT INTÉRIEUR (la vraie page une fois validée par LevelGate)
+   COMPOSANT INTÉRIEUR
    ============================================================ */
 function ContratsContent({ contracts = [], transactions = [], user }) {
   const [activeTab, setActiveTab] = useState("contrats")
@@ -755,7 +889,7 @@ function ContratsContent({ contracts = [], transactions = [], user }) {
 }
 
 /* ============================================================
-   EXPORT PRINCIPAL : wrappé par LevelGate
+   EXPORT PRINCIPAL
    ============================================================ */
 export default function ContratsSection({ contracts = [], transactions = [], user }) {
   return (
@@ -764,6 +898,9 @@ export default function ContratsSection({ contracts = [], transactions = [], use
       sectionTitle="Contrats & Paiements"
       sectionDescription="Gestion Contractuelle • Suivi des Paiements • Historique Complet"
     >
+      <div className="mb-6">
+        <PaymentSetup user={user} />
+      </div>
       <ContratsContent contracts={contracts} transactions={transactions} user={user} />
     </LevelGate>
   )
