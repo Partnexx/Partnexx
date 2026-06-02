@@ -1,939 +1,672 @@
 'use client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useState, useEffect, useRef } from 'react'
-import { Brain, Shield, Bell, CreditCard, Crown, Star, CheckCircle, Download, ExternalLink, MessageCircle, Settings, LogOut, AlertCircle, Eye, EyeOff, Copy, KeyRound, FileText } from 'lucide-react'
-import { toast } from 'sonner'
+import {
+  Trophy, Star, Target, Clock, TrendingUp, Crown, Award, Flame,
+  Brain, Eye, Users, Calendar, BarChart3, Zap, Lock, CheckCircle, Sparkle,
+  Heart, MessageSquare, Share2, Video
+} from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import supabase from '@/lib/supabase'
+import { LEVELS } from '@/lib/hook/useUserLevel'
+import { useLevel } from '@/lib/context/LevelContext'
 
-const ShieldCheck = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
-const Palette = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
-const Laptop = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/></svg>
-const Smartphone = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
-const Mail = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-const Sun = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-const Moon = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-const Monitor = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-const Tag = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+const Sparkles = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4M19 17v4M3 5h4M17 19h4"/></svg>
+const Rocket = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
+const Diamond = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2.7 10.3a2.41 2.41 0 0 0 0 3.41l7.59 7.59a2.41 2.41 0 0 0 3.41 0l7.59-7.59a2.41 2.41 0 0 0 0-3.41L13.7 2.71a2.41 2.41 0 0 0-3.41 0Z"/></svg>
+const Gem = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="6 3 18 3 22 9 12 22 2 9"/><path d="M11 3 8 9l4 13 4-13-3-6"/><line x1="2" x2="22" y1="9" y2="9"/></svg>
+const Coins = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>
+const Compass = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+const Gamepad2 = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="6" x2="10" y1="12" y2="12"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="15" x2="15.01" y1="13" y2="13"/><line x1="18" x2="18.01" y1="11" y2="11"/><rect width="20" height="12" x="2" y="6" rx="2"/></svg>
+const PlayCircle = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+const Lightbulb = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
 const Gift = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg>
-const HelpCircle = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
-const Trash = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-const Cookie = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"/><path d="M8.5 8.5v.01M16 15.5v.01M12 12v.01"/></svg>
-const AlertTriangle = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg>
+const ShoppingBag = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
 
-// Calcule la force d'un mot de passe → largeur de barre + label + couleurs
-function getPasswordStrength(pw) {
-  if (!pw) return { pct: 0, label: '', barClass: '', textClass: '' }
-  let s = 0
-  if (pw.length >= 6) s++
-  if (pw.length >= 10) s++
-  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) s++
-  if (/[0-9]/.test(pw)) s++
-  if (/[^A-Za-z0-9]/.test(pw)) s++
-  if (s <= 2) return { pct: 33, label: 'Faible', barClass: 'bg-red-500', textClass: 'text-red-500' }
-  if (s === 3) return { pct: 66, label: 'Moyen', barClass: 'bg-amber-500', textClass: 'text-amber-500' }
-  return { pct: 100, label: 'Fort', barClass: 'bg-green-500', textClass: 'text-green-500' }
+const LEVEL_VISUALS = {
+  bronze: { gradient: 'from-orange-400 to-amber-600', bgGradient: 'from-orange-50 to-amber-100', borderColor: 'border-orange-300', textColor: 'text-orange-700', tagline: 'Débloque tes premières opportunités', perks: [{ icon: '🎯', label: 'Défis quotidiens débloqués' }, { icon: '✅', label: 'Profil créateur vérifié' }, { icon: '📊', label: 'Dashboard débloqué' }, { icon: '💸', label: 'Retraits activés' }] },
+  argent: { gradient: 'from-slate-400 to-slate-600', bgGradient: 'from-slate-50 to-slate-100', borderColor: 'border-slate-300', textColor: 'text-slate-700', tagline: 'Progression accélérée', perks: [{ icon: '📊', label: 'Statistiques avancées' }, { icon: '🎨', label: 'Thèmes de profil exclusifs' }, { icon: '🎯', label: 'Multiplicateur x1.25' }] },
+  or: { gradient: 'from-yellow-400 to-amber-500', bgGradient: 'from-yellow-50 to-amber-100', borderColor: 'border-yellow-400', textColor: 'text-yellow-700', tagline: 'Expert créateur', perks: [{ icon: '📊', label: 'Analytics complets' }, { icon: '🎨', label: 'Personnalisation avancée' }, { icon: '🎯', label: 'Multiplicateur x1.5' }, { icon: '📈', label: 'Suivi collaborations' }] },
+  platine: { gradient: 'from-cyan-400 to-sky-500', bgGradient: 'from-cyan-50 to-sky-100', borderColor: 'border-cyan-400', textColor: 'text-cyan-700', tagline: 'Avantages premium', perks: [{ icon: '🛍️', label: 'Marketplace débloquée' }, { icon: '🤖', label: 'IA Partnexx' }, { icon: '📈', label: 'Revenus avancés' }, { icon: '🎧', label: 'Support prioritaire' }] },
+  diamant: { gradient: 'from-teal-400 to-cyan-500', bgGradient: 'from-teal-50 to-cyan-100', borderColor: 'border-teal-400', textColor: 'text-teal-700', tagline: 'Élite numérique', perks: [{ icon: '✨', label: 'Opportunités exclusives' }, { icon: '🛍️', label: 'Marketplace Premium' }, { icon: '🚀', label: 'Accès anticipé' }, { icon: '💎', label: 'Récompenses x2' }] },
+  elite: { gradient: 'from-fuchsia-500 to-pink-500', bgGradient: 'from-fuchsia-50 to-pink-100', borderColor: 'border-fuchsia-400', textColor: 'text-fuchsia-700', tagline: 'Cercle premium', perks: [{ icon: '🤝', label: 'Collabs premium' }, { icon: '📣', label: 'Mise en avant LinkedIn' }, { icon: '💼', label: 'Campagnes confidentielles' }, { icon: '👑', label: "Écosystème complet" }] },
+  champion: { gradient: 'from-violet-500 to-purple-600', bgGradient: 'from-violet-50 to-purple-100', borderColor: 'border-violet-400', textColor: 'text-violet-700', tagline: 'Créateur reconnu', perks: [{ icon: '🌟', label: 'Mise en avant Instagram' }, { icon: '🤝', label: 'Opportunités premium' }, { icon: '🎁', label: 'Multiplicateur x3' }, { icon: '💎', label: 'Avantages marketplace' }] },
+  legende: { gradient: 'from-pink-500 via-orange-500 to-yellow-500', bgGradient: 'from-pink-50 via-orange-50 to-yellow-100', borderColor: 'border-pink-400', textColor: 'text-pink-700', tagline: 'Top créateur', perks: [{ icon: '💰', label: 'Frais réduits -2%' }, { icon: '🏆', label: 'Statut Top Créateur' }, { icon: '✉️', label: 'Invitations privées' }, { icon: '🧠', label: 'Conseiller dédié' }] },
 }
 
-function Toggle({ checked, onChange, disabled }) {
+/* ============================================================
+   ⭐ NOUVEAU SYSTÈME : 3 défis par niveau (Facile/Moyen/Difficile)
+   ============================================================ */
+const CHALLENGES_BY_LEVEL = {
+  bronze: [
+    { id: 'bronze-easy', title: 'Premiers pas', description: 'Publier 2 contenus aujourd\'hui', basePoints: 10, difficulty: 'Facile', icon: Video, color: 'from-green-500 to-emerald-600' },
+    { id: 'bronze-medium', title: 'Maître des likes', description: 'Atteindre 250 likes sur 1 post', basePoints: 25, difficulty: 'Moyen', icon: Heart, color: 'from-blue-500 to-cyan-600' },
+    { id: 'bronze-hard', title: 'Première communauté', description: 'Gagner 25 nouveaux followers en 24h', basePoints: 50, difficulty: 'Difficile', icon: Users, color: 'from-orange-500 to-red-600' },
+  ],
+  argent: [
+    { id: 'argent-easy', title: 'Rythme régulier', description: 'Publier 3 contenus dans la journée', basePoints: 20, difficulty: 'Facile', icon: Video, color: 'from-green-500 to-emerald-600' },
+    { id: 'argent-medium', title: 'Engagement boost', description: 'Obtenir 50 commentaires sur 1 post', basePoints: 50, difficulty: 'Moyen', icon: MessageSquare, color: 'from-blue-500 to-cyan-600' },
+    { id: 'argent-hard', title: 'Story virale', description: 'Atteindre 50% de taux de vues sur une story', basePoints: 100, difficulty: 'Difficile', icon: Eye, color: 'from-orange-500 to-red-600' },
+  ],
+  or: [
+    { id: 'or-easy', title: 'Productivité', description: 'Publier 5 contenus en 24h', basePoints: 35, difficulty: 'Facile', icon: Rocket, color: 'from-green-500 to-emerald-600' },
+    { id: 'or-medium', title: 'Conversation', description: 'Répondre à 100 commentaires dans la journée', basePoints: 80, difficulty: 'Moyen', icon: MessageSquare, color: 'from-blue-500 to-cyan-600' },
+    { id: 'or-hard', title: 'Stratège', description: 'Tester 4 formats différents en 24h', basePoints: 175, difficulty: 'Difficile', icon: Lightbulb, color: 'from-orange-500 to-red-600' },
+  ],
+  platine: [
+    { id: 'platine-easy', title: 'Discipline', description: 'Publier sur 2 plateformes le même jour avec 500+ vues chacune', basePoints: 60, difficulty: 'Facile', icon: Share2, color: 'from-green-500 to-emerald-600' },
+    { id: 'platine-medium', title: 'Branding', description: 'Obtenir 5 000 vues cumulées en 24h', basePoints: 140, difficulty: 'Moyen', icon: Eye, color: 'from-blue-500 to-cyan-600' },
+    { id: 'platine-hard', title: 'Croissance accélérée', description: 'Gagner 250 followers en 7 jours', basePoints: 300, difficulty: 'Difficile', icon: TrendingUp, color: 'from-orange-500 to-red-600' },
+  ],
+  diamant: [
+    { id: 'diamant-easy', title: 'Multicanal', description: 'Publier sur 3 plateformes différentes avec 2k+ vues chacune', basePoints: 100, difficulty: 'Facile', icon: Share2, color: 'from-green-500 to-emerald-600' },
+    { id: 'diamant-medium', title: 'Influence', description: 'Faire 25 000 vues sur un contenu en 24h', basePoints: 240, difficulty: 'Moyen', icon: Eye, color: 'from-blue-500 to-cyan-600' },
+    { id: 'diamant-hard', title: 'Monétisation', description: 'Signer 1 collaboration en 7 jours via Partnexx', basePoints: 500, difficulty: 'Difficile', icon: Gem, color: 'from-orange-500 to-red-600' },
+  ],
+  elite: [
+    { id: 'elite-easy', title: 'Présence forte', description: 'Faire 10 stories cumulées dans la journée', basePoints: 175, difficulty: 'Facile', icon: Video, color: 'from-green-500 to-emerald-600' },
+    { id: 'elite-medium', title: 'Reach massif', description: 'Atteindre 100 000 vues cumulées en 7 jours', basePoints: 400, difficulty: 'Moyen', icon: Eye, color: 'from-blue-500 to-cyan-600' },
+    { id: 'elite-hard', title: 'Référent', description: 'Être mentionné par 5 autres créateurs Partnexx en 30j', basePoints: 850, difficulty: 'Difficile', icon: Star, color: 'from-orange-500 to-red-600' },
+  ],
+  champion: [
+    { id: 'champion-easy', title: 'Pilier', description: 'Publier du contenu 15 jours d\'affilée', basePoints: 300, difficulty: 'Facile', icon: Flame, color: 'from-green-500 to-emerald-600' },
+    { id: 'champion-medium', title: 'Top performer', description: 'Faire 500k vues cumulées en 30 jours', basePoints: 700, difficulty: 'Moyen', icon: TrendingUp, color: 'from-blue-500 to-cyan-600' },
+    { id: 'champion-hard', title: 'Empire', description: 'Signer 5 collaborations dans le mois via Partnexx', basePoints: 1500, difficulty: 'Difficile', icon: Crown, color: 'from-orange-500 to-red-600' },
+  ],
+  legende: [
+    { id: 'legende-easy', title: 'Inspiration', description: 'Mentor : aider 2 créateurs Bronze à atteindre Argent', basePoints: 500, difficulty: 'Facile', icon: Star, color: 'from-green-500 to-emerald-600' },
+    { id: 'legende-medium', title: 'Trendsetter', description: 'Lancer une tendance virale (250k+ vues partagées)', basePoints: 1200, difficulty: 'Moyen', icon: Flame, color: 'from-blue-500 to-cyan-600' },
+    { id: 'legende-hard', title: 'Icône', description: 'Faire 3 millions de vues sur un contenu en 7 jours', basePoints: 2500, difficulty: 'Difficile', icon: Trophy, color: 'from-orange-500 to-red-600' },
+  ],
+}
+
+const achievements = [
+  { title: "Première Victoire", desc: "Complétez votre premier défi", unlocked: false, rarity: "common", icon: Target },
+  { title: "Série de Feu", desc: "7 défis consécutifs réussis", unlocked: false, rarity: "rare", icon: Flame },
+  { title: "Perfectionniste", desc: "100% sur 10 défis difficiles", unlocked: false, rarity: "epic", icon: Diamond },
+  { title: "Maître du Temps", desc: "30 défis daily en avance", unlocked: false, rarity: "legendary", icon: Clock },
+  { title: "Influenceur Suprême", desc: "Top 1% pendant 3 mois", unlocked: false, rarity: "mythique", icon: Crown },
+  { title: "Pionnier IA", desc: "Premier à tester 5 nouvelles features IA", unlocked: false, rarity: "rare", icon: Brain },
+]
+const exclusivePerks = [
+  { title: "Consultation IA Personnalisée", description: "Session 1h avec notre IA expert", cost: 150, icon: Brain, available: true, popularity: 94 },
+  { title: "Accès Early Beta Features", description: "Testez les nouvelles fonctionnalités avant tout le monde", cost: 200, icon: Rocket, available: true, popularity: 89 },
+  { title: "Mentor Personnel 1 Mois", description: "Accompagnement dédié par un Top 1% Partnexx", cost: 500, icon: Crown, available: false, popularity: 97, waitlist: 23 },
+  { title: "Event Privé Paris", description: "Soirée networking exclusive", cost: 300, icon: Sparkles, available: true, popularity: 92, limited: "12 places" },
+]
+const premiumPerks = [
+  { title: "🔥 Boost Algorithme Premium", description: "Multipliez votre visibilité pendant 7 jours", cost: 400, icon: Flame, available: true, popularity: 96, premium: true },
+  { title: "🔥 Coaching Stratégique VIP", description: "3 sessions privées avec un consultant Senior", cost: 800, icon: Brain, available: true, popularity: 91, premium: true },
+]
+const aiInsights = [
+  { title: "Prédiction de Croissance", value: "+347 points", timeframe: "30 prochains jours", confidence: 87, icon: TrendingUp },
+  { title: "Optimal Posting Time", value: "14h-16h & 20h-22h", timeframe: "Votre audience", confidence: 94, icon: Clock },
+  { title: "Contenu Suggéré", value: "Lifestyle + Tech", timeframe: "Tendance émergente", confidence: 91, icon: Lightbulb },
+  { title: "Partenariat Optimal", value: "Fashion x Gaming", timeframe: "Q1 2025", confidence: 89, icon: Compass },
+]
+
+/* ============================================================
+   Composant carte de défi
+   ============================================================ */
+function ChallengeCard({ challenge, accepted, status, onAccept, onComplete, scoreMultiplier, levelName, dailyLimitReached }) {
+  const Icon = challenge.icon
+  const completed = status?.status === 'completed'
+  const showBonusPreview = scoreMultiplier > 1 && !completed
+  const finalPoints = Math.round(challenge.basePoints * scoreMultiplier)
+
+  const difficultyConfig = {
+    'Facile': { color: 'bg-green-500/10 text-green-600 border-green-500/20' },
+    'Moyen': { color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+    'Difficile': { color: 'bg-red-500/10 text-red-600 border-red-500/20' },
+  }
+  const diffStyle = difficultyConfig[challenge.difficulty] || difficultyConfig['Facile']
+
   return (
-    <button
-      onClick={() => !disabled && onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? 'bg-primary' : 'bg-muted-foreground/30'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-    >
-      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
-    </button>
+    <Card className="group relative overflow-hidden hover:shadow-2xl transition-all hover:scale-105">
+      <div className={`absolute inset-0 bg-gradient-to-r ${challenge.color} opacity-5`} />
+
+      <CardHeader className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+          <div className={`p-3 rounded-xl bg-gradient-to-r ${challenge.color} shadow-lg`}>
+            <Icon className="h-6 w-6 text-white" />
+          </div>
+          <Badge variant="outline" className={`${diffStyle.color} font-bold`}>
+            {challenge.difficulty}
+          </Badge>
+        </div>
+        <CardTitle className="text-xl">{challenge.title}</CardTitle>
+      </CardHeader>
+
+      <CardContent className="relative z-10 space-y-4">
+        <p className="text-muted-foreground">{challenge.description}</p>
+
+        {accepted && (
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Progression</span>
+              <span>{status?.progress ?? 0}%</span>
+            </div>
+            <Progress value={status?.progress ?? 0} className="h-2" />
+          </div>
+        )}
+
+        <div className="bg-primary/10 rounded-lg p-3 border border-primary/20">
+          <div className="flex items-center gap-2">
+            <Gift className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium text-primary">+{challenge.basePoints} pts</span>
+          </div>
+          {showBonusPreview && (
+            <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1">
+              <Sparkle className="h-3 w-3" />
+              Avec ton niveau {levelName} : +{finalPoints} pts ({challenge.basePoints} × {scoreMultiplier})
+            </p>
+          )}
+        </div>
+
+        <Button
+          onClick={() => onAccept(challenge)}
+          disabled={accepted || (dailyLimitReached && !accepted)}
+          className={`w-full ${completed ? 'bg-green-600' : accepted ? 'bg-green-600/80' : `bg-gradient-to-r ${challenge.color}`} text-white font-bold`}
+        >
+          {completed ? <><CheckCircle className="h-4 w-4 mr-2" />Complété ✓</> : accepted ? <><Target className="h-4 w-4 mr-2" />En cours...</> : dailyLimitReached ? <><Lock className="h-4 w-4 mr-2" />Déjà fait aujourd'hui</> : <><PlayCircle className="h-4 w-4 mr-2" />Relever le Défi</>}
+        </Button>
+
+        {accepted && !completed && (
+          <Button variant="outline" onClick={() => onComplete(challenge)} className="w-full border-green-500/50 text-green-600 hover:bg-green-500/10 font-bold">
+            <CheckCircle className="h-4 w-4 mr-2" />
+            ✅ Marquer comme complété (TEST)
+          </Button>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
-export default function ParametresSection({ user, profile }) {
+export default function PartnextScoreSection({ user }) {
   const router = useRouter()
-  const [promoCode, setPromoCode] = useState("")
-  const [promoApplied, setPromoApplied] = useState(false)
-  const [notifications, setNotifications] = useState({ push: true, email: true, sms: false })
-  const [cookies, setCookies] = useState({ analytics: true, marketing: false })
-  const [dnd, setDnd] = useState(false)
-  const [theme, setTheme] = useState("light")
-  const [newPassword, setNewPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [showNew, setShowNew] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [changingPassword, setChangingPassword] = useState(false)
-  const [deletingAccount, setDeletingAccount] = useState(false)
-  const [exporting, setExporting] = useState(false)
-  const [notifTypes, setNotifTypes] = useState({
-    opportunity: true, message: true, collab: true, payment: true, review: true, deadline: false,
-  })
-  const [frequency, setFrequency] = useState('daily')
-  const loadedRef = useRef(false)
+  const {
+    score, level, nextLevel, currentLevelIndex,
+    progress: levelProgress, pointsToNextLevel,
+    profileCompletion, isProfileComplete,
+    canAccess, getRequiredLevel, loading: levelLoading,
+    scoreMultiplier, awardPoints,
+  } = useLevel()
 
-  // Charge les préférences cookies sauvegardées (côté navigateur)
+  const [animatedScore, setAnimatedScore] = useState(0)
+  const [showCelebration, setShowCelebration] = useState(false)
+  const [activeTab, setActiveTab] = useState('dashboard')
+  const [leaderboard, setLeaderboard] = useState([])
+  const [selectedLevelKey, setSelectedLevelKey] = useState(null)
+  const [acceptedChallenges, setAcceptedChallenges] = useState(new Map())
+
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('partnexx_cookies')
-      if (saved) setCookies(JSON.parse(saved))
-    } catch (e) { /* ignore */ }
-  }, [])
+    if (!selectedLevelKey) setSelectedLevelKey(level?.key || 'bronze')
+  }, [level, selectedLevelKey])
 
-  // Charge les préférences de notifications
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('partnexx_notifs')
-      if (saved) {
-        const p = JSON.parse(saved)
-        if (p.channels) setNotifications(p.channels)
-        if (p.types) setNotifTypes(p.types)
-        if (typeof p.dnd === 'boolean') setDnd(p.dnd)
-        if (p.frequency) setFrequency(p.frequency)
-      }
-    } catch (e) { /* ignore */ }
-    loadedRef.current = true
-  }, [])
-
-  // Sauvegarde auto des préférences de notifications
-  useEffect(() => {
-    if (!loadedRef.current) return
-    try {
-      localStorage.setItem('partnexx_notifs', JSON.stringify({ channels: notifications, types: notifTypes, dnd, frequency }))
-    } catch (e) { /* ignore */ }
-  }, [notifications, notifTypes, dnd, frequency])
-
-  // Applique le thème (clair / sombre / auto) sur la page
-  const applyTheme = (t) => {
-    if (typeof document === 'undefined') return
-    const root = document.documentElement
-    if (t === 'dark') root.classList.add('dark')
-    else if (t === 'light') root.classList.remove('dark')
-    else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      root.classList.toggle('dark', prefersDark)
-    }
-  }
-
-  // Charge + applique le thème sauvegardé
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('partnexx_theme') || 'light'
-      setTheme(saved)
-      applyTheme(saved)
-    } catch (e) { /* ignore */ }
-  }, [])
-
-  const handleThemeChange = (t) => {
-    setTheme(t)
-    applyTheme(t)
-    try { localStorage.setItem('partnexx_theme', t) } catch (e) { /* ignore */ }
-    toast.success(`Thème ${t === 'light' ? 'Clair' : t === 'dark' ? 'Sombre' : 'Auto'} activé`)
-  }
-
-  const handleApplyPromo = () => {
-    if (!promoCode.trim()) { toast.error("Veuillez entrer un code promo"); return }
-    if (["WELCOME20", "PARTNER50"].includes(promoCode.toUpperCase())) {
-      setPromoApplied(true)
-      toast.success("Code promo appliqué ! -20% sur votre prochain paiement")
-    } else {
-      toast.error("Code promo invalide ou expiré")
-    }
-  }
-
-  const handleChangePassword = async () => {
-    if (!newPassword || newPassword.length < 6) { toast.error("Mot de passe trop court (min 6 caractères)"); return }
-    if (newPassword !== confirmPassword) { toast.error("Les mots de passe ne correspondent pas"); return }
-    setChangingPassword(true)
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
-    if (error) { toast.error("Erreur : " + error.message) }
-    else { toast.success("Mot de passe mis à jour !"); setNewPassword(""); setConfirmPassword("") }
-    setChangingPassword(false)
-  }
-
-  const handleCopyId = () => {
     if (!user?.id) return
-    navigator.clipboard.writeText(user.id)
-    toast.success("Identifiant copié !")
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
-
-  // Télécharge un fichier dans le navigateur
-  const downloadFile = (content, filename, type) => {
-    const blob = new Blob([content], { type })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  // Récupère TOUTES les données de l'utilisateur (réutilisé par PDF + JSON)
-  const fetchAllUserData = async () => {
-    const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-    const { data: inf } = await supabase.from('influencers').select('*').eq('user_id', user.id).single()
-    let social = [], collabs = [], reviews = []
-    if (inf?.id) {
-      const [sRes, cRes] = await Promise.allSettled([
-        supabase.from('social_accounts').select('*').eq('influencer_id', inf.id),
-        supabase.from('collaborations').select('*, campaigns(title), brands(company_name)').eq('influencer_id', inf.id),
-      ])
-      social = sRes.status === 'fulfilled' ? (sRes.value.data || []) : []
-      collabs = cRes.status === 'fulfilled' ? (cRes.value.data || []) : []
+    const fetchUserChallenges = async () => {
+      const { data, error } = await supabase.from('user_challenges').select('*').eq('user_id', user.id)
+      if (error) { console.warn(error); return }
+      const map = new Map()
+      data?.forEach(c => map.set(c.challenge_id, c))
+      setAcceptedChallenges(map)
     }
-    const rRes = await supabase.from('reviews').select('*, collaborations(id, campaigns(title))').eq('reviewee_id', user.id)
-    reviews = rRes.data || []
-    return { prof, inf, social, collabs, reviews }
-  }
+    fetchUserChallenges()
 
-  // Export complet des données du compte (RGPD) au format JSON
-  const handleDownloadData = async () => {
-    if (!user?.id) { toast.error("Non connecté"); return }
-    setExporting(true)
-    try {
-      const { prof, inf, social, collabs, reviews } = await fetchAllUserData()
-      const payload = {
-        exported_at: new Date().toISOString(),
-        account: { email: user?.email, id: user?.id },
-        profile: prof || null,
-        influencer: inf || null,
-        social_accounts: social,
-        collaborations: collabs,
-        reviews: reviews,
-      }
-      downloadFile(JSON.stringify(payload, null, 2), 'mes-donnees-partnexx.json', 'application/json')
-      toast.success("Tes données ont été téléchargées 📦")
-    } catch (err) {
-      toast.error("Erreur : " + (err.message || 'export échoué'))
-    }
-    setExporting(false)
-  }
-
-  // Export PDF lisible et complet des données du compte (multi-pages)
-  const handleDownloadPdf = async () => {
-    if (!user?.id) { toast.error("Non connecté"); return }
-    setExporting(true)
-    try {
-      const { prof, inf, social, collabs, reviews } = await fetchAllUserData()
-
-      // Import dynamique (évite tout souci côté serveur)
-      const mod = await import('jspdf')
-      const JsPDF = mod.jsPDF || mod.default
-      const doc = new JsPDF()
-      const margin = 16
-      const pageH = doc.internal.pageSize.getHeight()
-      let y = 20
-
-      const ensureSpace = (need = 10) => { if (y + need > pageH - 16) { doc.addPage(); y = 20 } }
-      const heading = (txt) => {
-        ensureSpace(18); y += 4
-        doc.setFontSize(14); doc.setTextColor(124, 58, 237); doc.setFont(undefined, 'bold')
-        doc.text(txt, margin, y); doc.setFont(undefined, 'normal'); y += 6
-        doc.setDrawColor(228); doc.line(margin, y - 1, 194, y - 1); y += 4
-      }
-      const subtitle = (txt) => {
-        ensureSpace(8)
-        doc.setFontSize(11); doc.setTextColor(70); doc.setFont(undefined, 'bold')
-        doc.text(txt, margin, y); doc.setFont(undefined, 'normal'); y += 6
-      }
-      const line = (label, value) => {
-        const txt = (value === null || value === undefined || value === '') ? '—' : String(value)
-        const wrapped = doc.splitTextToSize(txt, 118)
-        ensureSpace(6 * wrapped.length)
-        doc.setFontSize(10); doc.setTextColor(120); doc.text(label, margin, y)
-        doc.setTextColor(30); doc.text(wrapped, margin + 52, y)
-        y += 6 * wrapped.length
-      }
-
-      // En-tête
-      doc.setFontSize(22); doc.setTextColor(124, 58, 237); doc.setFont(undefined, 'bold')
-      doc.text('Partnexx', margin, y); y += 8
-      doc.setFont(undefined, 'normal'); doc.setFontSize(13); doc.setTextColor(60)
-      doc.text('Export de mes données', margin, y); y += 6
-      doc.setFontSize(10); doc.setTextColor(140)
-      doc.text(`Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`, margin, y); y += 2
-
-      heading('Compte')
-      line('Email', user?.email)
-      line('Identifiant', user?.id)
-
-      heading('Profil')
-      line('Nom', inf?.display_name || prof?.full_name)
-      line("Nom d'utilisateur", prof?.username)
-      line('Pays', inf?.country)
-      line('Niches', Array.isArray(inf?.niche) ? inf.niche.join(', ') : inf?.niche)
-      line('Types de contenu', Array.isArray(inf?.content_types) ? inf.content_types.join(', ') : inf?.content_types)
-      line('Tarif minimum', inf?.min_budget != null ? `${inf.min_budget} EUR` : null)
-      line('Bio', prof?.bio)
-
-      heading('Statistiques')
-      line('Score Partnexx', inf?.ai_score)
-      line('Revenus totaux', inf?.total_earned != null ? `${inf.total_earned} EUR` : null)
-      line('Collaborations', inf?.collaborations_count)
-      line('Note moyenne', inf?.avg_rating != null ? `${inf.avg_rating} / 5` : null)
-
-      heading(`Réseaux connectés (${social.length})`)
-      if (social.length === 0) line('Statut', 'Aucun réseau connecté')
-      else social.forEach((s, i) => {
-        subtitle(`${i + 1}. ${String(s.platform || '').toUpperCase()}`)
-        line('   Pseudo', s.handle)
-        line('   Lien', s.profile_url)
-        line('   Abonnés', s.followers_count)
-        line('   Engagement', s.engagement_rate != null ? `${s.engagement_rate} %` : null)
+    const channelName = `user-challenges:${user.id}:${Math.random().toString(36).slice(2, 8)}`
+    const channel = supabase.channel(channelName)
+    channel.on('postgres_changes', { event: '*', schema: 'public', table: 'user_challenges', filter: `user_id=eq.${user.id}` }, (payload) => {
+      setAcceptedChallenges(prev => {
+        const next = new Map(prev)
+        if (payload.eventType === 'DELETE') next.delete(payload.old.challenge_id)
+        else next.set(payload.new.challenge_id, payload.new)
+        return next
       })
+    })
+    channel.subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [user?.id])
 
-      heading(`Collaborations (${collabs.length})`)
-      if (collabs.length === 0) line('Statut', 'Aucune collaboration')
-      else collabs.forEach((c, i) => {
-        subtitle(`${i + 1}. ${c.campaigns?.title || 'Campagne'}`)
-        line('   Marque', c.brands?.company_name)
-        line('   Statut', c.status)
-        line('   Date', c.created_at ? new Date(c.created_at).toLocaleDateString('fr-FR') : null)
-      })
-
-      heading(`Avis reçus (${reviews.length})`)
-      if (reviews.length === 0) line('Statut', 'Aucun avis')
-      else reviews.forEach((r, i) => {
-        subtitle(`${i + 1}. ${r.collaborations?.campaigns?.title || 'Collaboration'}`)
-        line('   Note', r.rating != null ? `${r.rating} / 5` : null)
-        line('   Commentaire', r.comment)
-        line('   Date', r.created_at ? new Date(r.created_at).toLocaleDateString('fr-FR') : null)
-      })
-
-      // Pieds de page numérotés
-      const pages = doc.internal.getNumberOfPages()
-      for (let p = 1; p <= pages; p++) {
-        doc.setPage(p)
-        doc.setFontSize(9); doc.setTextColor(165)
-        doc.text(`Partnexx — Export de données — Page ${p}/${pages}`, margin, pageH - 8)
-      }
-
-      doc.save('mes-donnees-partnexx.pdf')
-      toast.success("PDF téléchargé 📄")
-    } catch (err) {
-      toast.error("Erreur PDF : " + (err.message || 'export échoué'))
+  useEffect(() => {
+    if (!user?.id) return
+    const fetchLeaderboard = async () => {
+      const { data } = await supabase.from('influencers').select('id, display_name, ai_score, user_id').order('ai_score', { ascending: false }).limit(10)
+      if (data) setLeaderboard(data)
     }
-    setExporting(false)
+    fetchLeaderboard()
+  }, [user?.id, score])
+
+  useEffect(() => {
+    if (score <= 0) { setAnimatedScore(0); return }
+    const duration = 3000, steps = 100, increment = score / steps
+    let current = 0
+    const timer = setInterval(() => {
+      current += increment
+      if (current >= score) { setAnimatedScore(score); clearInterval(timer); setShowCelebration(true); setTimeout(() => setShowCelebration(false), 4000) }
+      else setAnimatedScore(Math.floor(current))
+    }, duration / steps)
+    return () => clearInterval(timer)
+  }, [score])
+
+  const canAccessMarketplace = canAccess('marketplace')
+  const canAccessPremiumMarketplace = canAccess('premiumMarketplace')
+  const marketplaceRequiredLevel = getRequiredLevel('marketplace')
+  const marketplaceProgress = marketplaceRequiredLevel ? Math.min((score / marketplaceRequiredLevel.threshold) * 100, 100) : 0
+  const pointsToMarketplace = marketplaceRequiredLevel ? Math.max(0, marketplaceRequiredLevel.threshold - score) : 0
+
+  /* ============ Défis du niveau actuel ============ */
+  const currentLevelChallenges = level ? CHALLENGES_BY_LEVEL[level.key] || [] : []
+
+  /* ============ Vérif limite 1 défi/difficulté par 24h ============ */
+  const isDifficultyLockedToday = (difficulty) => {
+    // On regarde si un défi de cette difficulté a été complété/accepté dans les 24 dernières heures
+    const now = Date.now()
+    const dayAgo = now - 24 * 60 * 60 * 1000
+    return currentLevelChallenges.some(c => {
+      if (c.difficulty !== difficulty) return false
+      const status = acceptedChallenges.get(c.id)
+      if (!status) return false
+      const acceptedAt = new Date(status.accepted_at).getTime()
+      return acceptedAt > dayAgo && status.status === 'completed'
+    })
   }
 
-  // Export de l'historique des collaborations au format CSV
-  const handleExportHistory = async () => {
-    if (!user?.id) { toast.error("Non connecté"); return }
-    setExporting(true)
-    try {
-      const { data: inf } = await supabase.from('influencers').select('id').eq('user_id', user.id).single()
-      let collabs = []
-      if (inf?.id) {
-        const { data: c } = await supabase
-          .from('collaborations')
-          .select('*, campaigns(title), brands(company_name)')
-          .eq('influencer_id', inf.id)
-        collabs = c || []
-      }
-      if (collabs.length === 0) { toast.info("Aucune collaboration à exporter pour l'instant"); setExporting(false); return }
-      const rows = [['Campagne', 'Marque', 'Statut', 'Date']]
-      collabs.forEach(c => rows.push([
-        (c.campaigns?.title || '').replace(/;/g, ','),
-        (c.brands?.company_name || '').replace(/;/g, ','),
-        c.status || '',
-        c.created_at ? new Date(c.created_at).toLocaleDateString('fr-FR') : '',
-      ]))
-      const csv = '\ufeff' + rows.map(r => r.join(';')).join('\n')
-      downloadFile(csv, 'historique-collaborations.csv', 'text/csv;charset=utf-8;')
-      toast.success("Historique exporté 📊")
-    } catch (err) {
-      toast.error("Erreur : " + (err.message || 'export échoué'))
-    }
-    setExporting(false)
-  }
+  const handleAcceptChallenge = async (challenge) => {
+    if (!user?.id) return
+    const optimistic = { challenge_id: challenge.id, challenge_type: challenge.difficulty.toLowerCase(), challenge_title: challenge.title, challenge_reward: `+${challenge.basePoints} pts`, status: 'in_progress', progress: 0, accepted_at: new Date().toISOString() }
+    setAcceptedChallenges(prev => { const next = new Map(prev); next.set(challenge.id, optimistic); return next })
 
-  // Sauvegarde les préférences cookies (côté navigateur)
-  const handleSavePreferences = () => {
-    try {
-      localStorage.setItem('partnexx_cookies', JSON.stringify(cookies))
-      toast.success("Préférences enregistrées ✅")
-    } catch (e) {
-      toast.error("Impossible d'enregistrer les préférences")
-    }
-  }
-
-  const handleDeleteAccount = async () => {
-    if (!deletingAccount) {
-      setDeletingAccount(true)
-      toast.error("Êtes-vous sûr ? Cliquez à nouveau pour confirmer la suppression.")
-      setTimeout(() => setDeletingAccount(false), 5000)
+    const { error } = await supabase.from('user_challenges').insert({
+      user_id: user.id, challenge_id: challenge.id, challenge_type: challenge.difficulty.toLowerCase(),
+      challenge_title: challenge.title, challenge_reward: `+${challenge.basePoints} pts`,
+      status: 'in_progress', progress: 0,
+    })
+    if (error) {
+      setAcceptedChallenges(prev => { const next = new Map(prev); next.delete(challenge.id); return next })
+      toast.error(error.code === '23505' ? 'Tu as déjà accepté ce défi' : "Erreur")
       return
     }
-    toast.error("Suppression de compte — contactez support@partnexx.fr")
-    setDeletingAccount(false)
+    toast.success(`Défi accepté : ${challenge.title} 🎯`)
   }
 
-  const strength = getPasswordStrength(newPassword)
-  const passwordsMatch = confirmPassword.length > 0 && newPassword === confirmPassword
+  const handleCompleteChallenge = async (challenge) => {
+    if (!user?.id) return
+    const { error: updateError } = await supabase.from('user_challenges')
+      .update({ status: 'completed', progress: 100, completed_at: new Date().toISOString() })
+      .eq('user_id', user.id).eq('challenge_id', challenge.id)
+    if (updateError) { toast.error(`Erreur : ${updateError.message}`); return }
 
-  const tabs = [
-    { value: "security", label: "Sécurité", icon: Shield, color: "from-red-500 to-red-600" },
-    { value: "privacy", label: "Confidentialité", icon: ShieldCheck, color: "from-purple-500 to-purple-600" },
-    { value: "notifications", label: "Notifications", icon: Bell, color: "from-blue-500 to-blue-600" },
-    { value: "appearance", label: "Apparence", icon: Palette, color: "from-amber-500 to-amber-600" },
-    { value: "payment", label: "Paiement", icon: CreditCard, color: "from-green-500 to-green-600" },
-    { value: "subscription", label: "Abonnement", icon: Crown, color: "from-yellow-500 to-yellow-600" },
-    { value: "support", label: "Support", icon: HelpCircle, color: "from-cyan-500 to-cyan-600" },
-  ]
+    await awardPoints(challenge.basePoints, 'challenge_completed', {
+      challenge_id: challenge.id, challenge_title: challenge.title, difficulty: challenge.difficulty,
+    })
+  }
+
+  const isAccepted = (id) => acceptedChallenges.has(id)
+  const getChallengeStatus = (id) => acceptedChallenges.get(id)
+
+  const userRankIndex = leaderboard.findIndex(l => l.user_id === user?.id)
+  const userRank = userRankIndex >= 0 ? userRankIndex + 1 : '?'
+
+  const top7 = leaderboard.slice(0, 7).map((l, i) => ({
+    rank: i + 1, name: l.display_name || 'Influenceur', score: l.ai_score || 0,
+    avatar: ['🚀', '💎', '⭐', '🎯', '💫', '🌟', '🎨'][i] || '🏆',
+    trend: '+' + Math.floor(((i + 1) * 37) % 200 + 50),
+    badge: ['👑', '🔥', '💫', '🚀', '⭐', '🔮', '🎯'][i] || '🎖️',
+    isUser: l.user_id === user?.id,
+  }))
+  const userInTop7 = top7.some(u => u.isUser)
+  const leaderboardWithUser = userInTop7 ? top7 : [...top7, { rank: top7.length + 1, name: 'Vous', score, avatar: '🏆', trend: '+0', badge: '🎖️', isUser: true }]
+
+  const selectedLevel = LEVELS.find(l => l.key === selectedLevelKey) || LEVELS[0]
+  const selectedVisual = LEVEL_VISUALS[selectedLevel.key]
+  const selectedLevelIndex = LEVELS.findIndex(l => l.key === selectedLevel.key)
+  const isSelectedLevelUnlocked = currentLevelIndex >= 0 && selectedLevelIndex <= currentLevelIndex
 
   return (
-    <div className="space-y-6">
-      <div>
-        <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-3xl font-bold text-foreground">Paramètres</h1>
-          <Badge variant="outline" className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 border-purple-400 text-white shadow-lg">
-            <Brain className="h-4 w-4 text-white" /><span className="text-sm font-semibold">IA activé</span>
-          </Badge>
-        </div>
-        <p className="text-muted-foreground">Configuration • Notifications • Sécurité & Confidentialité</p>
-        {user && <p className="text-sm text-muted-foreground mt-1">Connecté en tant que <span className="font-medium text-foreground">{user.email}</span></p>}
+    <div className="min-h-screen relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-background via-primary/5 to-secondary/10" />
+      <div className="absolute inset-0 pointer-events-none">
+        {Array.from({ length: 20 }).map((_, i) => (
+          <div key={i} className="absolute animate-pulse" style={{ left: `${(i * 53) % 100}%`, top: `${(i * 37) % 100}%`, animationDelay: `${(i * 0.3) % 5}s`, animationDuration: `${3 + ((i * 0.2) % 4)}s` }}>
+            <div className="w-2 h-2 bg-gradient-to-r from-primary/30 to-secondary/30 rounded-full blur-sm" />
+          </div>
+        ))}
       </div>
 
-      <Tabs defaultValue="security" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7 gap-2 bg-transparent p-0 h-auto">
-          {tabs.map(({ value, label, icon: Icon, color }) => (
-            <TabsTrigger key={value} value={value} className={`rounded-2xl h-14 data-[state=active]:bg-gradient-to-br data-[state=active]:${color} data-[state=active]:text-white data-[state=active]:shadow-lg bg-card hover:bg-muted/50 transition-all duration-300 border-2 border-border/50`}>
-              <div className="flex flex-col items-center gap-1">
-                <Icon className="h-4 w-4" />
-                <span className="text-xs font-semibold">{label}</span>
-              </div>
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        {/* ═══════════════ SÉCURITÉ ═══════════════ */}
-        <TabsContent value="security" className="space-y-6">
-
-          {/* Bannière statut */}
-          <Card className="border-0 overflow-hidden bg-gradient-to-br from-red-500/10 via-orange-500/5 to-background shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center shadow-lg shrink-0">
-                    <Shield className="h-7 w-7 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold">Centre de Sécurité</h2>
-                    <p className="text-sm text-muted-foreground">Gère ton mot de passe et tes connexions</p>
-                  </div>
-                </div>
-                <Badge className="bg-green-500/15 text-green-600 border border-green-500/30 gap-1.5 px-3 py-1.5 self-start sm:self-auto">
-                  <CheckCircle className="h-4 w-4" />Compte sécurisé
-                </Badge>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-5">
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-background/70 border rounded-full px-3 py-1.5">
-                  <CheckCircle className="h-3.5 w-3.5 text-green-500" />Email vérifié
-                </span>
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-background/70 border rounded-full px-3 py-1.5">
-                  <CheckCircle className="h-3.5 w-3.5 text-green-500" />Mot de passe actif
-                </span>
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-background/70 border rounded-full px-3 py-1.5 text-muted-foreground">
-                  <Smartphone className="h-3.5 w-3.5" />Double authentification — bientôt
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Infos du compte */}
-          <Card className="shadow-sm">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Mail className="h-5 w-5 text-blue-500" />Informations du compte</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between gap-3 p-4 bg-muted/40 rounded-xl border">
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground mb-0.5">Email</p>
-                  <p className="font-semibold truncate">{user?.email || 'Non connecté'}</p>
-                </div>
-                <Badge className="bg-green-500/15 text-green-600 border border-green-500/30 gap-1 shrink-0"><CheckCircle className="h-3 w-3" />Vérifié</Badge>
-              </div>
-              <div className="flex items-center justify-between gap-3 p-4 bg-muted/40 rounded-xl border">
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground mb-0.5">Identifiant utilisateur</p>
-                  <p className="font-mono text-xs text-muted-foreground truncate">{user?.id || '—'}</p>
-                </div>
-                <Button variant="outline" size="lg" onClick={handleCopyId} className="shrink-0 gap-1.5 h-11 rounded-xl"><Copy className="h-4 w-4" />Copier</Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Changer le mot de passe */}
-          <Card className="shadow-sm">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><KeyRound className="h-5 w-5 text-red-500" />Changer le mot de passe</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold">Nouveau mot de passe</label>
-                <div className="relative">
-                  <Input type={showNew ? 'text' : 'password'} placeholder="Au moins 6 caractères" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="pr-10 h-11" />
-                  <button type="button" onClick={() => setShowNew(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                    {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                {newPassword && (
-                  <div className="space-y-1 pt-1">
-                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all duration-300 ${strength.barClass}`} style={{ width: `${strength.pct}%` }} />
-                    </div>
-                    <p className={`text-xs font-medium ${strength.textClass}`}>Sécurité : {strength.label}</p>
-                  </div>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold">Confirmer le mot de passe</label>
-                <div className="relative">
-                  <Input type={showConfirm ? 'text' : 'password'} placeholder="Retape le mot de passe" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="pr-10 h-11" />
-                  <button type="button" onClick={() => setShowConfirm(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                    {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                {confirmPassword && (
-                  <p className={`text-xs font-medium flex items-center gap-1 ${passwordsMatch ? 'text-green-500' : 'text-red-500'}`}>
-                    {passwordsMatch ? <><CheckCircle className="h-3 w-3" />Les mots de passe correspondent</> : <><AlertCircle className="h-3 w-3" />Les mots de passe ne correspondent pas</>}
-                  </p>
-                )}
-              </div>
-              <Button onClick={handleChangePassword} disabled={changingPassword} size="lg" className="w-full h-12 rounded-xl text-sm font-semibold bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white shadow-md">
-                {changingPassword ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Mise à jour...</> : <><KeyRound className="h-5 w-5 mr-2" />Mettre à jour le mot de passe</>}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Session active */}
-          <Card className="shadow-sm">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Laptop className="h-5 w-5 text-cyan-500" />Session active</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-xl bg-muted/40 gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shrink-0">
-                    <Laptop className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm truncate">Cet appareil</p>
-                    <p className="text-xs text-muted-foreground truncate">{user?.email} • Connecté maintenant</p>
-                  </div>
-                </div>
-                <Badge variant="secondary" className="text-xs shrink-0">Actuelle</Badge>
-              </div>
-              <Button variant="outline" onClick={handleLogout} size="lg" className="w-full h-12 rounded-xl text-sm font-semibold border-2 border-red-500/30 text-red-600 hover:bg-red-500/10 hover:text-red-600">
-                <LogOut className="h-5 w-5 mr-2" />Se déconnecter
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ═══════════════ CONFIDENTIALITÉ (refaite + boutons fonctionnels) ═══════════════ */}
-        <TabsContent value="privacy" className="space-y-6">
-
-          {/* Bannière */}
-          <Card className="border-0 overflow-hidden bg-gradient-to-br from-purple-500/10 via-fuchsia-500/5 to-background shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-500 flex items-center justify-center shadow-lg shrink-0">
-                    <ShieldCheck className="h-7 w-7 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold">Confidentialité & Données</h2>
-                    <p className="text-sm text-muted-foreground">Gère tes cookies et récupère tes données</p>
-                  </div>
-                </div>
-                <Badge className="bg-purple-500/15 text-purple-600 border border-purple-500/30 gap-1.5 px-3 py-1.5 self-start sm:self-auto">
-                  <CheckCircle className="h-4 w-4" />Protégé
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Cookies */}
-          <Card className="shadow-sm">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Cookie className="h-5 w-5 text-purple-500" />Préférences Cookies</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              {[
-                { key: "essential", name: "Cookies essentiels", desc: "Nécessaires au fonctionnement", required: true, checked: true },
-                { key: "analytics", name: "Cookies analytiques", desc: "Amélioration de l'expérience", required: false, checked: cookies.analytics },
-                { key: "marketing", name: "Cookies marketing", desc: "Publicité personnalisée", required: false, checked: cookies.marketing },
-              ].map((cookie) => (
-                <div key={cookie.key} className="flex items-center justify-between p-4 border rounded-xl bg-muted/30">
-                  <div><p className="font-semibold text-sm">{cookie.name}</p><p className="text-xs text-muted-foreground">{cookie.desc}</p></div>
-                  <Toggle checked={cookie.checked} disabled={cookie.required} onChange={(v) => !cookie.required && setCookies(prev => ({ ...prev, [cookie.key]: v }))} />
-                </div>
-              ))}
-              <Button onClick={handleSavePreferences} size="lg" className="w-full h-12 rounded-xl text-sm font-semibold mt-2 bg-gradient-to-r from-purple-500 to-fuchsia-500 hover:from-purple-600 hover:to-fuchsia-600 text-white shadow-md">
-                <CheckCircle className="h-5 w-5 mr-2" />Enregistrer mes préférences
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Gestion des données — gros boutons fonctionnels */}
-          <Card className="shadow-sm">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Download className="h-5 w-5 text-blue-500" />Mes données</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <Button variant="outline" onClick={handleDownloadPdf} disabled={exporting} className="w-full h-auto py-4 rounded-xl gap-3 justify-start border-2 hover:border-rose-500/40 hover:bg-rose-500/5 transition-all">
-                <span className="w-10 h-10 rounded-xl bg-rose-500/15 flex items-center justify-center shrink-0"><FileText className="h-5 w-5 text-rose-500" /></span>
-                <span className="flex flex-col items-start text-left">
-                  <span className="text-sm font-semibold">Télécharger mes données (PDF)</span>
-                  <span className="text-xs text-muted-foreground font-normal">Document lisible — facile à lire</span>
-                </span>
-              </Button>
-              <Button variant="outline" onClick={handleDownloadData} disabled={exporting} className="w-full h-auto py-4 rounded-xl gap-3 justify-start border-2 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all">
-                <span className="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0"><Download className="h-5 w-5 text-blue-500" /></span>
-                <span className="flex flex-col items-start text-left">
-                  <span className="text-sm font-semibold">Télécharger mes données (JSON)</span>
-                  <span className="text-xs text-muted-foreground font-normal">Export complet RGPD — format technique</span>
-                </span>
-              </Button>
-              <Button variant="outline" onClick={handleExportHistory} disabled={exporting} className="w-full h-auto py-4 rounded-xl gap-3 justify-start border-2 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all">
-                <span className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0"><ExternalLink className="h-5 w-5 text-emerald-500" /></span>
-                <span className="flex flex-col items-start text-left">
-                  <span className="text-sm font-semibold">Exporter mon historique</span>
-                  <span className="text-xs text-muted-foreground font-normal">Tes collaborations au format CSV (Excel)</span>
-                </span>
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Suppression compte */}
-          <Card className="border-red-500/30 bg-gradient-to-br from-red-500/5 to-background shadow-sm">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-red-600 text-base"><AlertTriangle className="h-5 w-5" />Suppression du compte</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">Cette action est irréversible. Toutes tes données seront définitivement supprimées.</p>
-              <Button variant="destructive" onClick={handleDeleteAccount} size="lg" className="w-full h-12 rounded-xl text-sm font-semibold">
-                <Trash className="h-5 w-5 mr-2" />{deletingAccount ? "Cliquez à nouveau pour confirmer" : "Supprimer définitivement mon compte"}
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ═══════════════ NOTIFICATIONS (refaite + fonctionnelle) ═══════════════ */}
-        <TabsContent value="notifications" className="space-y-6">
-
-          {/* Bannière */}
-          <Card className="border-0 overflow-hidden bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-background shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-lg shrink-0">
-                    <Bell className="h-7 w-7 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold">Centre de Notifications</h2>
-                    <p className="text-sm text-muted-foreground">Choisis ce que tu reçois et comment</p>
-                  </div>
-                </div>
-                <Badge className="bg-blue-500/15 text-blue-600 border border-blue-500/30 gap-1.5 px-3 py-1.5 self-start sm:self-auto">
-                  <CheckCircle className="h-4 w-4" />Sauvegarde auto
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Canaux */}
-            <Card className="shadow-sm">
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Bell className="h-5 w-5 text-blue-500" />Canaux de notification</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {[
-                  { key: "push", name: "Notifications push", desc: "Sur ton appareil", icon: Bell, color: "bg-blue-500/15 text-blue-500" },
-                  { key: "email", name: "Notifications email", desc: "Dans ta boîte mail", icon: Mail, color: "bg-purple-500/15 text-purple-500" },
-                  { key: "sms", name: "Notifications SMS", desc: "Par message texte", icon: MessageCircle, color: "bg-emerald-500/15 text-emerald-500" },
-                ].map(({ key, name, desc, icon: Icon, color }) => (
-                  <div key={key} className="flex items-center justify-between p-4 border rounded-xl bg-muted/30">
-                    <div className="flex items-center gap-3">
-                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${color}`}><Icon className="h-5 w-5" /></span>
-                      <div><p className="font-semibold text-sm">{name}</p><p className="text-xs text-muted-foreground">{desc}</p></div>
-                    </div>
-                    <Toggle checked={notifications[key]} onChange={(v) => { setNotifications(prev => ({ ...prev, [key]: v })); toast.success(`${name} ${v ? 'activées' : 'désactivées'}`) }} />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Préférences */}
-            <Card className="shadow-sm">
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Settings className="h-5 w-5 text-indigo-500" />Préférences</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between p-4 border rounded-xl bg-muted/30">
-                  <div><p className="font-semibold text-sm">Ne pas déranger</p><p className="text-xs text-muted-foreground">Coupe toutes les notifications</p></div>
-                  <Toggle checked={dnd} onChange={(v) => { setDnd(v); toast.success(v ? "Mode silencieux activé" : "Notifications réactivées") }} />
-                </div>
-                <div className="space-y-2 p-4 border rounded-xl bg-muted/30">
-                  <label className="text-sm font-semibold">Fréquence des résumés</label>
-                  <select value={frequency} onChange={(e) => { setFrequency(e.target.value); toast.success("Fréquence enregistrée") }} className="w-full h-11 px-3 rounded-lg border border-input bg-background text-sm">
-                    <option value="realtime">Temps réel</option>
-                    <option value="daily">Quotidien</option>
-                    <option value="weekly">Hebdomadaire</option>
-                  </select>
-                </div>
-              </CardContent>
-            </Card>
+      <div className="relative z-10 space-y-8 p-6">
+        <div className="text-center space-y-6">
+          <div className="flex items-center justify-center gap-4 mb-6">
+            <div className="relative">
+              <Trophy className="h-16 w-16 text-primary animate-pulse" />
+              {showCelebration && (
+                <>
+                  <div className="absolute inset-0 animate-ping"><Sparkles className="h-16 w-16 text-yellow-400" /></div>
+                  <div className="absolute -top-2 -left-2 animate-bounce"><Crown className="h-8 w-8 text-yellow-500" /></div>
+                </>
+              )}
+            </div>
+            <div>
+              <h1 className="text-6xl font-black bg-gradient-to-r from-primary via-purple-500 via-pink-500 to-orange-500 bg-clip-text text-transparent drop-shadow-2xl">Partnexx Empire</h1>
+              <p className="text-xl text-muted-foreground mt-2">🚀 <span className="font-bold text-primary">Niveau {level?.name || 'Verrouillé'}</span> • Rang #{userRank} • Multiplicateur x{scoreMultiplier}</p>
+            </div>
           </div>
+        </div>
 
-          {/* Types */}
-          <Card className="shadow-sm">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><MessageCircle className="h-5 w-5 text-indigo-500" />Types de notifications</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              {[
-                { key: "opportunity", title: "Nouvelle opportunité" },
-                { key: "message", title: "Message reçu" },
-                { key: "collab", title: "Collaboration acceptée" },
-                { key: "payment", title: "Paiement reçu" },
-                { key: "review", title: "Nouvel avis reçu" },
-                { key: "deadline", title: "Rappel de deadline" },
-              ].map(({ key, title }) => (
-                <div key={key} className="flex items-center justify-between p-4 border rounded-xl bg-muted/30 gap-3">
-                  <span className="font-semibold text-sm flex-1">{title}</span>
-                  <Toggle checked={!!notifTypes[key]} onChange={(v) => setNotifTypes(prev => ({ ...prev, [key]: v }))} />
-                </div>
-              ))}
-              <p className="text-xs text-muted-foreground pt-2">Tes préférences sont enregistrées automatiquement.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        <div className="flex justify-center mb-12">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-6xl">
+            <TabsList className="grid w-full grid-cols-6 bg-card/80 backdrop-blur-sm border-0 h-14 rounded-2xl shadow-2xl">
+              <TabsTrigger value="dashboard" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-purple-500 data-[state=active]:text-white font-bold"><BarChart3 className="h-5 w-5 mr-2" />Dashboard</TabsTrigger>
+              <TabsTrigger value="challenges" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-red-500 data-[state=active]:text-white font-bold"><Gamepad2 className="h-5 w-5 mr-2" />Défis</TabsTrigger>
+              <TabsTrigger value="leaderboard" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-500 data-[state=active]:to-orange-500 data-[state=active]:text-white font-bold"><Trophy className="h-5 w-5 mr-2" />Classement</TabsTrigger>
+              <TabsTrigger value="achievements" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-500 data-[state=active]:text-white font-bold"><Award className="h-5 w-5 mr-2" />Succès</TabsTrigger>
+              <TabsTrigger value="ai-insights" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-blue-500 data-[state=active]:text-white font-bold"><Brain className="h-5 w-5 mr-2" />IA Insights</TabsTrigger>
+              <TabsTrigger value="marketplace" className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-500 data-[state=active]:to-purple-500 data-[state=active]:text-white font-bold"><Gift className="h-5 w-5 mr-2" />Marketplace</TabsTrigger>
+            </TabsList>
 
-        {/* ═══════════════ APPARENCE (refaite + thème appliqué) ═══════════════ */}
-        <TabsContent value="appearance" className="space-y-6">
+            <TabsContent value="dashboard" className="space-y-8 mt-8">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2">
+                  <Card className="relative overflow-hidden bg-gradient-to-br from-primary/20 via-purple-500/10 to-pink-500/10 border-primary/30 shadow-2xl backdrop-blur-sm">
+                    <CardContent className="p-8 relative z-10">
+                      <div className="text-center space-y-6">
+                        <div className="relative inline-block">
+                          <div className="text-9xl font-black bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent drop-shadow-2xl animate-pulse">{animatedScore.toLocaleString()}</div>
+                          <div className="absolute -top-4 -right-4 flex gap-2"><Flame className="h-10 w-10 text-orange-500 animate-bounce" /><Crown className="h-10 w-10 text-yellow-500 animate-pulse" /></div>
+                        </div>
+                        <Badge className={`text-xl px-6 py-3 ${level ? `bg-gradient-to-r ${LEVEL_VISUALS[level.key].gradient}` : 'bg-gradient-to-r from-gray-400 to-gray-600'} text-white border-0 shadow-lg`}>{level ? `${level.emoji} ${level.name} Créateur • Rang #${userRank}` : '🔒 Profil incomplet'}</Badge>
 
-          {/* Bannière */}
-          <Card className="border-0 overflow-hidden bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-background shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shrink-0">
-                  <Palette className="h-7 w-7 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold">Personnalisation</h2>
-                  <p className="text-sm text-muted-foreground">Choisis l'apparence de ton espace</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                        <div className="mt-10 space-y-6">
+                          {!isProfileComplete && !levelLoading && (
+                            <div className="bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 rounded-2xl p-6 space-y-4">
+                              <div className="flex items-center justify-center gap-3"><Lock className="h-6 w-6 text-orange-600" /><h3 className="text-xl font-bold text-orange-700">Complète ton profil pour débloquer Bronze</h3></div>
+                              <div className="space-y-2"><div className="flex justify-between text-sm font-semibold"><span>Profil complété</span><span className="text-orange-600">{profileCompletion}%</span></div><div className="relative h-3 bg-orange-500/10 rounded-full overflow-hidden"><div className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-400 to-amber-500 rounded-full transition-all duration-1000" style={{ width: `${profileCompletion}%` }} /></div></div>
+                              <Button onClick={() => router.push('/dashboard/influencer?section=profil')} className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold"><Target className="h-4 w-4 mr-2" />Compléter mon profil</Button>
+                            </div>
+                          )}
 
-          <Card className="shadow-sm">
-            <CardHeader><CardTitle className="text-base">Thème</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {[
-                  { key: "light", label: "Clair", sub: "Interface lumineuse", icon: Sun },
-                  { key: "dark", label: "Sombre", sub: "Confort nocturne", icon: Moon },
-                  { key: "auto", label: "Auto", sub: "Suit ton système", icon: Monitor },
-                ].map(({ key, label, sub, icon: Icon }) => (
-                  <button key={key} type="button" onClick={() => handleThemeChange(key)} className={`text-left p-5 border-2 rounded-2xl cursor-pointer transition-all hover:shadow-md ${theme === key ? 'border-primary bg-primary/5 shadow-md' : 'border-border hover:border-primary/40'}`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shrink-0"><Icon className="h-5 w-5 text-white" /></span>
-                      {theme === key && <CheckCircle className="h-5 w-5 text-primary" />}
-                    </div>
-                    <p className="font-bold text-sm">{label}</p>
-                    <p className="text-xs text-muted-foreground">{sub}</p>
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground border-t pt-4">
-                ℹ️ Ton choix est mémorisé. Le mode sombre s'applique à toute l'interface (à condition que le thème sombre soit activé dans l'app).
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                          <div className="bg-card/50 backdrop-blur-sm rounded-2xl p-6 border border-border">
+                            <div className="flex justify-between items-center mb-6">
+                              <h3 className="text-lg font-bold">Parcours de progression</h3>
+                              {nextLevel && level && (<span className="text-sm text-muted-foreground"><span className="font-bold text-primary">{pointsToNextLevel.toLocaleString()} pts</span> vers <span className="font-semibold">{nextLevel.name}</span></span>)}
+                            </div>
+                            <div className="relative">
+                              <div className="absolute top-6 left-[6%] right-[6%] h-1 bg-muted rounded-full" />
+                              <div className="absolute top-6 left-[6%] h-1 bg-gradient-to-r from-orange-400 via-yellow-400 via-cyan-400 via-fuchsia-500 to-pink-500 rounded-full transition-all duration-1000" style={{ width: currentLevelIndex >= 0 ? `${(currentLevelIndex / (LEVELS.length - 1)) * 88}%` : '0%' }} />
+                              <div className="relative grid grid-cols-8 gap-1">
+                                {LEVELS.map((lvl, idx) => {
+                                  const visual = LEVEL_VISUALS[lvl.key]
+                                  const isUnlocked = currentLevelIndex >= 0 && idx <= currentLevelIndex
+                                  const isCurrent = level?.key === lvl.key
+                                  const isSelected = selectedLevelKey === lvl.key
+                                  return (
+                                    <button key={lvl.key} onClick={() => setSelectedLevelKey(lvl.key)} className="flex flex-col items-center group cursor-pointer">
+                                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-all duration-300 relative z-10 ${isUnlocked ? `bg-gradient-to-br ${visual.gradient} shadow-lg group-hover:scale-110` : 'bg-muted text-muted-foreground grayscale opacity-60 group-hover:opacity-80'} ${isCurrent ? 'ring-4 ring-primary ring-offset-2 ring-offset-background animate-pulse scale-110' : ''} ${isSelected && !isCurrent ? 'ring-2 ring-primary/50 ring-offset-2 ring-offset-background' : ''}`}>{isUnlocked ? lvl.emoji : <Lock className="h-5 w-5" />}</div>
+                                      <div className={`mt-2 text-xs font-bold transition-colors ${isUnlocked ? visual.textColor : 'text-muted-foreground'} ${isCurrent ? 'text-primary' : ''}`}>{lvl.name}</div>
+                                      <div className="text-[10px] text-muted-foreground">{lvl.threshold.toLocaleString()}</div>
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </div>
 
-        {/* ═══════════════ PAIEMENT (refait) ═══════════════ */}
-        <TabsContent value="payment" className="space-y-6">
-
-          {/* Bannière */}
-          <Card className="border-0 overflow-hidden bg-gradient-to-br from-green-500/10 via-emerald-500/5 to-background shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shrink-0">
-                    <CreditCard className="h-7 w-7 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold">Paiement & Versements</h2>
-                    <p className="text-sm text-muted-foreground">Reçois tes gains en toute sécurité</p>
-                  </div>
-                </div>
-                <Badge className="bg-green-500/15 text-green-600 border border-green-500/30 gap-1.5 px-3 py-1.5 self-start sm:self-auto">
-                  <CheckCircle className="h-4 w-4" />Sécurisé par Stripe
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Compte de versement */}
-            <Card className="shadow-sm">
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CreditCard className="h-5 w-5 text-green-500" />Compte de versement</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 rounded-xl border bg-muted/30 text-sm text-muted-foreground">
-                  Tes paiements sont envoyés sur ton compte bancaire via <span className="font-medium text-foreground">Stripe</span>, après chaque collaboration validée.
-                </div>
-                <Button size="lg" className="w-full h-12 rounded-xl text-sm font-semibold bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white" onClick={() => toast.info("Configuration des versements bientôt disponible")}>
-                  <CreditCard className="h-5 w-5 mr-2" />Configurer mes versements
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Factures */}
-            <Card className="shadow-sm">
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><FileText className="h-5 w-5 text-blue-500" />Mes factures</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 rounded-xl border bg-muted/30 text-sm text-muted-foreground">
-                  Retrouve les factures de tes collaborations terminées dans <span className="font-medium text-foreground">« Contrats &amp; Paiements »</span> (menu de gauche).
-                </div>
-                <Button variant="outline" size="lg" className="w-full h-12 rounded-xl text-sm font-semibold" onClick={() => toast.info("Tes factures sont dans « Contrats & Paiements » (menu de gauche)")}>
-                  <FileText className="h-5 w-5 mr-2" />Où trouver mes factures ?
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* ABONNEMENT */}
-        <TabsContent value="subscription" className="space-y-6">
-          <Card className="border-primary bg-gradient-to-br from-primary/10 to-background">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-xl">Plan actuel</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">Accès à la plateforme Partnexx</p>
-                </div>
-                <Badge className="bg-primary text-white text-lg px-4 py-2 capitalize">
-                  {profile?.subscription_plan || 'Gratuit'}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {[
-                  { name: "Starter", price: "0 €", period: "gratuit", features: ["5 opportunités par mois", "Support basique", "Messagerie limitée", "Statistiques de base"], popular: false },
-                  { name: "Pro", price: "29,99 €", period: "par mois", features: ["Opportunités illimitées", "Support prioritaire", "Messagerie avancée", "Statistiques détaillées", "Badge vérifié"], popular: true },
-                  { name: "Enterprise", price: "99,99 €", period: "par mois", features: ["Tout inclus du Pro", "Support dédié 24/7", "API access", "Branding personnalisé", "Priorité absolue"], popular: false },
-                ].map((plan, i) => (
-                  <Card key={i} className={plan.popular ? "border-2 border-primary relative" : ""}>
-                    {plan.popular && <div className="absolute -top-3 left-1/2 -translate-x-1/2"><Badge className="bg-primary text-white">Recommandé</Badge></div>}
-                    <CardHeader className="text-center">
-                      <CardTitle className="text-lg">{plan.name}</CardTitle>
-                      <div className="pt-4"><p className="text-3xl font-bold">{plan.price}</p><p className="text-xs text-muted-foreground">{plan.period}</p></div>
-                    </CardHeader>
-                    <CardContent>
-                      <ul className="space-y-2 mb-4">
-                        {plan.features.map((f, j) => <li key={j} className="flex items-start gap-2"><CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" /><span className="text-sm">{f}</span></li>)}
-                      </ul>
-                      <Button
-                        variant={plan.popular ? "default" : "outline"}
-                        className="w-full"
-                        onClick={() => toast.info(`Passage au plan ${plan.name} — disponible prochainement`)}
-                      >
-                        Choisir ce plan
-                      </Button>
+                          <Card className={`relative overflow-hidden bg-gradient-to-br ${selectedVisual.bgGradient} ${selectedVisual.borderColor} border-2 shadow-xl text-left dark:from-muted/40 dark:via-muted/40 dark:to-muted/40 dark:border-border`}>
+                            <CardContent className="p-6 space-y-5">
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-4">
+                                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${selectedVisual.gradient} flex items-center justify-center text-3xl shadow-lg ${!isSelectedLevelUnlocked && 'grayscale opacity-70'}`}>{isSelectedLevelUnlocked ? selectedLevel.emoji : <Lock className="h-7 w-7 text-white" />}</div>
+                                  <div><div className="text-xs font-bold text-muted-foreground tracking-wider">NIVEAU</div><div className={`text-2xl font-black ${selectedVisual.textColor} dark:text-foreground`}>{selectedLevel.name}</div></div>
+                                </div>
+                                <Badge variant="outline" className={`${selectedVisual.borderColor} ${selectedVisual.textColor} bg-transparent font-bold dark:text-foreground`}>FOCUS NIVEAU</Badge>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{selectedVisual.perks.map((perk, i) => (<div key={i} className="bg-white/80 dark:bg-white/10 backdrop-blur-sm rounded-xl p-3 flex items-center gap-3 shadow-sm"><span className="text-xl">{perk.icon}</span><span className="text-sm font-medium text-foreground">{perk.label}</span></div>))}</div>
+                              <div className="flex justify-start"><div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r ${selectedVisual.gradient} ${!isSelectedLevelUnlocked && 'grayscale opacity-70'}`}><BarChart3 className="h-4 w-4 text-white" /><span className="text-sm font-bold text-white">{selectedVisual.tagline}</span></div></div>
+                              {!isSelectedLevelUnlocked && (<div className="bg-muted/50 rounded-lg p-3 text-center text-sm">🔒 <span className="font-semibold">{Math.max(0, selectedLevel.threshold - score).toLocaleString()} points</span> requis pour débloquer ce niveau</div>)}
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
-                ))}
+                </div>
+                <div className="space-y-6">
+                  <Card className="bg-gradient-to-br from-card to-primary/5 border-primary/20 shadow-xl">
+                    <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" />Analytics Live</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex justify-between items-center"><span className="text-sm">Multiplicateur</span><span className="text-lg font-bold text-primary">x{scoreMultiplier}</span></div>
+                      <div className="flex justify-between items-center"><span className="text-sm">Classement</span><span className="text-lg font-bold text-primary">#{userRank}/50k</span></div>
+                      <div className="flex justify-between items-center"><span className="text-sm">Points totaux</span><span className="text-lg font-bold text-purple-600">{score.toLocaleString()}</span></div>
+                      <Separator />
+                      <div className="text-center p-4 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg"><div className="text-xs text-muted-foreground">Niveau actuel</div><div className="text-sm font-semibold">{level ? `${level.emoji} ${level.name}` : '🔒 Profil incomplet'}</div></div>
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            </TabsContent>
 
-          {/* Code promo */}
-          <Card className="border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 to-background">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Gift className="h-5 w-5 text-emerald-500" />Code Promo
-                {promoApplied && <Badge className="ml-2 bg-emerald-500 text-white">Actif</Badge>}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">Vous avez un code promo ? Entrez-le ci-dessous.</p>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Tag className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Entrez votre code promo" value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())} className="pl-10" disabled={promoApplied} />
-                </div>
-                <Button onClick={handleApplyPromo} disabled={promoApplied} className="bg-emerald-500 hover:bg-emerald-600">
-                  {promoApplied ? "Appliqué" : "Appliquer"}
-                </Button>
-              </div>
-              {promoApplied && (
-                <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                  <CheckCircle className="h-4 w-4 text-emerald-500" />
-                  <span className="text-sm text-emerald-600 font-medium">Code appliqué — 20% de réduction sur votre prochain paiement</span>
-                </div>
+            {/* ============ DÉFIS DU NIVEAU ACTUEL ============ */}
+            <TabsContent value="challenges" className="space-y-8 mt-8">
+              {!isProfileComplete && !levelLoading && (
+                <Card className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border-orange-500/30">
+                  <CardContent className="p-12 text-center space-y-6">
+                    <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center"><Lock className="h-10 w-10 text-white" /></div>
+                    <div><h2 className="text-3xl font-bold text-orange-700 mb-2">Défis verrouillés</h2><p className="text-muted-foreground">Complète ton profil à 100% pour accéder aux défis Partnexx.</p></div>
+                    <Button onClick={() => router.push('/dashboard/influencer?section=profil')} className="bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold"><Target className="h-4 w-4 mr-2" />Compléter mon profil</Button>
+                  </CardContent>
+                </Card>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        {/* ═══════════════ SUPPORT (refait) ═══════════════ */}
-        <TabsContent value="support" className="space-y-6">
+              {isProfileComplete && level && (
+                <>
+                  {/* Bannière niveau actuel */}
+                  <Card className={`bg-gradient-to-r ${LEVEL_VISUALS[level.key].gradient} border-0 text-white`}>
+                    <CardContent className="p-5 flex items-center justify-center gap-3 flex-wrap">
+                      <span className="text-3xl">{level.emoji}</span>
+                      <div className="text-center">
+                        <p className="text-sm opacity-90">Défis du niveau</p>
+                        <p className="text-xl font-black">{level.name}</p>
+                      </div>
+                      {scoreMultiplier > 1 && (
+                        <Badge className="bg-white/20 text-white border-white/30 backdrop-blur-md px-3 py-1.5">
+                          <Sparkle className="h-3 w-3 mr-1" />
+                          Bonus x{scoreMultiplier}
+                        </Badge>
+                      )}
+                    </CardContent>
+                  </Card>
 
-          {/* Bannière */}
-          <Card className="border-0 overflow-hidden bg-gradient-to-br from-cyan-500/10 via-sky-500/5 to-background shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-sky-500 flex items-center justify-center shadow-lg shrink-0">
-                    <HelpCircle className="h-7 w-7 text-white" />
+                  <div className="text-center mb-4">
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">Tes 3 défis du jour 🎯</h2>
+                    <p className="text-muted-foreground mt-2 text-sm">1 défi de chaque difficulté par 24h • Adaptés à ton niveau actuel</p>
                   </div>
-                  <div>
-                    <h2 className="text-xl font-bold">Aide & Support</h2>
-                    <p className="text-sm text-muted-foreground">On est là si tu as besoin d&apos;un coup de main</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {currentLevelChallenges.map((challenge) => (
+                      <ChallengeCard
+                        key={challenge.id}
+                        challenge={challenge}
+                        accepted={isAccepted(challenge.id)}
+                        status={getChallengeStatus(challenge.id)}
+                        onAccept={handleAcceptChallenge}
+                        onComplete={handleCompleteChallenge}
+                        scoreMultiplier={scoreMultiplier}
+                        levelName={level.name}
+                        dailyLimitReached={isDifficultyLockedToday(challenge.difficulty)}
+                      />
+                    ))}
                   </div>
-                </div>
-                <Badge className="bg-cyan-500/15 text-cyan-600 border border-cyan-500/30 gap-1.5 px-3 py-1.5 self-start sm:self-auto">
-                  <CheckCircle className="h-4 w-4" />Réponse ~2h
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Contacter le support — gros boutons */}
-          <Card className="shadow-sm">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><MessageCircle className="h-5 w-5 text-cyan-500" />Contacter le support</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <Button onClick={() => window.location.href = "mailto:support@partnexx.fr?subject=Demande%20de%20support"} className="w-full h-auto py-4 rounded-xl gap-3 justify-start bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-600 hover:to-sky-600 text-white">
-                <span className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0"><Mail className="h-5 w-5 text-white" /></span>
-                <span className="flex flex-col items-start text-left">
-                  <span className="text-sm font-semibold">Écrire au support</span>
-                  <span className="text-xs text-white/80 font-normal">support@partnexx.fr</span>
-                </span>
-              </Button>
-              <Button variant="outline" onClick={() => toast.info("Le chat en direct arrive bientôt")} className="w-full h-auto py-4 rounded-xl gap-3 justify-start border-2">
-                <span className="w-10 h-10 rounded-xl bg-cyan-500/15 flex items-center justify-center shrink-0"><MessageCircle className="h-5 w-5 text-cyan-500" /></span>
-                <span className="flex flex-col items-start text-left">
-                  <span className="text-sm font-semibold">Chat en direct</span>
-                  <span className="text-xs text-muted-foreground font-normal">Bientôt disponible</span>
-                </span>
-              </Button>
-            </CardContent>
-          </Card>
+                  {nextLevel && (
+                    <Card className="bg-gradient-to-r from-primary/10 to-purple-500/10 border-primary/30">
+                      <CardContent className="p-5 flex items-center justify-between flex-wrap gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="text-2xl">{nextLevel.emoji}</div>
+                          <div>
+                            <p className="text-sm font-semibold">
+                              Atteins <span className="text-primary">{nextLevel.name}</span> pour débloquer 3 nouveaux défis
+                            </p>
+                            <p className="text-xs text-muted-foreground">Plus que {pointsToNextLevel.toLocaleString()} points</p>
+                          </div>
+                        </div>
+                        <div className="h-2 w-32 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-primary to-purple-500 transition-all" style={{ width: `${levelProgress}%` }} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              )}
+            </TabsContent>
 
-          {/* Centre d'aide */}
-          <Card className="shadow-sm">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><HelpCircle className="h-5 w-5 text-cyan-500" />Centre d&apos;aide</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <Button variant="outline" className="w-full justify-start h-12 rounded-xl text-sm font-semibold" onClick={() => toast.info("Documentation bientôt disponible")}><ExternalLink className="h-4 w-4 mr-2" />Documentation</Button>
-              <Button variant="outline" className="w-full justify-start h-12 rounded-xl text-sm font-semibold" onClick={() => toast.info("FAQ bientôt disponible")}><HelpCircle className="h-4 w-4 mr-2" />Questions fréquentes</Button>
-            </CardContent>
-          </Card>
+            <TabsContent value="leaderboard" className="space-y-8 mt-8">
+              <Card className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border-yellow-500/30">
+                <CardHeader><CardTitle className="flex items-center gap-3 text-2xl"><Trophy className="h-8 w-8 text-yellow-600" />Classement Global Elite</CardTitle><p className="text-muted-foreground">🏆 Les légendes de Partnexx</p></CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {leaderboardWithUser.map((u) => (
+                      <div key={u.rank} className={`flex items-center gap-6 p-4 rounded-xl border transition-all hover:scale-105 ${u.isUser ? 'border-primary bg-gradient-to-r from-primary/10 to-purple-500/10' : 'border-muted/30 bg-card/80 hover:bg-card'}`}>
+                        <div className="flex items-center gap-4"><div className={`text-2xl font-black ${u.rank <= 3 ? 'text-yellow-600' : 'text-muted-foreground'}`}>#{u.rank}</div><div className="text-3xl">{u.avatar}</div></div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-1"><h4 className={`font-bold ${u.isUser ? 'text-primary text-lg' : ''}`}>{u.name}</h4><span className="text-2xl">{u.badge}</span>{u.rank <= 3 && <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">TOP 3</Badge>}{u.isUser && <Badge className="bg-gradient-to-r from-primary to-purple-500 text-white animate-pulse">VOUS</Badge>}</div>
+                          <div className="flex items-center gap-4"><span className="text-xl font-bold text-primary">{(u.score || 0).toLocaleString()} pts</span></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-          {/* Avis */}
-          <Card className="shadow-sm">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Star className="h-5 w-5 text-purple-500" />Ton avis compte</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">Une idée, un bug, une suggestion ? Dis-nous tout, ça nous aide à améliorer Partnexx.</p>
-              <Button variant="outline" size="lg" className="w-full h-12 rounded-xl text-sm font-semibold" onClick={() => window.location.href = "mailto:support@partnexx.fr?subject=Mon%20avis%20sur%20Partnexx"}>
-                <MessageCircle className="h-5 w-5 mr-2" />Donner mon avis
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            <TabsContent value="achievements" className="space-y-8 mt-8">
+              <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/30">
+                <CardHeader><CardTitle className="flex items-center gap-3 text-2xl"><Award className="h-8 w-8 text-green-600" />Collection de Trophées</CardTitle><p className="text-muted-foreground">🏅 {achievements.filter(a => a.unlocked).length}/{achievements.length} débloqués</p></CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {achievements.map((a, i) => {
+                      const Icon = a.icon
+                      const rarityConfig = { common: 'from-gray-400 to-gray-600', rare: 'from-blue-400 to-blue-600', epic: 'from-purple-400 to-purple-600', legendary: 'from-yellow-400 to-orange-500', mythique: 'from-pink-400 via-purple-500 to-indigo-600' }
+                      const color = rarityConfig[a.rarity] || rarityConfig.common
+                      return (
+                        <Card key={i} className={`relative overflow-hidden transition-all hover:scale-105 ${a.unlocked ? 'border-2 shadow-xl' : 'border-muted/30 opacity-60 grayscale'}`}>
+                          <CardContent className="p-6 text-center space-y-4">
+                            <div className={`mx-auto w-16 h-16 rounded-full bg-gradient-to-r ${color} flex items-center justify-center`}><Icon className="h-8 w-8 text-white" /></div>
+                            <div><h4 className="font-bold text-lg mb-2">{a.title}</h4><p className="text-muted-foreground text-sm mb-4">{a.desc}</p><Badge variant="outline" className={`${a.unlocked ? `bg-gradient-to-r ${color} text-white border-0` : 'opacity-50'} font-bold text-xs`}>{a.rarity.toUpperCase()}</Badge></div>
+                            <div className={`text-sm font-semibold ${a.unlocked ? 'text-green-600' : 'text-muted-foreground'}`}>{a.unlocked ? '✅ DÉBLOQUÉ' : '🔒 Verrouillé'}</div>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="ai-insights" className="space-y-8 mt-8">
+              <Card className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border-cyan-500/30">
+                <CardHeader><CardTitle className="flex items-center gap-3 text-2xl"><Brain className="h-8 w-8 text-cyan-600" />Insights IA</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {aiInsights.map((insight, i) => {
+                      const Icon = insight.icon
+                      return (
+                        <Card key={i} className="hover:shadow-xl transition-all hover:scale-105">
+                          <CardContent className="p-6">
+                            <div className="flex items-start gap-4">
+                              <div className="bg-gradient-to-r from-cyan-500 to-blue-500 p-3 rounded-xl shadow-lg"><Icon className="h-6 w-6 text-white" /></div>
+                              <div className="flex-1 space-y-3">
+                                <h4 className="font-bold text-lg">{insight.title}</h4>
+                                <div className="text-2xl font-black text-primary">{insight.value}</div>
+                                <p className="text-muted-foreground text-sm">{insight.timeframe}</p>
+                                <div className="flex items-center gap-2"><div className="flex-1 bg-secondary/20 rounded-full h-2"><div className="bg-gradient-to-r from-cyan-500 to-blue-500 h-2 rounded-full" style={{ width: `${insight.confidence}%` }} /></div><span className="text-sm font-medium text-cyan-600">{insight.confidence}%</span></div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="marketplace" className="space-y-8 mt-8">
+              {!isProfileComplete && !levelLoading && (
+                <Card className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border-orange-500/30">
+                  <CardContent className="p-12 text-center space-y-6">
+                    <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center"><Lock className="h-10 w-10 text-white" /></div>
+                    <div><h2 className="text-3xl font-bold text-orange-700 mb-2">Marketplace verrouillée</h2><p className="text-muted-foreground">Complète ton profil à 100%.</p></div>
+                    <Button onClick={() => router.push('/dashboard/influencer?section=profil')} className="bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold"><Target className="h-4 w-4 mr-2" />Compléter</Button>
+                  </CardContent>
+                </Card>
+              )}
+              {isProfileComplete && !canAccessMarketplace && (
+                <Card className="bg-gradient-to-br from-cyan-500/10 to-sky-500/10 border-cyan-500/30">
+                  <CardContent className="p-12 text-center space-y-6">
+                    <div className="relative inline-block"><div className="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-cyan-400 to-sky-500 flex items-center justify-center shadow-2xl"><ShoppingBag className="h-12 w-12 text-white" /></div><div className="absolute -bottom-2 -right-2 w-10 h-10 bg-card rounded-full flex items-center justify-center shadow-lg border-2 border-cyan-400"><Lock className="h-5 w-5 text-cyan-600" /></div></div>
+                    <div><h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-500 to-sky-500 bg-clip-text text-transparent mb-2">Marketplace verrouillée</h2><p className="text-muted-foreground max-w-md mx-auto">Débloque la Marketplace au niveau Platine.</p></div>
+                    <div className="inline-flex items-center gap-3 bg-card rounded-2xl px-6 py-4 border-2 border-cyan-300 shadow-lg"><div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-sky-500 flex items-center justify-center text-2xl">💠</div><div className="text-left"><div className="text-xs text-muted-foreground font-semibold">DÉBLOQUER À</div><div className="text-xl font-black text-cyan-700">Niveau Platine</div><div className="text-xs text-muted-foreground">{marketplaceRequiredLevel?.threshold.toLocaleString()} pts requis</div></div></div>
+                    <div className="max-w-md mx-auto space-y-3"><div className="flex justify-between text-sm"><span className="font-semibold">Progression</span><span className="font-bold text-cyan-600">{score.toLocaleString()} / {marketplaceRequiredLevel?.threshold.toLocaleString()} pts</span></div><div className="relative h-4 bg-cyan-500/10 rounded-full overflow-hidden"><div className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-400 to-sky-500 rounded-full transition-all duration-1000" style={{ width: `${marketplaceProgress}%` }} /></div><p className="text-sm text-muted-foreground">Plus que <span className="font-bold text-cyan-600">{pointsToMarketplace.toLocaleString()} points</span></p></div>
+                    <Button onClick={() => setActiveTab('challenges')} className="bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-600 hover:to-sky-600 text-white font-bold"><Gamepad2 className="h-4 w-4 mr-2" />Faire des défis</Button>
+                  </CardContent>
+                </Card>
+              )}
+              {isProfileComplete && canAccessMarketplace && (
+                <>
+                  {canAccessPremiumMarketplace && (<Card className="bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-pink-500/10 border-teal-400/40"><CardContent className="p-4 flex items-center justify-center gap-3 flex-wrap"><Flame className="h-6 w-6 text-teal-600 animate-pulse" /><span className="font-bold bg-gradient-to-r from-teal-600 to-pink-600 bg-clip-text text-transparent text-lg">Marketplace Premium débloquée</span><Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0">DIAMANT</Badge></CardContent></Card>)}
+                  <Card className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30">
+                    <CardHeader><CardTitle className="flex items-center gap-3 text-2xl"><Gift className="h-8 w-8 text-pink-600" />Marketplace Exclusif</CardTitle><p className="text-muted-foreground">💎 {score.toLocaleString()} points à dépenser</p></CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {exclusivePerks.map((p, i) => {
+                          const Icon = p.icon
+                          const canAfford = score >= p.cost
+                          return (
+                            <Card key={i} className="hover:shadow-xl transition-all hover:scale-105">
+                              <CardContent className="p-6">
+                                <div className="flex items-start gap-4 mb-4"><div className="bg-gradient-to-r from-pink-500 to-purple-500 p-3 rounded-xl shadow-lg"><Icon className="h-6 w-6 text-white" /></div><div className="flex-1"><h4 className="font-bold text-lg mb-2">{p.title}</h4><p className="text-muted-foreground text-sm">{p.description}</p></div></div>
+                                <div className="flex items-center justify-between mb-3"><div className="flex items-center gap-2"><Coins className="h-5 w-5 text-primary" /><span className={`text-xl font-bold ${canAfford ? 'text-primary' : 'text-red-500'}`}>{p.cost} points</span></div><Badge variant="secondary">{p.popularity}% populaire</Badge></div>
+                                {!canAfford && <p className="text-xs text-red-500 mb-2">Il vous manque {p.cost - score} points</p>}
+                                {p.limited && <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-2 text-center mb-2"><span className="text-red-600 font-semibold text-sm">⏰ {p.limited}</span></div>}
+                                {p.waitlist && <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-2 text-center mb-2"><span className="text-yellow-600 font-semibold text-sm">📋 {p.waitlist} en liste d&apos;attente</span></div>}
+                                <Button className={`w-full font-bold ${p.available && canAfford ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'bg-muted text-muted-foreground'}`} disabled={!p.available || !canAfford} onClick={() => toast.success(`${p.title} échangé ! 🎉`)}>
+                                  {p.available && canAfford ? <><Gem className="h-4 w-4 mr-2" />Échanger</> : p.available ? <><Clock className="h-4 w-4 mr-2" />Points insuffisants</> : <><Clock className="h-4 w-4 mr-2" />Liste d&apos;attente</>}
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          )
+                        })}
+                        {canAccessPremiumMarketplace && premiumPerks.map((p, i) => {
+                          const Icon = p.icon
+                          const canAfford = score >= p.cost
+                          return (
+                            <Card key={`premium-${i}`} className="hover:shadow-xl transition-all hover:scale-105 border-2 border-teal-400/50 bg-gradient-to-br from-teal-50/50 to-cyan-50/50 dark:from-teal-500/10 dark:to-cyan-500/10">
+                              <CardContent className="p-6">
+                                <div className="flex items-start gap-4 mb-4"><div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-3 rounded-xl shadow-lg"><Icon className="h-6 w-6 text-white" /></div><div className="flex-1"><div className="flex items-center gap-2 mb-1"><h4 className="font-bold text-lg">{p.title}</h4><Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-[10px]">PREMIUM</Badge></div><p className="text-muted-foreground text-sm">{p.description}</p></div></div>
+                                <div className="flex items-center justify-between mb-3"><div className="flex items-center gap-2"><Coins className="h-5 w-5 text-teal-600" /><span className={`text-xl font-bold ${canAfford ? 'text-teal-600' : 'text-red-500'}`}>{p.cost} points</span></div><Badge variant="secondary">{p.popularity}% populaire</Badge></div>
+                                {!canAfford && <p className="text-xs text-red-500 mb-2">Il vous manque {p.cost - score} points</p>}
+                                <Button className={`w-full font-bold ${canAfford ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white' : 'bg-muted text-muted-foreground'}`} disabled={!canAfford} onClick={() => toast.success(`${p.title} échangé ! 🔥`)}>{canAfford ? <><Gem className="h-4 w-4 mr-2" />Échanger</> : <><Clock className="h-4 w-4 mr-2" />Points insuffisants</>}</Button>
+                              </CardContent>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                      <Separator className="my-8" />
+                      <div className="text-center p-6 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-2xl border border-primary/20"><h3 className="text-xl font-bold mb-2">💰 Vos Points Disponibles</h3><div className="text-4xl font-black bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">{score.toLocaleString()} points</div><p className="text-muted-foreground mt-2">Gagnez plus de points en complétant des défis</p></div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
     </div>
   )
 }

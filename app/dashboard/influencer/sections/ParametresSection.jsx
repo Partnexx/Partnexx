@@ -25,6 +25,59 @@ const HelpCircle = ({ className }) => <svg className={className} viewBox="0 0 24
 const Trash = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
 const Cookie = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"/><path d="M8.5 8.5v.01M16 15.5v.01M12 12v.01"/></svg>
 const AlertTriangle = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg>
+const Plus = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5v14"/></svg>
+const Send = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+const ChevronDown = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
+const Clock = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+const BookOpen = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+const LifeBuoy = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24M14.83 14.83l4.24 4.24M14.83 9.17l4.24-4.24M14.83 9.17l3.53-3.53M4.93 19.07l4.24-4.24"/></svg>
+const Lightbulb = ({ className }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+
+const FAQ_ITEMS = [
+  { q: "Comment je reçois mes paiements ?", a: "Renseigne ton IBAN dans Paramètres → Paiement. Après chaque collaboration validée, tes gains sont versés automatiquement sur ce compte." },
+  { q: "Comment connecter mes réseaux sociaux ?", a: "Va dans Mon profil → onglet Réseaux, puis clique sur « Connecter » pour chaque plateforme et renseigne ton @ et ton lien." },
+  { q: "Comment fonctionnent les niveaux et les points ?", a: "Tu gagnes des points en complétant des défis dans Partnexx Score. Plus tu montes de niveau, plus tu débloques d'avantages (marketplace, multiplicateurs de gains…)." },
+  { q: "Comment candidater à une campagne ?", a: "Rends-toi dans Opportunités, ouvre une campagne qui t'intéresse, puis clique sur « Candidater »." },
+  { q: "Mon profil doit-il être complété à 100 % ?", a: "Oui : certaines fonctionnalités (défis, marketplace) se débloquent une fois ton profil complet. Complète-le dans Mon profil." },
+  { q: "Comment contacter une marque ?", a: "Une fois ta candidature acceptée, un fil de discussion s'ouvre dans Messagerie pour échanger directement avec la marque." },
+]
+const DOC_SECTIONS = [
+  {
+    icon: '🚀', title: 'Bien démarrer',
+    articles: [
+      { t: 'Compléter ton profil à 100 %', a: "Un profil complet est indispensable : les marques filtrent dessus, et certaines fonctionnalités (défis, marketplace) se débloquent seulement à 100 %.\n\n1. Va dans Mon profil.\n2. Ajoute ta photo, ta bio, tes niches et tes types de contenu.\n3. Renseigne tes tarifs indicatifs.\n4. Vérifie la barre de complétion en haut du profil.\n\nAstuce : une bio claire + des tarifs réalistes augmentent nettement tes chances d'être contacté." },
+      { t: 'Connecter tes réseaux sociaux', a: "Tes réseaux montrent ta vraie audience aux marques.\n\n1. Mon profil → onglet Réseaux.\n2. Clique sur « Connecter » pour Instagram, TikTok, YouTube ou X.\n3. Renseigne ton @, le lien de ton profil et ton nombre d'abonnés.\n\nTes statistiques (followers, engagement) se recalculent automatiquement et deviennent visibles par les marques." },
+    ],
+  },
+  {
+    icon: '💸', title: 'Paiements & versements',
+    articles: [
+      { t: 'Configurer tes versements (IBAN)', a: "Pour être payé après tes collaborations :\n\n1. Paramètres → onglet Paiement.\n2. Clique sur « Configurer mes versements ».\n3. Renseigne le titulaire du compte, ton IBAN et (optionnel) ton BIC.\n4. Enregistre.\n\nTes gains sont ensuite versés sur ce compte après chaque collaboration validée. Tu peux modifier ton IBAN à tout moment." },
+      { t: 'Suivre tes gains et tes factures', a: "Le menu « Contrats & Paiements » (à gauche) regroupe tes contrats signés, l'état de tes paiements et tes factures à télécharger. Chaque collaboration validée y apparaît avec son montant." },
+    ],
+  },
+  {
+    icon: '🏆', title: 'Partnexx Score',
+    articles: [
+      { t: 'Gagner des points avec les défis', a: "Va dans Partnexx Score → onglet Défis.\n\nTu as droit à 1 défi Facile, 1 Moyen et 1 Difficile par tranche de 24h. Chaque défi complété te rapporte des points, multipliés par le bonus de ton niveau actuel. Plus tu es actif, plus tu montes vite." },
+      { t: 'Monter de niveau et débloquer des avantages', a: "Les niveaux vont de Bronze à Légende. Chaque palier débloque des avantages : marketplace de récompenses, multiplicateur de gains, mises en avant, accès premium…\n\nTon niveau dépend de ton total de points : plus tu en accumules, plus tu progresses." },
+    ],
+  },
+  {
+    icon: '🤝', title: 'Campagnes & collaborations',
+    articles: [
+      { t: 'Trouver et candidater à une campagne', a: "1. Va dans Opportunités.\n2. Parcours les campagnes (filtre par niche, budget…).\n3. Ouvre celle qui t'intéresse et clique sur « Candidater ».\n4. Personnalise ton message de candidature : explique pourquoi tu es le bon profil.\n\nUn message soigné fait toute la différence face aux candidatures génériques." },
+      { t: 'Gérer une collaboration acceptée', a: "Quand une marque accepte ta candidature :\n\n1. Un fil de discussion s'ouvre dans Messagerie.\n2. Vous calez les détails (deadline, livrables).\n3. Tu livres ton contenu.\n4. La marque valide → ton paiement est déclenché.\n\nRetrouve l'avancement de chaque collab dans Mes collaborations." },
+    ],
+  },
+  {
+    icon: '🛡️', title: 'Compte & sécurité',
+    articles: [
+      { t: 'Changer ton mot de passe', a: "Paramètres → onglet Sécurité → renseigne ton nouveau mot de passe (la jauge t'indique sa solidité), confirme-le, puis enregistre." },
+      { t: 'Confidentialité & données (RGPD)', a: "Paramètres → onglet Confidentialité te permet de gérer tes cookies et d'exporter toutes tes données (au format PDF lisible ou JSON complet). Tu gardes le contrôle de tes informations." },
+    ],
+  },
+]
 
 // Calcule la force d'un mot de passe → largeur de barre + label + couleurs
 function getPasswordStrength(pw) {
@@ -70,6 +123,31 @@ export default function ParametresSection({ user, profile }) {
     opportunity: true, message: true, collab: true, payment: true, review: true, deadline: false,
   })
   const [frequency, setFrequency] = useState('daily')
+  const [payout, setPayout] = useState({
+    account_type: 'particulier',
+    first_name: '', last_name: '', company_name: '',
+    address: '', postal_code: '', city: '', country: 'France',
+    siret: '', vat: '',
+    account_holder: '', iban: '', bic: '',
+  })
+  const [showPayoutForm, setShowPayoutForm] = useState(false)
+  const [savingPayout, setSavingPayout] = useState(false)
+  const [payoutConfigured, setPayoutConfigured] = useState(false)
+  const [tickets, setTickets] = useState([])
+  const [showTicketForm, setShowTicketForm] = useState(false)
+  const [ticketSubject, setTicketSubject] = useState('')
+  const [ticketCategory, setTicketCategory] = useState('autre')
+  const [ticketMessage, setTicketMessage] = useState('')
+  const [creatingTicket, setCreatingTicket] = useState(false)
+  const [openTicketId, setOpenTicketId] = useState(null)
+  const [ticketMsgs, setTicketMsgs] = useState({})
+  const [replyBody, setReplyBody] = useState('')
+  const [sendingReply, setSendingReply] = useState(false)
+  const [helpView, setHelpView] = useState(null)
+  const [openFaq, setOpenFaq] = useState(null)
+  const [openGuide, setOpenGuide] = useState(null)
+  const [suggestion, setSuggestion] = useState('')
+  const [sendingSuggestion, setSendingSuggestion] = useState(false)
   const loadedRef = useRef(false)
 
   // Charge les préférences cookies sauvegardées (côté navigateur)
@@ -129,6 +207,139 @@ export default function ParametresSection({ user, profile }) {
     applyTheme(t)
     try { localStorage.setItem('partnexx_theme', t) } catch (e) { /* ignore */ }
     toast.success(`Thème ${t === 'light' ? 'Clair' : t === 'dark' ? 'Sombre' : 'Auto'} activé`)
+  }
+
+  // Charge les coordonnées de versement (IBAN) existantes
+  useEffect(() => {
+    if (!user?.id) return
+    const loadPayout = async () => {
+      const { data, error } = await supabase.from('payout_accounts').select('*').eq('user_id', user.id).maybeSingle()
+      if (error) { console.warn('payout load:', error.message); return }
+      if (data) {
+        setPayout({
+          account_type: data.account_type || 'particulier',
+          first_name: data.first_name || '', last_name: data.last_name || '', company_name: data.company_name || '',
+          address: data.address || '', postal_code: data.postal_code || '', city: data.city || '', country: data.country || 'France',
+          siret: data.siret || '', vat: data.vat || '',
+          account_holder: data.account_holder || '', iban: data.iban || '', bic: data.bic || '',
+        })
+        setPayoutConfigured(!!data.iban)
+      }
+    }
+    loadPayout()
+  }, [user?.id])
+
+  // Masque l'IBAN à l'affichage (garde début + 4 derniers)
+  const maskIban = (iban) => {
+    const clean = (iban || '').replace(/\s/g, '')
+    if (clean.length < 8) return clean
+    return clean.slice(0, 4) + ' •••• ' + clean.slice(-4)
+  }
+
+  const handleSavePayout = async () => {
+    if (!user?.id) return
+    const isCompany = payout.account_type === 'societe'
+    const holder = payout.account_holder.trim()
+    const iban = payout.iban.replace(/\s/g, '').toUpperCase()
+    if (isCompany ? !payout.company_name.trim() : (!payout.first_name.trim() || !payout.last_name.trim())) {
+      toast.error(isCompany ? "Indique la raison sociale" : "Indique ton prénom et ton nom"); return
+    }
+    if (!holder) { toast.error("Indique le titulaire du compte bancaire"); return }
+    if (iban.length < 14) { toast.error("IBAN invalide"); return }
+    setSavingPayout(true)
+    const { error } = await supabase.from('payout_accounts').upsert({
+      user_id: user.id,
+      account_type: payout.account_type,
+      first_name: payout.first_name.trim(),
+      last_name: payout.last_name.trim(),
+      company_name: payout.company_name.trim(),
+      address: payout.address.trim(),
+      postal_code: payout.postal_code.trim(),
+      city: payout.city.trim(),
+      country: payout.country.trim() || 'France',
+      siret: payout.siret.replace(/\s/g, ''),
+      vat: payout.vat.replace(/\s/g, '').toUpperCase(),
+      account_holder: holder,
+      iban,
+      bic: (payout.bic || '').replace(/\s/g, '').toUpperCase(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' })
+    setSavingPayout(false)
+    if (error) { toast.error("Erreur : " + error.message); return }
+    setPayout(p => ({ ...p, iban }))
+    setPayoutConfigured(true)
+    setShowPayoutForm(false)
+    toast.success("Informations de versement enregistrées ✅")
+  }
+
+  // ----- Tickets de support -----
+  const TICKET_STATUS = {
+    open: { label: 'Ouvert', cls: 'bg-blue-500/15 text-blue-600 border-blue-500/30' },
+    in_progress: { label: 'En cours', cls: 'bg-amber-500/15 text-amber-600 border-amber-500/30' },
+    resolved: { label: 'Résolu', cls: 'bg-green-500/15 text-green-600 border-green-500/30' },
+  }
+
+  useEffect(() => {
+    if (!user?.id) return
+    const loadTickets = async () => {
+      const { data, error } = await supabase.from('support_tickets').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+      if (error) { console.warn('tickets load:', error.message); return }
+      setTickets(data || [])
+    }
+    loadTickets()
+  }, [user?.id])
+
+  const handleCreateTicket = async () => {
+    if (!user?.id) return
+    const subject = ticketSubject.trim()
+    const message = ticketMessage.trim()
+    if (!subject) { toast.error("Donne un sujet à ton ticket"); return }
+    if (!message) { toast.error("Décris ton problème"); return }
+    setCreatingTicket(true)
+    const { data: ticket, error } = await supabase.from('support_tickets')
+      .insert({ user_id: user.id, subject, category: ticketCategory, status: 'open' })
+      .select().single()
+    if (error) { setCreatingTicket(false); toast.error("Erreur : " + error.message); return }
+    await supabase.from('ticket_messages').insert({ ticket_id: ticket.id, user_id: user.id, sender: 'user', body: message })
+    setCreatingTicket(false)
+    setTicketSubject(''); setTicketMessage(''); setTicketCategory('autre'); setShowTicketForm(false)
+    setTickets(prev => [ticket, ...prev])
+    setTicketMsgs(prev => ({ ...prev, [ticket.id]: [{ id: 'first', sender: 'user', body: message, created_at: new Date().toISOString() }] }))
+    toast.success("Ticket créé ✅ On te répond au plus vite !")
+  }
+
+  const toggleTicket = async (ticketId) => {
+    if (openTicketId === ticketId) { setOpenTicketId(null); return }
+    setOpenTicketId(ticketId)
+    if (!ticketMsgs[ticketId]) {
+      const { data } = await supabase.from('ticket_messages').select('*').eq('ticket_id', ticketId).order('created_at', { ascending: true })
+      setTicketMsgs(prev => ({ ...prev, [ticketId]: data || [] }))
+    }
+  }
+
+  const handleSendReply = async (ticketId) => {
+    const body = replyBody.trim()
+    if (!body) return
+    setSendingReply(true)
+    const { data, error } = await supabase.from('ticket_messages')
+      .insert({ ticket_id: ticketId, user_id: user.id, sender: 'user', body })
+      .select().single()
+    setSendingReply(false)
+    if (error) { toast.error("Erreur : " + error.message); return }
+    setTicketMsgs(prev => ({ ...prev, [ticketId]: [...(prev[ticketId] || []), data] }))
+    setReplyBody('')
+  }
+
+  const handleSendSuggestion = async () => {
+    if (!user?.id) return
+    const body = suggestion.trim()
+    if (!body) { toast.error("Écris ton idée d'amélioration"); return }
+    setSendingSuggestion(true)
+    const { error } = await supabase.from('feature_suggestions').insert({ user_id: user.id, body })
+    setSendingSuggestion(false)
+    if (error) { toast.error("Erreur : " + error.message); return }
+    setSuggestion('')
+    toast.success("Merci ! Ta suggestion a bien été envoyée 💡")
   }
 
   const handleApplyPromo = () => {
@@ -382,7 +593,6 @@ export default function ParametresSection({ user, profile }) {
     { value: "notifications", label: "Notifications", icon: Bell, color: "from-blue-500 to-blue-600" },
     { value: "appearance", label: "Apparence", icon: Palette, color: "from-amber-500 to-amber-600" },
     { value: "payment", label: "Paiement", icon: CreditCard, color: "from-green-500 to-green-600" },
-    { value: "subscription", label: "Abonnement", icon: Crown, color: "from-yellow-500 to-yellow-600" },
     { value: "support", label: "Support", icon: HelpCircle, color: "from-cyan-500 to-cyan-600" },
   ]
 
@@ -400,7 +610,7 @@ export default function ParametresSection({ user, profile }) {
       </div>
 
       <Tabs defaultValue="security" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7 gap-2 bg-transparent p-0 h-auto">
+        <TabsList className="grid w-full grid-cols-6 gap-2 bg-transparent p-0 h-auto">
           {tabs.map(({ value, label, icon: Icon, color }) => (
             <TabsTrigger key={value} value={value} className={`rounded-2xl h-14 data-[state=active]:bg-gradient-to-br data-[state=active]:${color} data-[state=active]:text-white data-[state=active]:shadow-lg bg-card hover:bg-muted/50 transition-all duration-300 border-2 border-border/50`}>
               <div className="flex flex-col items-center gap-1">
@@ -743,155 +953,361 @@ export default function ParametresSection({ user, profile }) {
           </Card>
         </TabsContent>
 
-        {/* PAIEMENT */}
+        {/* ═══════════════ PAIEMENT (refait) ═══════════════ */}
         <TabsContent value="payment" className="space-y-6">
-          <Card className="border-green-500/20 bg-gradient-to-br from-green-500/5 to-background">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-3"><CreditCard className="h-6 w-6 text-green-500" />Paiement & Facturation</CardTitle>
-                <Badge className="bg-green-500 text-white">Sécurisé Stripe</Badge>
-              </div>
-            </CardHeader>
-          </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CreditCard className="h-5 w-5 text-green-500" />Moyens de paiement</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <div className="p-4 bg-muted/50 rounded-lg border text-center text-sm text-muted-foreground">
-                  Gérez vos moyens de paiement via Stripe
+          {/* Bannière */}
+          <Card className="border-0 overflow-hidden bg-gradient-to-br from-green-500/10 via-emerald-500/5 to-background shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shrink-0">
+                    <CreditCard className="h-7 w-7 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Paiement & Versements</h2>
+                    <p className="text-sm text-muted-foreground">Reçois tes gains en toute sécurité</p>
+                  </div>
                 </div>
-                <Button className="w-full" size="sm" onClick={() => toast.info("Portail Stripe disponible prochainement")}>
-                  <CreditCard className="h-4 w-4 mr-2" />Gérer mes paiements
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Download className="h-5 w-5 text-blue-500" />Factures</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <div className="p-4 bg-muted/50 rounded-lg border text-center text-sm text-muted-foreground">
-                  Vos factures sont disponibles dans le portail Stripe
-                </div>
-                <Button variant="outline" className="w-full" size="sm" onClick={() => toast.info("Portail Stripe disponible prochainement")}>
-                  <Download className="h-4 w-4 mr-2" />Télécharger les factures
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* ABONNEMENT */}
-        <TabsContent value="subscription" className="space-y-6">
-          <Card className="border-primary bg-gradient-to-br from-primary/10 to-background">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-xl">Plan actuel</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">Accès à la plateforme Partnexx</p>
-                </div>
-                <Badge className="bg-primary text-white text-lg px-4 py-2 capitalize">
-                  {profile?.subscription_plan || 'Gratuit'}
+                <Badge className="bg-green-500/15 text-green-600 border border-green-500/30 gap-1.5 px-3 py-1.5 self-start sm:self-auto">
+                  <CheckCircle className="h-4 w-4" />Sécurisé par Stripe
                 </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {[
-                  { name: "Starter", price: "0 €", period: "gratuit", features: ["5 opportunités par mois", "Support basique", "Messagerie limitée", "Statistiques de base"], popular: false },
-                  { name: "Pro", price: "29,99 €", period: "par mois", features: ["Opportunités illimitées", "Support prioritaire", "Messagerie avancée", "Statistiques détaillées", "Badge vérifié"], popular: true },
-                  { name: "Enterprise", price: "99,99 €", period: "par mois", features: ["Tout inclus du Pro", "Support dédié 24/7", "API access", "Branding personnalisé", "Priorité absolue"], popular: false },
-                ].map((plan, i) => (
-                  <Card key={i} className={plan.popular ? "border-2 border-primary relative" : ""}>
-                    {plan.popular && <div className="absolute -top-3 left-1/2 -translate-x-1/2"><Badge className="bg-primary text-white">Recommandé</Badge></div>}
-                    <CardHeader className="text-center">
-                      <CardTitle className="text-lg">{plan.name}</CardTitle>
-                      <div className="pt-4"><p className="text-3xl font-bold">{plan.price}</p><p className="text-xs text-muted-foreground">{plan.period}</p></div>
-                    </CardHeader>
-                    <CardContent>
-                      <ul className="space-y-2 mb-4">
-                        {plan.features.map((f, j) => <li key={j} className="flex items-start gap-2"><CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" /><span className="text-sm">{f}</span></li>)}
-                      </ul>
-                      <Button
-                        variant={plan.popular ? "default" : "outline"}
-                        className="w-full"
-                        onClick={() => toast.info(`Passage au plan ${plan.name} — disponible prochainement`)}
-                      >
-                        Choisir ce plan
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
               </div>
             </CardContent>
           </Card>
 
-          {/* Code promo */}
-          <Card className="border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 to-background">
+          {/* Compte de versement */}
+          <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Gift className="h-5 w-5 text-emerald-500" />Code Promo
-                {promoApplied && <Badge className="ml-2 bg-emerald-500 text-white">Actif</Badge>}
-              </CardTitle>
+              <CardTitle className="flex items-center gap-2 text-base"><CreditCard className="h-5 w-5 text-green-500" />Compte de versement</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">Vous avez un code promo ? Entrez-le ci-dessous.</p>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Tag className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Entrez votre code promo" value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())} className="pl-10" disabled={promoApplied} />
+
+              {payoutConfigured && !showPayoutForm ? (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border bg-green-500/5">
+                  <div className="flex items-center gap-3">
+                    <span className="w-10 h-10 rounded-xl bg-green-500/15 flex items-center justify-center shrink-0"><CheckCircle className="h-5 w-5 text-green-600" /></span>
+                    <div>
+                      <p className="text-sm font-semibold">Compte configuré</p>
+                      <p className="text-xs text-muted-foreground">{payout.account_holder} • {maskIban(payout.iban)}</p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" className="rounded-lg" onClick={() => setShowPayoutForm(true)}>Modifier</Button>
                 </div>
-                <Button onClick={handleApplyPromo} disabled={promoApplied} className="bg-emerald-500 hover:bg-emerald-600">
-                  {promoApplied ? "Appliqué" : "Appliquer"}
-                </Button>
-              </div>
-              {promoApplied && (
-                <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                  <CheckCircle className="h-4 w-4 text-emerald-500" />
-                  <span className="text-sm text-emerald-600 font-medium">Code appliqué — 20% de réduction sur votre prochain paiement</span>
+              ) : !showPayoutForm ? (
+                <>
+                  <div className="p-4 rounded-xl border bg-muted/30 text-sm text-muted-foreground">
+                    Pour recevoir tes paiements après chaque collaboration validée, renseigne les coordonnées de ton compte bancaire (IBAN).
+                  </div>
+                  <Button size="lg" className="w-full h-12 rounded-xl text-sm font-semibold bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white" onClick={() => setShowPayoutForm(true)}>
+                    <CreditCard className="h-5 w-5 mr-2" />Configurer mes versements
+                  </Button>
+                </>
+              ) : (
+                <div className="space-y-5">
+
+                  {/* Type de compte */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Type de compte</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { k: 'particulier', l: 'Particulier' },
+                        { k: 'auto', l: 'Auto-entrep.' },
+                        { k: 'societe', l: 'Société' },
+                      ].map(opt => (
+                        <button key={opt.k} type="button" onClick={() => setPayout(p => ({ ...p, account_type: opt.k }))}
+                          className={`h-11 rounded-xl border-2 text-sm font-medium transition-all ${payout.account_type === opt.k ? 'border-green-500 bg-green-500/10 text-green-600' : 'border-border hover:bg-muted/50'}`}>
+                          {opt.l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Identité / facturation */}
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-green-500" />Identité &amp; facturation</p>
+                    {payout.account_type === 'societe' ? (
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">Raison sociale</label>
+                        <Input placeholder="Ma Société SAS" value={payout.company_name} onChange={(e) => setPayout(p => ({ ...p, company_name: e.target.value }))} className="h-11" />
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Prénom</label>
+                          <Input placeholder="Prénom" value={payout.first_name} onChange={(e) => setPayout(p => ({ ...p, first_name: e.target.value }))} className="h-11" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Nom</label>
+                          <Input placeholder="Nom" value={payout.last_name} onChange={(e) => setPayout(p => ({ ...p, last_name: e.target.value }))} className="h-11" />
+                        </div>
+                      </div>
+                    )}
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Adresse</label>
+                      <Input placeholder="12 rue des Créateurs" value={payout.address} onChange={(e) => setPayout(p => ({ ...p, address: e.target.value }))} className="h-11" />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">Code postal</label>
+                        <Input placeholder="75001" value={payout.postal_code} onChange={(e) => setPayout(p => ({ ...p, postal_code: e.target.value }))} className="h-11" />
+                      </div>
+                      <div className="space-y-1.5 col-span-2">
+                        <label className="text-sm font-medium">Ville</label>
+                        <Input placeholder="Paris" value={payout.city} onChange={(e) => setPayout(p => ({ ...p, city: e.target.value }))} className="h-11" />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Pays</label>
+                      <Input placeholder="France" value={payout.country} onChange={(e) => setPayout(p => ({ ...p, country: e.target.value }))} className="h-11" />
+                    </div>
+                    {payout.account_type !== 'particulier' && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">SIRET</label>
+                          <Input placeholder="123 456 789 00012" value={payout.siret} onChange={(e) => setPayout(p => ({ ...p, siret: e.target.value }))} className="h-11" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">N° TVA <span className="text-muted-foreground font-normal">(optionnel)</span></label>
+                          <Input placeholder="FR12345678901" value={payout.vat} onChange={(e) => setPayout(p => ({ ...p, vat: e.target.value.toUpperCase() }))} className="h-11 font-mono" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Coordonnées bancaires */}
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold flex items-center gap-2"><CreditCard className="h-4 w-4 text-green-500" />Coordonnées bancaires</p>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Titulaire du compte</label>
+                      <Input placeholder="Prénom Nom / Raison sociale" value={payout.account_holder} onChange={(e) => setPayout(p => ({ ...p, account_holder: e.target.value }))} className="h-11" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">IBAN</label>
+                      <Input placeholder="FR76 0000 0000 0000 0000 0000 000" value={payout.iban} onChange={(e) => setPayout(p => ({ ...p, iban: e.target.value.toUpperCase() }))} className="h-11 font-mono tracking-wide" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">BIC <span className="text-muted-foreground font-normal">(optionnel)</span></label>
+                      <Input placeholder="BNPAFRPP" value={payout.bic} onChange={(e) => setPayout(p => ({ ...p, bic: e.target.value.toUpperCase() }))} className="h-11 font-mono" />
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-muted-foreground">
+                    <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                    Tes informations sont confidentielles et servent uniquement à établir tes factures et te verser tes gains.
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button variant="outline" className="flex-1 h-12 rounded-xl" onClick={() => setShowPayoutForm(false)} disabled={savingPayout}>Annuler</Button>
+                    <Button className="flex-1 h-12 rounded-xl font-semibold bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white" onClick={handleSavePayout} disabled={savingPayout}>
+                      {savingPayout ? 'Enregistrement…' : 'Enregistrer'}
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
+
+          {/* Factures */}
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><FileText className="h-5 w-5 text-blue-500" />Mes factures</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 rounded-xl border bg-muted/30 text-sm text-muted-foreground">
+                Retrouve les factures de tes collaborations terminées dans <span className="font-medium text-foreground">« Contrats &amp; Paiements »</span> (menu de gauche).
+              </div>
+              <Button variant="outline" size="lg" className="w-full h-12 rounded-xl text-sm font-semibold" onClick={() => toast.info("Tes factures sont dans « Contrats & Paiements » (menu de gauche)")}>
+                <FileText className="h-5 w-5 mr-2" />Où trouver mes factures ?
+              </Button>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        {/* SUPPORT */}
+        {/* ═══════════════ SUPPORT (refait) ═══════════════ */}
         <TabsContent value="support" className="space-y-6">
-          <Card className="border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-background">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-3"><HelpCircle className="h-6 w-6 text-cyan-500" />Aide & Support</CardTitle>
-                <Badge className="bg-cyan-500 text-white">24/7</Badge>
+
+          {/* Bannière */}
+          <Card className="border-0 overflow-hidden bg-gradient-to-br from-cyan-500/10 via-sky-500/5 to-background shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-sky-500 flex items-center justify-center shadow-lg shrink-0">
+                    <LifeBuoy className="h-7 w-7 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Aide & Support</h2>
+                    <p className="text-sm text-muted-foreground">Crée un ticket, on te répond vite</p>
+                  </div>
+                </div>
+                <Badge className="bg-cyan-500/15 text-cyan-600 border border-cyan-500/30 gap-1.5 px-3 py-1.5 self-start sm:self-auto">
+                  <Clock className="h-4 w-4" />Réponse ~2h
+                </Badge>
               </div>
-            </CardHeader>
+            </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><HelpCircle className="h-5 w-5 text-cyan-500" />Centre d&apos;aide</CardTitle></CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start" size="sm" onClick={() => toast.info("Documentation disponible prochainement")}><ExternalLink className="h-4 w-4 mr-2" />Documentation complète</Button>
-                <Button variant="outline" className="w-full justify-start" size="sm" onClick={() => toast.info("FAQ disponible dans Ressources")}><MessageCircle className="h-4 w-4 mr-2" />Questions fréquentes</Button>
-                <Button variant="outline" className="w-full justify-start" size="sm" onClick={() => toast.info("Tutoriels disponibles prochainement")}><ExternalLink className="h-4 w-4 mr-2" />Tutoriels vidéo</Button>
-              </CardContent>
-            </Card>
+          {/* SYSTÈME DE TICKETS */}
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="flex items-center gap-2 text-base"><MessageCircle className="h-5 w-5 text-cyan-500" />Mes tickets</CardTitle>
+              <Button size="sm" className="rounded-lg gap-1.5 bg-gradient-to-r from-cyan-500 to-sky-500 text-white" onClick={() => setShowTicketForm(v => !v)}>
+                <Plus className="h-4 w-4" />Nouveau ticket
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
 
-            <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><MessageCircle className="h-5 w-5 text-blue-500" />Contacter le support</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <Button className="w-full" size="sm" onClick={() => toast.info("Chat disponible prochainement")}><MessageCircle className="h-4 w-4 mr-2" />Chat en direct</Button>
-                <Button variant="outline" className="w-full" size="sm" onClick={() => window.location.href = "mailto:support@partnexx.fr"}><Mail className="h-4 w-4 mr-2" />support@partnexx.fr</Button>
-                <p className="text-xs text-muted-foreground text-center">Temps de réponse moyen : 2h</p>
-              </CardContent>
-            </Card>
-          </div>
+              {showTicketForm && (
+                <div className="space-y-3 p-4 rounded-xl border bg-muted/30">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Sujet</label>
+                    <Input placeholder="Ex : Problème avec un versement" value={ticketSubject} onChange={(e) => setTicketSubject(e.target.value)} className="h-11" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Catégorie</label>
+                    <select value={ticketCategory} onChange={(e) => setTicketCategory(e.target.value)} className="w-full h-11 rounded-md border bg-background px-3 text-sm">
+                      <option value="bug">Bug / problème technique</option>
+                      <option value="paiement">Paiement</option>
+                      <option value="compte">Compte</option>
+                      <option value="campagne">Campagne / collaboration</option>
+                      <option value="autre">Autre</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Message</label>
+                    <textarea rows={4} placeholder="Décris ton souci en détail…" value={ticketMessage} onChange={(e) => setTicketMessage(e.target.value)} className="w-full rounded-md border bg-background px-3 py-2 text-sm resize-y" />
+                  </div>
+                  <div className="flex gap-3">
+                    <Button variant="outline" className="flex-1 h-11 rounded-xl" onClick={() => setShowTicketForm(false)} disabled={creatingTicket}>Annuler</Button>
+                    <Button className="flex-1 h-11 rounded-xl bg-gradient-to-r from-cyan-500 to-sky-500 text-white font-semibold" onClick={handleCreateTicket} disabled={creatingTicket}>
+                      {creatingTicket ? 'Envoi…' : 'Envoyer le ticket'}
+                    </Button>
+                  </div>
+                </div>
+              )}
 
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Star className="h-5 w-5 text-purple-500" />Votre avis compte</CardTitle></CardHeader>
+              {!showTicketForm && tickets.length === 0 && (
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  <LifeBuoy className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                  Aucun ticket pour l&apos;instant. Un souci ? Crée ton premier ticket.
+                </div>
+              )}
+
+              {tickets.map((t) => {
+                const st = TICKET_STATUS[t.status] || TICKET_STATUS.open
+                const isOpen = openTicketId === t.id
+                const msgs = ticketMsgs[t.id] || []
+                return (
+                  <div key={t.id} className="rounded-xl border overflow-hidden">
+                    <button onClick={() => toggleTicket(t.id)} className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-muted/40 transition-colors">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">{t.subject}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleDateString('fr-FR')} • {t.category}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant="outline" className={`${st.cls} text-xs`}>{st.label}</Badge>
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+
+                    {isOpen && (
+                      <div className="border-t p-4 space-y-3 bg-muted/20">
+                        {msgs.length === 0 && <p className="text-xs text-muted-foreground">Chargement…</p>}
+                        {msgs.map((m) => (
+                          <div key={m.id} className={`flex ${m.sender === 'support' ? 'justify-start' : 'justify-end'}`}>
+                            <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.sender === 'support' ? 'bg-card border' : 'bg-cyan-500/15 text-foreground'}`}>
+                              <p>{m.body}</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">{m.sender === 'support' ? 'Support Partnexx' : 'Toi'}</p>
+                            </div>
+                          </div>
+                        ))}
+                        {t.status !== 'resolved' && (
+                          <div className="flex gap-2 pt-1">
+                            <Input placeholder="Répondre…" value={replyBody} onChange={(e) => setReplyBody(e.target.value)} className="h-10" />
+                            <Button size="sm" className="h-10 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white" onClick={() => handleSendReply(t.id)} disabled={sendingReply}>
+                              <Send className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+
+          {/* Contact alternatif */}
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Mail className="h-5 w-5 text-cyan-500" />Autre moyen de contact</CardTitle></CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-3">Aidez-nous à améliorer Partnexx en partageant votre expérience</p>
-              <Button variant="outline" className="w-full" size="sm" onClick={() => toast.success("Merci pour votre retour !")}>
-                <MessageCircle className="h-4 w-4 mr-2" />Donner mon avis
+              <Button variant="outline" onClick={() => window.location.href = "mailto:support@partnexx.fr?subject=Demande%20de%20support"} className="w-full h-auto py-4 rounded-xl gap-3 justify-start border-2">
+                <span className="w-10 h-10 rounded-xl bg-cyan-500/15 flex items-center justify-center shrink-0"><Mail className="h-5 w-5 text-cyan-500" /></span>
+                <span className="flex flex-col items-start text-left">
+                  <span className="text-sm font-semibold">Écrire un e-mail</span>
+                  <span className="text-xs text-muted-foreground font-normal">support@partnexx.fr</span>
+                </span>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* CENTRE D'AIDE : FAQ + Documentation */}
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><BookOpen className="h-5 w-5 text-cyan-500" />Centre d&apos;aide</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant={helpView === 'faq' ? 'default' : 'outline'} className={`h-12 rounded-xl text-sm font-semibold ${helpView === 'faq' ? 'bg-cyan-500 text-white' : ''}`} onClick={() => setHelpView(v => v === 'faq' ? null : 'faq')}>
+                  <HelpCircle className="h-4 w-4 mr-2" />FAQ
+                </Button>
+                <Button variant={helpView === 'guides' ? 'default' : 'outline'} className={`h-12 rounded-xl text-sm font-semibold ${helpView === 'guides' ? 'bg-cyan-500 text-white' : ''}`} onClick={() => setHelpView(v => v === 'guides' ? null : 'guides')}>
+                  <BookOpen className="h-4 w-4 mr-2" />Documentation
+                </Button>
+              </div>
+
+              {helpView === 'faq' && (
+                <div className="space-y-2 pt-1">
+                  {FAQ_ITEMS.map((item, i) => (
+                    <div key={i} className="rounded-xl border overflow-hidden">
+                      <button onClick={() => setOpenFaq(openFaq === i ? null : i)} className="w-full flex items-center justify-between gap-3 p-3 text-left hover:bg-muted/40 transition-colors">
+                        <span className="text-sm font-medium">{item.q}</span>
+                        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${openFaq === i ? 'rotate-180' : ''}`} />
+                      </button>
+                      {openFaq === i && <div className="px-3 pb-3 text-sm text-muted-foreground">{item.a}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {helpView === 'guides' && (
+                <div className="space-y-4 pt-1">
+                  {DOC_SECTIONS.map((sec, si) => (
+                    <div key={si} className="space-y-2">
+                      <p className="text-sm font-semibold flex items-center gap-2"><span>{sec.icon}</span>{sec.title}</p>
+                      {sec.articles.map((art, ai) => {
+                        const key = `${si}-${ai}`
+                        return (
+                          <div key={key} className="rounded-xl border overflow-hidden">
+                            <button onClick={() => setOpenGuide(openGuide === key ? null : key)} className="w-full flex items-center justify-between gap-3 p-3 text-left hover:bg-muted/40 transition-colors">
+                              <span className="text-sm font-medium flex items-center gap-2"><FileText className="h-4 w-4 text-cyan-500 shrink-0" />{art.t}</span>
+                              <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${openGuide === key ? 'rotate-180' : ''}`} />
+                            </button>
+                            {openGuide === key && <div className="px-3 pb-3 text-sm text-muted-foreground whitespace-pre-line leading-relaxed">{art.a}</div>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Proposer une amélioration */}
+          <Card className="shadow-sm">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Lightbulb className="h-5 w-5 text-amber-500" />Proposer une amélioration</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">Une idée pour rendre Partnexx meilleur ? Décris-la, on lit toutes les suggestions.</p>
+              <textarea rows={3} placeholder="Ex : j'aimerais pouvoir filtrer les campagnes par budget…" value={suggestion} onChange={(e) => setSuggestion(e.target.value)} className="w-full rounded-md border bg-background px-3 py-2 text-sm resize-y" />
+              <Button className="w-full h-12 rounded-xl text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white" onClick={handleSendSuggestion} disabled={sendingSuggestion}>
+                <Send className="h-4 w-4 mr-2" />{sendingSuggestion ? 'Envoi…' : 'Envoyer ma suggestion'}
               </Button>
             </CardContent>
           </Card>
