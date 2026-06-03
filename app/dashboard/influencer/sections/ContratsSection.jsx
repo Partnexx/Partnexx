@@ -9,8 +9,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { useState } from 'react'
-import { Search, Calendar, DollarSign, FileText, Download, CreditCard, Brain, CheckCircle, Clock, AlertCircle, Eye, Shield, TrendingUp, Lock, Wallet, Send, BarChart3, Receipt, History, ChevronRight, List, LayoutGrid, Euro, AlertTriangle, CheckCircle2, Target, Zap, ArrowUpRight, ArrowDownRight, LayoutDashboard, RefreshCw, Plus, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Search, Calendar, DollarSign, FileText, Download, CreditCard, Brain, CheckCircle, Clock, AlertCircle, Eye, Shield, TrendingUp, Lock, Wallet, Send, BarChart3, Receipt, History, ChevronRight, List, LayoutGrid, Euro, AlertTriangle, CheckCircle2, Target, Zap, ArrowUpRight, ArrowDownRight, LayoutDashboard, RefreshCw, Plus, ThumbsUp, ThumbsDown, ImagePlus } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { toast } from 'sonner'
 import supabase from '@/lib/supabase'
@@ -824,7 +824,7 @@ function ContratsCote({ contracts = [], transactions = [] }) {
 /* ════════════════════════════════════════════════════════════
    ONGLET PAIEMENTS — refonte 5 sous-onglets (vraies données + gating conservés)
    ════════════════════════════════════════════════════════════ */
-function PaiementsTab({ transactions = [], user }) {
+function PaiementsTab({ transactions = [], contracts = [], user }) {
   const { canAccess, score: userScore } = useLevel()
 
   const canWithdraw = canAccess('withdrawals')
@@ -841,13 +841,163 @@ function PaiementsTab({ transactions = [], user }) {
   const [downloadingInvoiceId, setDownloadingInvoiceId] = useState(null)
   const [monthlyOpen, setMonthlyOpen] = useState(false)
   const [docsOpen, setDocsOpen] = useState(false)
+  const [expandedCampaign, setExpandedCampaign] = useState(null)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const [pendingImage, setPendingImage] = useState(null)
+
+  // Lien transaction → campagne (via contract_id, en s'appuyant sur les contrats déjà chargés)
+  const contractsById = {}
+  contracts.forEach(c => { if (c?.id) contractsById[c.id] = c })
+
+  const getCampaignLabel = (tx) => {
+    const c = contractsById[tx.contract_id]
+    if (c?.brands?.company_name) return c.brands.company_name
+    if (tx.description) return tx.description
+    return tx.contract_id ? `Campagne #${tx.contract_id.slice(0, 8)}` : `Transaction #${tx.id.slice(0, 8)}`
+  }
+
+  // Escrow : libération auto = escrow_held_at + 15 jours (ou validation marque avant)
+  const ESCROW_AUTO_DAYS = 15
+  const getEscrowRelease = (tx) => {
+    if (!tx.escrow_held_at) return null
+    const due = new Date(new Date(tx.escrow_held_at).getTime() + ESCROW_AUTO_DAYS * 86400000)
+    const days = Math.ceil((due - new Date()) / 86400000)
+    return { due, days }
+  }
 
   const filtered = transactions.filter(t => {
+    const q = search.toLowerCase()
     const matchSearch = search === "" ||
-      (t.description || "").toLowerCase().includes(search.toLowerCase())
+      (t.description || "").toLowerCase().includes(q) ||
+      getCampaignLabel(t).toLowerCase().includes(q)
     const matchStatus = filterStatus === "all" || t.status === filterStatus
     return matchSearch && matchStatus
   })
+
+  // Regroupement par campagne (onglet Transactions)
+  const campaignGroups = (() => {
+    const map = {}
+    filtered.forEach(tx => {
+      const key = tx.contract_id || `tx-${tx.id}`
+      if (!map[key]) map[key] = { key, label: getCampaignLabel(tx), txs: [], total: 0, received: 0, lastDate: 0 }
+      map[key].txs.push(tx)
+      map[key].total += parseFloat(tx.influencer_amount || 0)
+      if (tx.status === 'released') map[key].received += parseFloat(tx.influencer_amount || 0)
+      const d = new Date(tx.created_at).getTime()
+      if (d > map[key].lastDate) map[key].lastDate = d
+    })
+    return Object.values(map).sort((a, b) => b.lastDate - a.lastDate)
+  })()
+
+  // ===== Assistant fiscal IA =====
+  const presetQuestions = [
+    "Je suis auto-entrepreneur (micro-entreprise) : quelles sont mes obligations fiscales pour mes revenus de créateur ?",
+    "Je n'ai pas de statut : comment déclarer mes revenus de créateur ?",
+    "J'ai une société (SASU/EURL) : comment sont imposés mes revenus de créateur ?",
+  ]
+
+  const buildPayload = (msgs) => msgs.map(m => {
+    if (m.images && m.images.length) {
+      const blocks = m.images.map(img => ({ type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } }))
+      blocks.push({ type: 'text', text: m.content || 'Peux-tu analyser cette image ?' })
+      return { role: m.role, content: blocks }
+    }
+    return { role: m.role, content: m.content }
+  })
+
+  const sendChat = async (text) => {
+    const content = (typeof text === 'string' ? text : chatInput).trim()
+    if ((!content && !pendingImage) || chatLoading) return
+    const userMsg = { role: 'user', content, images: pendingImage ? [pendingImage] : undefined }
+    const newMessages = [...chatMessages, userMsg]
+    setChatMessages(newMessages)
+    setChatInput('')
+    setPendingImage(null)
+    setChatLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { toast.error('Tu dois être connecté'); setChatLoading(false); return }
+      const res = await fetch('/api/influencer/fiscal-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ messages: buildPayload(newMessages) }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erreur')
+      setChatMessages([...newMessages, { role: 'assistant', content: data.reply }])
+    } catch (e) {
+      setChatMessages([...newMessages, { role: 'assistant', content: `Désolé, je n'ai pas pu répondre (${e.message || 'erreur'}). Réessaie.` }])
+    } finally {
+      setChatLoading(false)
+    }
+  }
+
+  const handleAttachImage = (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) { toast.error('Image uniquement'); return }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image trop lourde (max 5 Mo)'); return }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = String(reader.result)
+      setPendingImage({ url: dataUrl, mediaType: file.type, data: dataUrl.split(',')[1] })
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const openChat = (starter) => {
+    setChatOpen(true)
+    if (starter && chatMessages.length === 0) setTimeout(() => sendChat(starter), 120)
+  }
+
+  const resetChat = () => { setChatMessages([]); setPendingImage(null); setChatInput('') }
+
+  // Auto-scroll vers le bas
+  const messagesEndRef = useRef(null)
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages, chatLoading])
+
+  // Mise en forme légère du markdown (gras + listes), sans dépendance
+  const formatInline = (text) => String(text).split(/(\*\*[^*]+\*\*)/g).map((p, i) =>
+    p.startsWith('**') && p.endsWith('**')
+      ? <strong key={i}>{p.slice(2, -2)}</strong>
+      : <span key={i}>{p}</span>
+  )
+  const renderMarkdown = (text) => {
+    const lines = String(text).split('\n')
+    const blocks = []
+    let list = null
+    const flush = () => { if (list) { blocks.push(list); list = null } }
+    lines.forEach((raw) => {
+      const line = raw.trimEnd()
+      const bullet = line.match(/^\s*[-*•]\s+(.*)/)
+      const numbered = line.match(/^\s*\d+\.\s+(.*)/)
+      if (bullet) {
+        if (!list || list.ordered) { flush(); list = { type: 'list', ordered: false, items: [] } }
+        list.items.push(bullet[1])
+      } else if (numbered) {
+        if (!list || !list.ordered) { flush(); list = { type: 'list', ordered: true, items: [] } }
+        list.items.push(numbered[1])
+      } else {
+        flush()
+        blocks.push(line.trim() === '' ? { type: 'space' } : { type: 'p', text: line })
+      }
+    })
+    flush()
+    return blocks.map((b, i) => {
+      if (b.type === 'list') {
+        const Tag = b.ordered ? 'ol' : 'ul'
+        return <Tag key={i} className={`${b.ordered ? 'list-decimal' : 'list-disc'} pl-5 space-y-1 my-1.5`}>{b.items.map((it, j) => <li key={j}>{formatInline(it)}</li>)}</Tag>
+      }
+      if (b.type === 'space') return <div key={i} className="h-2" />
+      return <p key={i} className="my-1">{formatInline(b.text)}</p>
+    })
+  }
 
   const escrowTx = transactions.filter(t => t.status === 'in_escrow')
 
@@ -1071,7 +1221,10 @@ function PaiementsTab({ transactions = [], user }) {
   }
 
   // Carte paiement réutilisable (Transactions + Fonds en attente)
-  const renderPaymentCard = (tx) => (
+  const renderPaymentCard = (tx) => {
+    const esc = tx.status === 'in_escrow' ? getEscrowRelease(tx) : null
+    const campaign = getCampaignLabel(tx)
+    return (
     <Card key={tx.id} className="hover:shadow-md transition-all duration-200">
       <CardContent className="p-5">
         <div className="flex items-center justify-between gap-4">
@@ -1081,14 +1234,24 @@ function PaiementsTab({ transactions = [], user }) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <p className="font-semibold truncate">{tx.description || `Transaction #${tx.id.slice(0, 8)}`}</p>
+                <p className="font-semibold truncate">{campaign}</p>
                 <Badge variant="outline" className={getPaymentStatusColor(tx.status)}>{getPaymentStatusLabel(tx.status)}</Badge>
               </div>
               <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                 <span>{tx.type || 'Paiement'}</span><span>•</span>
                 <span>{new Date(tx.created_at).toLocaleDateString('fr-FR')}</span>
-                {tx.stripe_payment_intent_id && (<><span>•</span><span className="font-mono">{tx.stripe_payment_intent_id.slice(0, 12)}...</span></>)}
+                {tx.description && tx.description !== campaign && (<><span>•</span><span className="truncate max-w-[180px]">{tx.description}</span></>)}
               </div>
+              {tx.status === 'in_escrow' && (
+                <div className="mt-2 flex items-start gap-1.5 text-xs">
+                  <Clock className="h-3.5 w-3.5 text-orange-500 flex-shrink-0 mt-0.5" />
+                  <span className="text-orange-600">
+                    {esc
+                      ? <>En attente de validation de la marque · libéré automatiquement le <span className="font-semibold">{esc.due.toLocaleDateString('fr-FR')}</span>{esc.days > 0 ? ` (${esc.days} j)` : ' (imminent)'}</>
+                      : <>En attente de validation du contenu par la marque (libéré sous {ESCROW_AUTO_DAYS} j)</>}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1110,7 +1273,38 @@ function PaiementsTab({ transactions = [], user }) {
         </div>
       </CardContent>
     </Card>
-  )
+    )
+  }
+
+  // Ligne paiement compacte (dans une campagne dépliée)
+  const renderPaymentRow = (tx) => {
+    const esc = tx.status === 'in_escrow' ? getEscrowRelease(tx) : null
+    return (
+      <div key={tx.id} className="flex items-center justify-between gap-3 px-5 py-3 border-t">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold">{tx.status === 'released' ? '+' : ''}{parseFloat(tx.influencer_amount || 0).toLocaleString()}€</span>
+            <Badge variant="outline" className={getPaymentStatusColor(tx.status)}>{getPaymentStatusLabel(tx.status)}</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">{tx.type || 'Paiement'} • {new Date(tx.created_at).toLocaleDateString('fr-FR')}</p>
+          {tx.status === 'in_escrow' && (
+            <p className="text-xs text-orange-600 mt-1 flex items-center gap-1">
+              <Clock className="h-3 w-3 flex-shrink-0" />
+              {esc ? <>Libéré auto le {esc.due.toLocaleDateString('fr-FR')}{esc.days > 0 ? ` (${esc.days} j)` : ' (imminent)'} · ou dès validation marque</> : <>En attente de validation marque (sous {ESCROW_AUTO_DAYS} j)</>}
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2 shrink-0">
+          {(tx.status === 'released' || tx.status === 'in_escrow') && (
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => handleDownloadIssuedInvoice(tx.id)} disabled={downloadingInvoiceId === tx.id}><FileText className="h-3.5 w-3.5" />{downloadingInvoiceId === tx.id ? '...' : 'Facture'}</Button>
+          )}
+          {tx.status === 'released' && (
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => handleDownloadReceipt(tx.id)} disabled={downloadingReceiptId === tx.id}><Receipt className="h-3.5 w-3.5" />{downloadingReceiptId === tx.id ? '...' : 'Reçu'}</Button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   const paySubTabs = [
     { value: 'dashboard', label: 'Dashboard', icon: TrendingUp },
@@ -1215,6 +1409,85 @@ function PaiementsTab({ transactions = [], user }) {
         </DialogContent>
       </Dialog>
 
+      {/* ============ CHAT ASSISTANT FISCAL IA ============ */}
+      <Dialog open={chatOpen} onOpenChange={setChatOpen}>
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-3xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+          <DialogTitle className="sr-only">Assistant fiscal IA</DialogTitle>
+          {/* Header */}
+          <div className="flex items-center gap-3 px-5 py-4 border-b bg-gradient-to-r from-primary/10 to-purple-500/5">
+            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow"><Shield className="h-5 w-5 text-white" /></div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold leading-tight">Assistant fiscal IA</p>
+              <p className="text-xs text-muted-foreground">Spécialiste fiscalité &amp; droit des créateurs · infos générales</p>
+            </div>
+            {chatMessages.length > 0 && (
+              <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground mr-7" onClick={resetChat}><RefreshCw className="h-3.5 w-3.5" />Nouvelle</Button>
+            )}
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            {chatMessages.length === 0 && !chatLoading ? (
+              <div className="h-full flex flex-col items-center justify-center text-center gap-5 py-6">
+                <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center"><Shield className="h-7 w-7 text-primary" /></div>
+                <div>
+                  <p className="font-semibold">Bonjour 👋</p>
+                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">Pose-moi tes questions de fiscalité <strong>ou de droit</strong> de créateur. Tu peux aussi joindre une photo (avis, contrat, formulaire…).</p>
+                </div>
+                <div className="flex flex-col gap-2 w-full max-w-sm">
+                  {presetQuestions.map((q, i) => (
+                    <button key={i} onClick={() => sendChat(q)} className="text-left text-sm px-4 py-2.5 rounded-xl border hover:bg-muted/60 transition-colors">{q}</button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                {chatMessages.map((m, i) => (
+                  <div key={i} className={`flex gap-2.5 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {m.role === 'assistant' && (<div className="h-8 w-8 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 mt-0.5"><Shield className="h-4 w-4 text-primary" /></div>)}
+                    <div className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-sm ${m.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-sm whitespace-pre-wrap' : 'bg-muted rounded-bl-sm'}`}>
+                      {m.images && m.images.map((img, j) => (<img key={j} src={img.url} alt="" className="rounded-lg mb-2 max-h-48 w-auto" />))}
+                      {m.role === 'assistant' ? renderMarkdown(m.content) : m.content}
+                    </div>
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div className="flex gap-2.5 justify-start">
+                    <div className="h-8 w-8 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0"><Shield className="h-4 w-4 text-primary" /></div>
+                    <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </>
+            )}
+          </div>
+
+          {/* Input */}
+          <div className="border-t px-4 py-3 space-y-2">
+            {pendingImage && (
+              <div className="flex items-center gap-2 text-xs">
+                <img src={pendingImage.url} alt="" className="h-12 w-12 rounded-lg object-cover" />
+                <span className="text-muted-foreground">Image jointe</span>
+                <button onClick={() => setPendingImage(null)} className="text-muted-foreground hover:text-foreground ml-auto">✕ Retirer</button>
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <label className="h-10 w-10 rounded-lg border flex items-center justify-center cursor-pointer hover:bg-muted/60 flex-shrink-0" title="Joindre une photo">
+                <ImagePlus className="h-4 w-4" />
+                <input type="file" accept="image/*" className="hidden" onChange={handleAttachImage} />
+              </label>
+              <Input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() } }} placeholder="Écris ta question..." disabled={chatLoading} className="flex-1" />
+              <Button onClick={() => sendChat()} disabled={chatLoading || (!chatInput.trim() && !pendingImage)} className="flex-shrink-0"><Send className="h-4 w-4" /></Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground text-center">⚠️ Réponses IA à titre informatif. Confirme avec ton expert-comptable ou ton avocat.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ============ SOUS-ONGLETS PAIEMENTS ============ */}
       <Tabs value={paySubTab} onValueChange={setPaySubTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 gap-2 bg-transparent p-0 h-auto mb-6">
@@ -1313,7 +1586,7 @@ function PaiementsTab({ transactions = [], user }) {
               <Input placeholder="Rechercher un paiement..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
             </div>
             <div className="flex gap-2 flex-wrap">
-              {["all", "released", "in_escrow", "pending"].map((s) => (
+              {["all", "released"].map((s) => (
                 <Button key={s} size="sm" variant={filterStatus === s ? "default" : "outline"} onClick={() => setFilterStatus(s)}>
                   {s === "all" ? "Tous" : getPaymentStatusLabel(s)}
                 </Button>
@@ -1338,7 +1611,32 @@ function PaiementsTab({ transactions = [], user }) {
                 </CardContent>
               </Card>
             ) : (
-              filtered.map(renderPaymentCard)
+              campaignGroups.map((camp) => {
+                const open = expandedCampaign === camp.key
+                return (
+                  <Card key={camp.key} className="overflow-hidden">
+                    <button onClick={() => setExpandedCampaign(open ? null : camp.key)} className="w-full text-left hover:bg-muted/40 transition-colors">
+                      <div className="p-5 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="p-3 rounded-full bg-primary/10"><CreditCard className="h-5 w-5 text-primary" /></div>
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{camp.label}</p>
+                            <p className="text-xs text-muted-foreground">{camp.txs.length} paiement{camp.txs.length > 1 ? 's' : ''}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-green-600">+{camp.received.toLocaleString()}€</p>
+                            <p className="text-xs text-muted-foreground">reçu</p>
+                          </div>
+                          <ChevronRight className={`h-5 w-5 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
+                        </div>
+                      </div>
+                    </button>
+                    {open && <div>{camp.txs.map(renderPaymentRow)}</div>}
+                  </Card>
+                )
+              })
             )}
           </div>
         </TabsContent>
@@ -1374,7 +1672,7 @@ function PaiementsTab({ transactions = [], user }) {
               <div className="h-12 w-12 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0"><Shield className="h-6 w-6 text-blue-500" /></div>
               <div>
                 <h4 className="font-semibold text-lg mb-1">Protection escrow</h4>
-                <p className="text-sm text-muted-foreground">Les fonds sont sécurisés jusqu'à la validation de tes livrables, puis libérés automatiquement. Tu es protégé contre les impayés.</p>
+                <p className="text-sm text-muted-foreground">Les fonds sont sécurisés dès la mise en escrow et libérés dès que la marque valide ton contenu — ou automatiquement au plus tard 15 jours après. Tu es protégé contre les impayés.</p>
               </div>
             </CardContent>
           </Card>
@@ -1620,18 +1918,11 @@ function PaiementsTab({ transactions = [], user }) {
             <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2"><div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center"><Shield className="h-5 w-5 text-primary" /></div><CardTitle className="text-xl">Assistant fiscal IA</CardTitle></div>
-                <CardDescription>Des réponses personnalisées sur ta situation fiscale</CardDescription>
+                <CardDescription>Fiscalité &amp; droit des créateurs — pose tes questions</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {[
-                  { t: "Auto-entrepreneur / Micro-entreprise", d: "Régime simplifié avec abattement forfaitaire" },
-                  { t: "Particulier sans statut", d: "Revenus occasionnels à déclarer" },
-                  { t: "Société (SASU, EURL...)", d: "Régime de l'impôt sur les sociétés" },
-                ].map((o, i) => (
-                  <Button key={i} variant="outline" className="w-full justify-start h-auto py-3" onClick={() => toast.info("Assistant fiscal IA bientôt disponible")}>
-                    <div className="text-left"><p className="font-medium">{o.t}</p><p className="text-xs text-muted-foreground">{o.d}</p></div>
-                  </Button>
-                ))}
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">Statut, TVA, déclaration, contrats, droits d'auteur… L'assistant connaît tes chiffres, et tu peux même lui envoyer la photo d'un document.</p>
+                <Button className="w-full gap-2" onClick={() => openChat()}><Shield className="h-4 w-4" />Discuter avec l'assistant</Button>
               </CardContent>
             </Card>
 
@@ -1702,7 +1993,7 @@ function ContratsContent({ contracts = [], transactions = [], user }) {
           <ContratsCote contracts={contracts} transactions={transactions} />
         </TabsContent>
         <TabsContent value="paiements" className="mt-6">
-          <PaiementsTab transactions={transactions} user={user} />
+          <PaiementsTab transactions={transactions} contracts={contracts} user={user} />
         </TabsContent>
       </Tabs>
     </div>
