@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -46,10 +46,11 @@ const PLATFORM_META = {
   linkedin: { name: 'LinkedIn', color: '#0077B5' },
 }
 
-const aiInsights = [
-  { title: 'Moment optimal de publication', description: "Publiez entre 14h-16h pour +32% d'engagement", confidence: 94, impact: 'high', type: 'timing' },
-  { title: 'Hashtags tendance', description: '#TechInnovation et #LifestyleGoals performent +156%', confidence: 87, impact: 'medium', type: 'content' },
-  { title: 'Format vidéo recommandé', description: "Les vidéos courtes (15-30s) génèrent plus d'engagement", confidence: 91, impact: 'high', type: 'format' },
+const RECO_STYLE = [
+  { color: '#22c55e', icon: Clock },
+  { color: '#a855f7', icon: TrendingUp },
+  { color: '#ec4899', icon: Users },
+  { color: '#f59e0b', icon: Target },
 ]
 
 const newsUpdates = [
@@ -72,6 +73,29 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
   const [showNotifPanel, setShowNotifPanel] = useState(false)
   const [topCreators, setTopCreators] = useState([])
   const [socialAccounts, setSocialAccounts] = useState([])
+  const [aiData, setAiData] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const aiFetchedRef = useRef(false)
+
+  // Insights IA — chargés à l'ouverture de l'onglet (une seule fois), cache serveur par semaine
+  useEffect(() => {
+    if (activeTab !== 'insights' || aiFetchedRef.current) return
+    aiFetchedRef.current = true
+    setAiLoading(true)
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const tk = session?.access_token
+        const res = await fetch('/api/influencer/insights', { headers: { Authorization: `Bearer ${tk}` } })
+        const json = await res.json().catch(() => ({}))
+        setAiData(res.ok ? json : { insights: [], recommendations: [], error: true })
+      } catch {
+        setAiData({ insights: [], recommendations: [], error: true })
+      } finally {
+        setAiLoading(false)
+      }
+    })()
+  }, [activeTab])
 
   // Réseaux sociaux réels du créateur
   useEffect(() => {
@@ -591,9 +615,22 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
       {activeTab === 'insights' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="shadow-lg">
-            <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Brain className="h-5 w-5 text-yellow-500" />Insights IA</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2"><Brain className="h-5 w-5 text-yellow-500" />Insights IA</CardTitle>
+              <p className="text-xs text-gray-400 mt-1">Personnalisé d&apos;après tes données · recalculé chaque semaine</p>
+            </CardHeader>
             <CardContent className="space-y-4">
-              {aiInsights.map((insight, i) => (
+              {aiLoading ? (
+                <div className="text-center py-12 text-gray-400">
+                  <Brain className="h-10 w-10 mx-auto mb-3 text-gray-200 animate-pulse" />
+                  <p className="text-sm">Analyse de tes données en cours…</p>
+                </div>
+              ) : (aiData?.insights || []).length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <Sparkles className="h-10 w-10 mx-auto mb-3 text-gray-200" />
+                  <p className="text-sm">{aiData?.error ? 'Insights indisponibles pour le moment, réessaie plus tard' : 'Pas encore assez de données pour générer des insights'}</p>
+                </div>
+              ) : aiData.insights.map((insight, i) => (
                 <div key={i} className={`rounded-2xl p-5 border-2 cursor-pointer hover:scale-[1.01] transition-transform relative overflow-hidden ${insight.impact === 'high' ? 'bg-gradient-to-br from-yellow-500/10 to-white border-yellow-500/30' : 'bg-gradient-to-br from-purple-500/10 to-white border-purple-500/30'}`}>
                   <div className="relative flex items-start gap-4 mb-3">
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0 ${insight.impact === 'high' ? 'bg-gradient-to-br from-yellow-500 to-orange-500' : 'bg-gradient-to-br from-purple-500 to-pink-500'}`}>
@@ -619,20 +656,26 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
           <Card className="shadow-lg">
             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Lightbulb className="h-5 w-5 text-yellow-500" />Recommandations</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              {[
-                { title: 'Timing Optimal', desc: "Publiez entre 14h-16h pour maximiser l'engagement", color: '#22c55e', icon: Clock },
-                { title: 'Contenu Tendance', desc: 'Focus sur les vidéos courtes et les tutoriels', color: '#a855f7', icon: TrendingUp },
-                { title: 'Collaborations', desc: '3 nouvelles opportunités de partenariat détectées', color: '#ec4899', icon: Users },
-                { title: 'Hashtags Optimaux', desc: '#TechReview #Innovation #Lifestyle pour plus de visibilité', color: '#f59e0b', icon: Target },
-              ].map((rec, i) => {
-                const Icon = rec.icon
+              {aiLoading ? (
+                <div className="text-center py-12 text-gray-400">
+                  <Lightbulb className="h-10 w-10 mx-auto mb-3 text-gray-200 animate-pulse" />
+                  <p className="text-sm">Génération de tes recommandations…</p>
+                </div>
+              ) : (aiData?.recommendations || []).length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <Lightbulb className="h-10 w-10 mx-auto mb-3 text-gray-200" />
+                  <p className="text-sm">{aiData?.error ? 'Recommandations indisponibles pour le moment' : 'Recommandations bientôt disponibles'}</p>
+                </div>
+              ) : (aiData?.recommendations || []).map((rec, i) => {
+                const st = RECO_STYLE[i % RECO_STYLE.length]
+                const Icon = st.icon
                 return (
-                  <div key={i} className="rounded-2xl p-5 border-2 cursor-pointer hover:scale-[1.01] transition-transform relative overflow-hidden" style={{ background: rec.color + '0a', borderColor: rec.color + '40' }}>
+                  <div key={i} className="rounded-2xl p-5 border-2 cursor-pointer hover:scale-[1.01] transition-transform relative overflow-hidden" style={{ background: st.color + '0a', borderColor: st.color + '40' }}>
                     <div className="relative flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0" style={{ background: `linear-gradient(135deg, ${rec.color}, ${rec.color}99)` }}>
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0" style={{ background: `linear-gradient(135deg, ${st.color}, ${st.color}99)` }}>
                         <Icon className="h-6 w-6 text-white" />
                       </div>
-                      <div><h4 className="font-semibold mb-1" style={{ color: rec.color }}>{rec.title}</h4><p className="text-sm text-gray-500">{rec.desc}</p></div>
+                      <div><h4 className="font-semibold mb-1" style={{ color: st.color }}>{rec.title}</h4><p className="text-sm text-gray-500">{rec.desc}</p></div>
                     </div>
                   </div>
                 )
