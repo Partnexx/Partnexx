@@ -847,6 +847,7 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [pendingImage, setPendingImage] = useState(null)
+  const [chatRemaining, setChatRemaining] = useState(null)
 
   // Lien transaction → campagne (via contract_id, en s'appuyant sur les contrats déjà chargés)
   const contractsById = {}
@@ -901,8 +902,10 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
 
   const buildPayload = (msgs) => msgs.map(m => {
     if (m.images && m.images.length) {
-      const blocks = m.images.map(img => ({ type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } }))
-      blocks.push({ type: 'text', text: m.content || 'Peux-tu analyser cette image ?' })
+      const blocks = m.images.map(f => f.kind === 'pdf'
+        ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: f.data } }
+        : { type: 'image', source: { type: 'base64', media_type: f.mediaType, data: f.data } })
+      blocks.push({ type: 'text', text: m.content || 'Peux-tu analyser ce document ?' })
       return { role: m.role, content: blocks }
     }
     return { role: m.role, content: m.content }
@@ -925,9 +928,13 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ messages: buildPayload(newMessages) }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Erreur')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setChatMessages([...newMessages, { role: 'assistant', content: data.error || "Désolé, une erreur est survenue. Réessaie." }])
+        return
+      }
       setChatMessages([...newMessages, { role: 'assistant', content: data.reply }])
+      if (typeof data.remaining === 'number') setChatRemaining(data.remaining)
     } catch (e) {
       setChatMessages([...newMessages, { role: 'assistant', content: `Désolé, je n'ai pas pu répondre (${e.message || 'erreur'}). Réessaie.` }])
     } finally {
@@ -939,12 +946,14 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    if (!file.type.startsWith('image/')) { toast.error('Image uniquement'); return }
-    if (file.size > 5 * 1024 * 1024) { toast.error('Image trop lourde (max 5 Mo)'); return }
+    const isPdf = file.type === 'application/pdf'
+    const isImg = file.type.startsWith('image/')
+    if (!isImg && !isPdf) { toast.error('Image ou PDF uniquement'); return }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Fichier trop lourd (max 5 Mo)'); return }
     const reader = new FileReader()
     reader.onload = () => {
       const dataUrl = String(reader.result)
-      setPendingImage({ url: dataUrl, mediaType: file.type, data: dataUrl.split(',')[1] })
+      setPendingImage({ url: dataUrl, mediaType: file.type, data: dataUrl.split(',')[1], kind: isPdf ? 'pdf' : 'image', name: file.name })
     }
     reader.readAsDataURL(file)
   }
@@ -1432,7 +1441,7 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
                 <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center"><Shield className="h-7 w-7 text-primary" /></div>
                 <div>
                   <p className="font-semibold">Bonjour 👋</p>
-                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">Pose-moi tes questions de fiscalité <strong>ou de droit</strong> de créateur. Tu peux aussi joindre une photo (avis, contrat, formulaire…).</p>
+                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">Pose-moi tes questions de fiscalité <strong>ou de droit</strong> de créateur. Tu peux aussi joindre une <strong>photo ou un PDF</strong> (avis d'imposition, contrat, formulaire…).</p>
                 </div>
                 <div className="flex flex-col gap-2 w-full max-w-sm">
                   {presetQuestions.map((q, i) => (
@@ -1446,7 +1455,9 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
                   <div key={i} className={`flex gap-2.5 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     {m.role === 'assistant' && (<div className="h-8 w-8 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 mt-0.5"><Shield className="h-4 w-4 text-primary" /></div>)}
                     <div className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-sm ${m.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-sm whitespace-pre-wrap' : 'bg-muted rounded-bl-sm'}`}>
-                      {m.images && m.images.map((img, j) => (<img key={j} src={img.url} alt="" className="rounded-lg mb-2 max-h-48 w-auto" />))}
+                      {m.images && m.images.map((f, j) => f.kind === 'pdf'
+                        ? (<div key={j} className="flex items-center gap-2 mb-2 rounded-lg border bg-background/40 px-3 py-2 text-xs"><FileText className="h-4 w-4 flex-shrink-0" /><span className="truncate">{f.name || 'Document.pdf'}</span></div>)
+                        : (<img key={j} src={f.url} alt="" className="rounded-lg mb-2 max-h-48 w-auto" />))}
                       {m.role === 'assistant' ? renderMarkdown(m.content) : m.content}
                     </div>
                   </div>
@@ -1470,20 +1481,25 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
           <div className="border-t px-4 py-3 space-y-2">
             {pendingImage && (
               <div className="flex items-center gap-2 text-xs">
-                <img src={pendingImage.url} alt="" className="h-12 w-12 rounded-lg object-cover" />
-                <span className="text-muted-foreground">Image jointe</span>
+                {pendingImage.kind === 'pdf'
+                  ? (<div className="flex items-center gap-2 rounded-lg border px-3 py-2 max-w-[60%]"><FileText className="h-4 w-4 flex-shrink-0" /><span className="truncate">{pendingImage.name || 'Document.pdf'}</span></div>)
+                  : (<img src={pendingImage.url} alt="" className="h-12 w-12 rounded-lg object-cover" />)}
+                <span className="text-muted-foreground">{pendingImage.kind === 'pdf' ? 'PDF joint' : 'Image jointe'}</span>
                 <button onClick={() => setPendingImage(null)} className="text-muted-foreground hover:text-foreground ml-auto">✕ Retirer</button>
               </div>
             )}
             <div className="flex items-end gap-2">
-              <label className="h-10 w-10 rounded-lg border flex items-center justify-center cursor-pointer hover:bg-muted/60 flex-shrink-0" title="Joindre une photo">
+              <label className="h-10 w-10 rounded-lg border flex items-center justify-center cursor-pointer hover:bg-muted/60 flex-shrink-0" title="Joindre une photo ou un PDF">
                 <ImagePlus className="h-4 w-4" />
-                <input type="file" accept="image/*" className="hidden" onChange={handleAttachImage} />
+                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleAttachImage} />
               </label>
               <Input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() } }} placeholder="Écris ta question..." disabled={chatLoading} className="flex-1" />
               <Button onClick={() => sendChat()} disabled={chatLoading || (!chatInput.trim() && !pendingImage)} className="flex-shrink-0"><Send className="h-4 w-4" /></Button>
             </div>
-            <p className="text-[10px] text-muted-foreground text-center">⚠️ Réponses IA à titre informatif. Confirme avec ton expert-comptable ou ton avocat.</p>
+            <p className="text-[10px] text-muted-foreground text-center">
+              ⚠️ Réponses IA à titre informatif. Confirme avec ton expert-comptable ou ton avocat.
+              {chatRemaining !== null && <> · Il te reste {chatRemaining} question{chatRemaining > 1 ? 's' : ''} aujourd'hui</>}
+            </p>
           </div>
         </DialogContent>
       </Dialog>
