@@ -76,17 +76,7 @@ const isRealTx = (t) => !isMicroTx(t) && !isRefundTx(t) // vraie transaction (ni
    SOUS-ONGLET : CONTRATS ACTUELS  (= ton ancien ContratsTab, VRAIES DONNÉES, inchangé)
    ════════════════════════════════════════════════════════════ */
 function ContratsActuels({ contracts = [] }) {
-  const [search, setSearch] = useState("")
-  const [filterStatus, setFilterStatus] = useState("all")
   const [selectedContrat, setSelectedContrat] = useState(null)
-
-  const filtered = contracts.filter(c => {
-    const matchSearch = search === "" ||
-      c.id.toLowerCase().includes(search.toLowerCase()) ||
-      (c.brands?.company_name || "").toLowerCase().includes(search.toLowerCase())
-    const matchStatus = filterStatus === "all" || c.status === filterStatus
-    return matchSearch && matchStatus
-  })
 
   const totalActive = contracts.filter(c => c.status === 'signed').length
   const totalCompleted = contracts.filter(c => c.status === 'completed').length
@@ -97,11 +87,24 @@ function ContratsActuels({ contracts = [] }) {
     return new Date(dateStr).toLocaleDateString('fr-FR')
   }
 
-  const handleDownload = (contrat) => {
-    if (contrat.pdf_url) {
-      window.open(contrat.pdf_url, '_blank')
-    } else {
-      toast.error('PDF non disponible pour ce contrat')
+  const handleDownload = async (contrat) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) { toast.error('Session expirée, reconnecte-toi'); return }
+      toast.loading('Génération du contrat…', { id: 'dl-contract' })
+      const res = await fetch(`/api/influencer/contract-pdf?contractId=${contrat.id}`, { headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); toast.error(e.error || 'Impossible de générer le contrat', { id: 'dl-contract' }); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `contrat-${(contrat.brands?.company_name || 'partnexx').replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+      toast.success('Contrat téléchargé', { id: 'dl-contract' })
+    } catch {
+      toast.error('Erreur réseau', { id: 'dl-contract' })
     }
   }
 
@@ -145,21 +148,7 @@ function ContratsActuels({ contracts = [] }) {
         </Card>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Rechercher un contrat..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {["all", "draft", "sent", "signed", "completed", "cancelled"].map((s) => (
-            <Button key={s} size="sm" variant={filterStatus === s ? "default" : "outline"} onClick={() => setFilterStatus(s)}>
-              {s === "all" ? "Tous" : getStatusLabel(s)}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-4">
+      <div className="space-y-6">
         {contracts.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
@@ -168,16 +157,9 @@ function ContratsActuels({ contracts = [] }) {
               <p className="text-sm text-muted-foreground">Vos contrats apparaîtront ici</p>
             </CardContent>
           </Card>
-        ) : filtered.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Aucun contrat trouvé</p>
-            </CardContent>
-          </Card>
         ) : (
-          filtered.map((contrat) => (
-            <Card key={contrat.id} className="hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
+          contracts.map((contrat) => (
+            <Card key={contrat.id} className="border shadow-sm rounded-xl hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -234,7 +216,7 @@ function ContratsActuels({ contracts = [] }) {
                     <Eye className="h-4 w-4" />Voir le contrat
                   </Button>
                   <Button variant="outline" className="flex-1 gap-2" onClick={() => handleDownload(contrat)}>
-                    <Download className="h-4 w-4" />Télécharger PDF
+                    <Download className="h-4 w-4" />Télécharger le contrat
                   </Button>
                 </div>
               </CardContent>
@@ -306,7 +288,7 @@ function ContratsActuels({ contracts = [] }) {
 
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1 gap-2" onClick={() => handleDownload(selectedContrat)}>
-                  <Download className="h-4 w-4" />Télécharger PDF
+                  <Download className="h-4 w-4" />Télécharger le contrat
                 </Button>
                 {selectedContrat.pdf_url && (
                   <Button className="flex-1 gap-2" onClick={() => window.open(selectedContrat.pdf_url, '_blank')}>
@@ -1985,7 +1967,7 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
         </TabsContent>
 
         {/* ─────────── FISCALITÉ ─────────── */}
-        <TabsContent value="fiscalite" className="mt-2 space-y-6">
+        <TabsContent value="fiscalite" className="mt-2 space-y-8">
           {/* Hero */}
           <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 p-8 border border-primary/20">
             <div className="flex items-center gap-3 mb-3">
@@ -2074,7 +2056,7 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
           </Card>
 
           {/* Récapitulatif par année (vraies données) */}
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="flex items-center justify-between">
               <h4 className="text-lg font-semibold">Récapitulatif par année</h4>
               <Button variant="outline" size="sm" onClick={() => handleDownloadAnnualReport()}>
@@ -2085,7 +2067,7 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
             {years.length === 0 ? (
               <Card><CardContent className="py-10 text-center text-muted-foreground">Aucun revenu enregistré pour l'instant — tes récaps annuels apparaîtront ici.</CardContent></Card>
             ) : years.map((y) => (
-              <Card key={y} className={y === currentYear ? "border-primary/30 shadow-lg" : ""}>
+              <Card key={y} className={y === currentYear ? "border-primary/30 shadow-lg" : "shadow-sm"}>
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -2113,7 +2095,7 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
           </div>
 
           {/* Exports personnalisés */}
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
               <div className="flex items-center gap-2"><Download className="h-5 w-5" /><CardTitle>Exports personnalisés</CardTitle></div>
               <CardDescription>Télécharge tes données dans différents formats</CardDescription>
@@ -2134,7 +2116,7 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
           </Card>
 
           {/* Documents officiels */}
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
               <div className="flex items-center gap-2"><Shield className="h-5 w-5 text-green-500" /><CardTitle>Documents officiels</CardTitle></div>
               <CardDescription>Justificatifs conformes aux normes fiscales françaises</CardDescription>
