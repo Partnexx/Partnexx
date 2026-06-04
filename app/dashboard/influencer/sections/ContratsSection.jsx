@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { useState, useEffect, useRef } from 'react'
-import { Search, Calendar, DollarSign, FileText, Download, CreditCard, Brain, CheckCircle, Clock, AlertCircle, Eye, Shield, TrendingUp, Lock, Wallet, Send, BarChart3, Receipt, History, ChevronRight, List, LayoutGrid, Euro, AlertTriangle, CheckCircle2, Target, Zap, ArrowUpRight, ArrowDownRight, LayoutDashboard, RefreshCw, Plus, ThumbsUp, ThumbsDown, ImagePlus } from 'lucide-react'
+import { Search, Calendar, DollarSign, FileText, Download, CreditCard, Brain, CheckCircle, Clock, AlertCircle, Eye, Shield, TrendingUp, Lock, Wallet, Send, BarChart3, Receipt, History, ChevronRight, List, LayoutGrid, Euro, AlertTriangle, CheckCircle2, Target, Zap, ArrowUpRight, ArrowDownRight, LayoutDashboard, RefreshCw, Plus, ThumbsUp, ThumbsDown, ImagePlus, MessageSquare } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { toast } from 'sonner'
 import supabase from '@/lib/supabase'
@@ -497,228 +497,396 @@ function ContratsDashboard({ contracts = [], transactions = [] }) {
 /* ════════════════════════════════════════════════════════════
    SOUS-ONGLET : LITIGES (local, non persisté — à brancher sur la table disputes)
    ════════════════════════════════════════════════════════════ */
-function ContratsLitiges() {
-  const [items, setItems] = useState([])
-  const [expandedDispute, setExpandedDispute] = useState(null)
-  const [messageText, setMessageText] = useState("")
-  const [interventionRequested, setInterventionRequested] = useState({})
-  const [showNewDispute, setShowNewDispute] = useState(false)
-  const [newDispute, setNewDispute] = useState({ title: "", contractTitle: "", type: "", description: "" })
+function ContratsLitiges({ user, transactions = [], contracts = [] }) {
+  const [disputes, setDisputes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showNew, setShowNew] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [form, setForm] = useState({ linkType: 'none', subjectKey: '', brandId: '', reason: '', description: '' })
+  const [files, setFiles] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [expandedId, setExpandedId] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [loadingMsg, setLoadingMsg] = useState(false)
+  const [msgText, setMsgText] = useState('')
+  const [sending, setSending] = useState(false)
+  const [acting, setActing] = useState(false)
+  const convEndRef = useRef(null)
 
-  const statusConfig = (id) => id === "1"
-    ? { label: "Haute", className: "bg-red-500/10 text-red-500 border-red-500/20", label2: "Médiation", className2: "bg-purple-500/10 text-purple-500 border-purple-500/20" }
-    : { label: "Critique", className: "bg-red-500/10 text-red-500 border-red-500/20", label2: "Discussion", className2: "bg-blue-500/10 text-blue-500 border-blue-500/20" }
-
-  const handleSend = () => { if (messageText.trim()) { toast.success("Message envoyé"); setMessageText("") } }
-  const handleIntervention = (id) => {
-    setInterventionRequested({ ...interventionRequested, [id]: true })
-    toast.success("L'équipe Partnexx a été notifiée et interviendra prochainement")
+  const CATEGORIES = ['Paiement', 'Contrat', 'Entreprise / marque', 'Contenu', 'Livraison / délais', 'Autre']
+  const STATUS = {
+    open: { label: 'Ouvert', cls: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
+    under_review: { label: 'En médiation', cls: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
+    resolved_influencer: { label: 'Résolu en ta faveur', cls: 'bg-green-500/10 text-green-600 border-green-500/20' },
+    resolved_brand: { label: 'Résolu (faveur marque)', cls: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+    auto_resolved: { label: 'Clôturé', cls: 'bg-green-500/10 text-green-600 border-green-500/20' },
   }
-  const handleCreate = () => {
-    if (!newDispute.title || !newDispute.contractTitle || !newDispute.description) { toast.error("Veuillez remplir tous les champs obligatoires"); return }
-    const created = {
-      id: `new-${Date.now()}`,
-      title: newDispute.title,
-      contractTitle: newDispute.contractTitle,
-      brand: "—",
-      type: newDispute.type || "Litige",
-      createdAt: `Ouvert le ${new Date().toLocaleDateString("fr-FR")} • À l'instant`,
-      duration: "0 jour",
-      description: newDispute.description,
-      attachments: [],
-      aiRecommendations: ["Analyse du dossier en cours par notre IA..."],
-      messages: [],
-      partnexIntervened: false,
+  const isResolved = (s) => s !== 'open' && s !== 'under_review'
+
+  const contractsById = {}
+  contracts.forEach(c => { if (c?.id) contractsById[c.id] = c })
+  const subjects = (() => {
+    const map = {}
+    transactions.filter(isRealTx).forEach(t => {
+      const key = t.collaboration_id || t.contract_id || `tx-${t.id}`
+      if (map[key]) return
+      const company = contractsById[t.contract_id]?.brands?.company_name
+      const label = company || t.description || (t.collaboration_id || t.contract_id ? `Campagne #${(t.collaboration_id || t.contract_id).slice(0, 8)}` : `Campagne du ${new Date(t.created_at).toLocaleDateString('fr-FR')}`)
+      map[key] = { key, label, collaborationId: t.collaboration_id || null, transactionId: t.id }
+    })
+    return Object.values(map)
+  })()
+  const selectedSubject = subjects.find(s => s.key === form.subjectKey)
+
+  // Liste des entreprises (marques) avec lesquelles le créateur a bossé
+  const brands = (() => {
+    const map = {}
+    contracts.forEach(c => {
+      const id = c?.brand_id || c?.brands?.id
+      const name = c?.brands?.company_name
+      if (id && name && !map[id]) map[id] = { id, name }
+    })
+    return Object.values(map)
+  })()
+
+  const load = async () => {
+    if (!user?.id) { setLoading(false); return }
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/disputes?userId=${user.id}`)
+      const data = await res.json()
+      setDisputes(Array.isArray(data.disputes) ? data.disputes : [])
+    } catch { setDisputes([]) } finally { setLoading(false) }
+  }
+  useEffect(() => { load() }, [user?.id])
+  useEffect(() => { convEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loadingMsg, expandedId])
+
+  const loadMessages = async (id) => {
+    setLoadingMsg(true); setMessages([])
+    try {
+      const res = await fetch(`/api/disputes/messages?disputeId=${id}`)
+      const d = await res.json()
+      setMessages(Array.isArray(d.messages) ? d.messages : [])
+    } catch { setMessages([]) } finally { setLoadingMsg(false) }
+  }
+  const toggleExpand = (id) => {
+    if (expandedId === id) { setExpandedId(null); return }
+    setExpandedId(id); setMsgText(''); loadMessages(id)
+  }
+  const sendMessage = async (id) => {
+    if (!msgText.trim() || sending) return
+    setSending(true)
+    try {
+      const res = await fetch('/api/disputes/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ disputeId: id, senderId: user?.id, senderRole: 'influencer', content: msgText.trim() }) })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); toast.error(e.error || 'Erreur'); return }
+      setMsgText(''); loadMessages(id)
+    } catch { toast.error('Erreur réseau') } finally { setSending(false) }
+  }
+  const requestIntervention = async (id) => {
+    setActing(true)
+    try {
+      const res = await fetch('/api/disputes/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ disputeId: id, senderId: user?.id, senderRole: 'influencer', content: "🛟 Demande d'intervention de l'équipe Partnexx.", setStatus: 'under_review' }) })
+      if (!res.ok) { toast.error('Erreur'); return }
+      toast.success("L'équipe Partnexx a été sollicitée")
+      loadMessages(id); load()
+    } catch { toast.error('Erreur réseau') } finally { setActing(false) }
+  }
+  const markResolved = async (id) => {
+    setActing(true)
+    try {
+      const res = await fetch('/api/disputes', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ disputeId: id, resolution: 'auto_resolved', resolvedBy: user?.id, adminNote: 'Clôturé par le créateur' }) })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); toast.error(e.error || 'Erreur'); return }
+      toast.success('Litige clôturé'); setExpandedId(null); load()
+    } catch { toast.error('Erreur réseau') } finally { setActing(false) }
+  }
+
+  const handleAddFiles = (e) => {
+    const picked = Array.from(e.target.files || [])
+    e.target.value = ''
+    const ok = picked.filter(f => f.size <= 10 * 1024 * 1024)
+    if (ok.length < picked.length) toast.error('Certains fichiers dépassent 10 Mo et ont été ignorés')
+    setFiles(prev => [...prev, ...ok].slice(0, 5))
+  }
+
+  const uploadAttachments = async () => {
+    if (files.length === 0) return []
+    const out = []
+    for (const f of files) {
+      const path = `${user?.id || 'anon'}/${Date.now()}-${Math.random().toString(36).slice(2)}-${f.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`
+      const { error } = await supabase.storage.from('dispute-attachments').upload(path, f)
+      if (error) throw new Error('Upload échoué : ' + error.message)
+      const { data } = supabase.storage.from('dispute-attachments').getPublicUrl(path)
+      out.push({ url: data.publicUrl, name: f.name, type: f.type })
     }
-    setItems([created, ...items])
-    setExpandedDispute(created.id)
-    toast.success("Nouveau litige créé avec succès")
-    setShowNewDispute(false)
-    setNewDispute({ title: "", contractTitle: "", type: "", description: "" })
+    return out
   }
 
-  const selectCls = "w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+  const resetForm = () => { setForm({ linkType: 'none', subjectKey: '', brandId: '', reason: '', description: '' }); setFiles([]) }
+
+  const handleCreate = async () => {
+    if (!form.reason) { toast.error('Choisis un motif'); return }
+    if (form.linkType === 'campaign' && !selectedSubject) { toast.error('Sélectionne la campagne'); return }
+    if (form.linkType === 'brand' && !form.brandId) { toast.error('Sélectionne l\'entreprise'); return }
+    setCreating(true)
+    try {
+      let attachments = []
+      if (files.length > 0) { setUploading(true); attachments = await uploadAttachments(); setUploading(false) }
+      const linkCampaign = form.linkType === 'campaign' ? selectedSubject : null
+      const res = await fetch('/api/disputes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          collaborationId: linkCampaign?.collaborationId || null,
+          transactionId: linkCampaign && !linkCampaign.collaborationId ? linkCampaign.transactionId : null,
+          brandId: form.linkType === 'brand' ? form.brandId : null,
+          attachments,
+          openedBy: user?.id,
+          openedByRole: 'influencer',
+          reason: form.reason,
+          description: form.description || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error || "Impossible d'ouvrir le litige"); return }
+      toast.success("Litige ouvert — l'équipe Partnexx a été notifiée")
+      setShowNew(false); resetForm(); load()
+    } catch (e) { toast.error(e.message || 'Erreur réseau') } finally { setCreating(false); setUploading(false) }
+  }
+
+  const openCount = disputes.filter(d => !isResolved(d.status)).length
+  const resolvedCount = disputes.filter(d => isResolved(d.status)).length
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="grid grid-cols-2 gap-4 flex-1 mr-4">
-          <Card><CardContent className="p-4 flex items-center gap-3"><div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center"><AlertTriangle className="h-5 w-5 text-orange-500" /></div><div><p className="text-sm text-muted-foreground">Litiges ouverts</p><p className="text-2xl font-bold">{items.length}</p></div></CardContent></Card>
-          <Card><CardContent className="p-4 flex items-center gap-3"><div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center"><CheckCircle2 className="h-5 w-5 text-green-500" /></div><div><p className="text-sm text-muted-foreground">Litiges résolus</p><p className="text-2xl font-bold">0</p></div></CardContent></Card>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex gap-3">
+          <Card className="px-4 py-3"><p className="text-2xl font-bold text-orange-500">{openCount}</p><p className="text-xs text-muted-foreground">en cours</p></Card>
+          <Card className="px-4 py-3"><p className="text-2xl font-bold text-green-600">{resolvedCount}</p><p className="text-xs text-muted-foreground">résolus</p></Card>
         </div>
-        <Button className="gap-2 shrink-0" onClick={() => setShowNewDispute(true)}><Plus className="h-4 w-4" />Nouveau litige</Button>
+        <Button onClick={() => setShowNew(true)} className="gap-2 bg-orange-600 hover:bg-orange-700 text-white"><Plus className="h-4 w-4" />Nouveau litige</Button>
       </div>
 
-      <div className="space-y-6">
-        {items.length === 0 && (
-          <Card><CardContent className="flex flex-col items-center justify-center py-12"><CheckCircle2 className="h-12 w-12 text-green-500 mb-3" /><p className="font-medium">Aucun litige en cours</p><p className="text-sm text-muted-foreground">Tout est en règle 🎉</p></CardContent></Card>
-        )}
-        {items.map((dispute) => {
-          const sc = statusConfig(dispute.id)
-          const isExpanded = expandedDispute === dispute.id
-          const showPartnex = dispute.partnexIntervened || interventionRequested[dispute.id]
-          return (
-            <Card key={dispute.id} className="overflow-hidden">
-              <CardHeader className="bg-muted/30 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2 flex-wrap flex-1">
-                    <h3 className="text-xl font-bold">{dispute.title}</h3>
-                    <Badge variant="outline" className={sc.className}>{sc.label}</Badge>
-                    <Badge variant="outline" className={sc.className2}>{sc.label2}</Badge>
+      {loading ? (
+        <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Chargement…</CardContent></Card>
+      ) : disputes.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <CheckCircle2 className="h-12 w-12 text-green-500 mb-3" />
+            <p className="font-medium">Aucun litige</p>
+            <p className="text-sm text-muted-foreground">Tout se passe bien avec tes collaborations 🎉</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {disputes.map((d) => {
+            const st = STATUS[d.status] || { label: d.status, cls: 'bg-muted text-muted-foreground' }
+            const open = expandedId === d.id
+            const amount = d.transactions?.amount
+            const resolved = isResolved(d.status)
+            const daysLeft = d.auto_resolve_at ? Math.ceil((new Date(d.auto_resolve_at) - new Date()) / 86400000) : null
+            const priority = resolved ? null : (daysLeft != null && daysLeft <= 2 ? { label: 'Urgent', cls: 'bg-red-500/10 text-red-600 border-red-500/20' } : null)
+            const accent = resolved ? 'border-l-green-500' : d.status === 'under_review' ? 'border-l-purple-500' : 'border-l-orange-500'
+            const StIcon = resolved ? CheckCircle2 : d.status === 'under_review' ? Shield : AlertTriangle
+            const stIconCls = resolved ? 'text-green-600 bg-green-500/10' : d.status === 'under_review' ? 'text-purple-600 bg-purple-500/10' : 'text-orange-600 bg-orange-500/10'
+            const step = resolved ? 2 : d.status === 'under_review' ? 1 : 0
+            return (
+              <Card key={d.id} className={`overflow-hidden border-l-4 ${accent}`}>
+                <button onClick={() => toggleExpand(d.id)} className="w-full text-left p-5 hover:bg-muted/40 transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className={`h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 ${stIconCls}`}><StIcon className="h-4 w-4" /></div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold">{d.reason}</p>
+                          <Badge variant="outline" className={st.cls}>{st.label}</Badge>
+                          {priority && <Badge variant="outline" className={priority.cls}>{priority.label}</Badge>}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Ouvert le {new Date(d.created_at).toLocaleDateString('fr-FR')}{amount ? ` · ${parseFloat(amount).toLocaleString()}€` : ''}</p>
+                        {d.description && <p className="text-sm text-muted-foreground mt-1 truncate">{d.description}</p>}
+                      </div>
+                    </div>
+                    <ChevronRight className={`h-5 w-5 text-muted-foreground flex-shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => setExpandedDispute(isExpanded ? null : dispute.id)}>{isExpanded ? "Réduire" : "Voir détails"}</Button>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-                  <span className="font-medium">{dispute.contractTitle}</span><span>•</span>
-                  <span>Partenaire : {dispute.brand}</span><span>•</span>
-                  <span>Type : {dispute.type}</span>
-                </div>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground"><span>{dispute.createdAt}</span><span>•</span><span>Durée : {dispute.duration}</span></div>
-              </CardHeader>
+                </button>
 
-              {isExpanded && (
-                <CardContent className="space-y-4 pt-6">
-                  <Card className="border-2">
-                    <CardContent className="pt-6 space-y-3">
-                      <div className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-blue-600" /><h4 className="font-semibold">Description du problème</h4></div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{dispute.description}</p>
-                      <div className="flex flex-wrap gap-2 pt-2">
-                        {dispute.attachments.map((a, i) => (
-                          <Button key={i} variant="outline" size="sm" className="gap-2" onClick={() => toast.info("Téléchargement bientôt disponible")}><FileText className="h-3 w-3" />{a}<Download className="h-3 w-3" /></Button>
+                {open && (
+                  <div className="border-t p-5 space-y-4">
+                    <div className="flex items-center gap-1">
+                      {['Ouvert', 'Médiation', 'Résolu'].map((s, i, arr) => (
+                        <div key={s} className="flex items-center gap-1 flex-1 last:flex-none">
+                          <div className={`flex items-center gap-1.5 ${i <= step ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            <div className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-semibold ${i < step ? 'bg-green-500 text-white' : i === step ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>{i < step ? '✓' : i + 1}</div>
+                            <span className="text-xs font-medium whitespace-nowrap">{s}</span>
+                          </div>
+                          {i < arr.length - 1 && <div className={`h-0.5 flex-1 rounded ${i < step ? 'bg-green-500' : 'bg-muted'}`} />}
+                        </div>
+                      ))}
+                    </div>
+                    {d.description && <p className="text-sm">{d.description}</p>}
+                    {!resolved && d.auto_resolve_at && (
+                      <p className="text-xs text-orange-600 flex items-center gap-1"><Clock className="h-3 w-3" />Résolution automatique le {new Date(d.auto_resolve_at).toLocaleDateString('fr-FR')} sans réponse</p>
+                    )}
+                    {Array.isArray(d.attachments) && d.attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {d.attachments.map((a, i) => (
+                          (a.type || '').startsWith('image/')
+                            ? <a key={i} href={a.url} target="_blank" rel="noreferrer" className="block"><img src={a.url} alt={a.name || ''} className="h-20 w-20 object-cover rounded-md border hover:opacity-90" /></a>
+                            : <a key={i} href={a.url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted/50"><FileText className="h-3.5 w-3.5" /><span className="truncate max-w-[160px]">{a.name || 'Pièce jointe'}</span></a>
                         ))}
                       </div>
-                    </CardContent>
-                  </Card>
+                    )}
 
-                  <Card className="border-2 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
-                    <CardContent className="pt-6 space-y-3">
-                      <div className="flex items-center gap-2"><Brain className="h-4 w-4 text-blue-600 dark:text-blue-400" /><h4 className="font-semibold text-blue-900 dark:text-blue-100">Recommandations IA</h4></div>
-                      <ul className="space-y-2">
-                        {dispute.aiRecommendations.map((r, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-blue-800 dark:text-blue-200"><CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" /><span>{r}</span></li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-
-                  {dispute.id === "1" && showPartnex && (
-                    <Card className="border-2 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900">
-                      <CardContent className="pt-6 space-y-3">
-                        <div className="flex items-center gap-2"><Shield className="h-4 w-4 text-green-600 dark:text-green-400" /><h4 className="font-semibold text-green-900 dark:text-green-100">Médiation Partnexx activée</h4></div>
-                        <p className="text-sm text-green-800 dark:text-green-200">Notre équipe est intervenue sur ce dossier et travaille à une solution équitable pour toutes les parties.</p>
-                      </CardContent>
-                    </Card>
-                  )}
-                  {dispute.id === "2" && (
-                    <Card className="border-2 bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900">
-                      <CardContent className="pt-6 space-y-3">
-                        <div className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" /><h4 className="font-semibold text-orange-900 dark:text-orange-100">72h écoulées</h4></div>
-                        <p className="text-sm text-orange-800 dark:text-orange-200">Vous pouvez maintenant faire intervenir Partnexx pour une médiation professionnelle.</p>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  <Card className="border-2">
-                    <CardContent className="pt-6 space-y-4">
-                      <div className="flex items-center gap-2"><h4 className="font-semibold">Conversation dédiée</h4><Badge variant="outline" className="text-xs">{dispute.id === "1" ? "Avec Partnexx" : "Discussion bilatérale"}</Badge></div>
-                      <div className="h-[340px] overflow-y-auto p-4 border rounded-lg">
-                        <div className="space-y-4">
-                          {dispute.messages.map((m) => {
-                            const isMe = m.sender === "me"
-                            const isPartnexx = m.sender === "partnexx"
+                    <div>
+                      <h4 className="font-semibold text-sm mb-2">Conversation</h4>
+                      <div className="h-[300px] overflow-y-auto p-4 border rounded-lg space-y-3 bg-muted/20">
+                        {loadingMsg ? (
+                          <p className="text-sm text-muted-foreground text-center py-8">Chargement…</p>
+                        ) : messages.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground gap-2">
+                            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center"><MessageSquare className="h-6 w-6" /></div>
+                            <p className="text-sm font-medium">Aucun message pour l'instant</p>
+                            <p className="text-xs max-w-[260px]">Explique la situation à la marque, ou demande l'intervention de l'équipe Partnexx.</p>
+                          </div>
+                        ) : messages.map((m) => {
+                          if (m.sender_role === 'system') {
                             return (
-                              <div key={m.id} className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="h-10 w-10 rounded-full flex items-center justify-center overflow-hidden bg-muted">
-                                    {isPartnexx ? <img src="/logo.png" alt="Partnexx" className="h-7 w-7 object-contain" /> : <span className={`h-full w-full flex items-center justify-center text-white text-sm font-semibold ${isMe ? 'bg-primary' : 'bg-blue-500'}`}>{m.senderName.charAt(0)}</span>}
-                                  </div>
-                                  <div className="flex-1"><div className="flex items-center gap-2"><span className="font-semibold text-sm">{m.senderName}</span><span className="text-xs text-muted-foreground">{m.timestamp}</span></div></div>
-                                  {!isMe && (<div className="flex gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => toast.success("Merci pour ton retour 👍")}><ThumbsUp className="h-3 w-3" /></Button><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => toast("Retour négatif noté")}><ThumbsDown className="h-3 w-3" /></Button></div>)}
+                              <div key={m.id} className="flex justify-center my-1">
+                                <div className="flex items-center gap-2 rounded-full bg-purple-500/10 text-purple-700 border border-purple-500/20 px-3 py-1.5 text-xs font-medium max-w-[90%]">
+                                  <img src="/logo.png" className="h-4 w-4 object-contain flex-shrink-0" alt="Partnexx" />
+                                  <span>{m.content}</span>
                                 </div>
-                                <div className={`ml-12 p-3 rounded-lg text-sm ${isMe ? "bg-primary/10" : isPartnexx ? "bg-green-500/10 border border-green-200 dark:border-green-900" : "bg-muted"}`}>{m.content}</div>
                               </div>
                             )
-                          })}
-                          {interventionRequested[dispute.id] && !dispute.partnexIntervened && (
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <div className="h-10 w-10 rounded-full flex items-center justify-center overflow-hidden bg-muted"><img src="/logo.png" alt="Partnexx" className="h-7 w-7 object-contain" /></div>
-                                <div className="flex-1"><div className="flex items-center gap-2"><span className="font-semibold text-sm">Équipe Partnexx</span><span className="text-xs text-muted-foreground">À l'instant</span></div></div>
+                          }
+                          const mine = m.sender_role === 'influencer'
+                          const isPx = m.sender_role === 'partnexx'
+                          return (
+                            <div key={m.id} className={`flex gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+                              {!mine && <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">{isPx ? <img src="/logo.png" className="h-5 w-5 object-contain" alt="Partnexx" /> : <span className="text-xs font-semibold text-blue-600">M</span>}</div>}
+                              <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${mine ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-card border rounded-bl-sm'}`}>
+                                {!mine && <p className="text-[10px] font-semibold mb-0.5 opacity-70">{isPx ? 'Équipe Partnexx' : 'La marque'}</p>}
+                                <p className="whitespace-pre-wrap">{m.content}</p>
+                                <p className="text-[10px] opacity-60 mt-1">{new Date(m.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
                               </div>
-                              <div className="ml-12 p-3 rounded-lg text-sm bg-green-500/10 border border-green-200 dark:border-green-900">Bonjour ! Je suis Thomas de l'équipe Partnexx 👋 Je viens d'être assigné à votre dossier. Je lis l'historique et je reviens vers vous d'ici 2h maximum avec une proposition concrète.</div>
                             </div>
-                          )}
+                          )
+                        })}
+                        <div ref={convEndRef} />
+                      </div>
+                      {!resolved && (
+                        <div className="flex gap-2 mt-2">
+                          <Input value={msgText} onChange={(e) => setMsgText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMessage(d.id) } }} placeholder="Écris un message…" />
+                          <Button size="icon" onClick={() => sendMessage(d.id)} disabled={sending}>{sending ? <span className="h-4 w-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" /> : <Send className="h-4 w-4" />}</Button>
                         </div>
-                      </div>
-                      <div className="flex gap-2 pt-2 border-t">
-                        <Input placeholder="Écrire un message..." value={messageText} onChange={(e) => setMessageText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} />
-                        <Button onClick={handleSend} size="icon"><Send className="h-4 w-4" /></Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      )}
+                    </div>
 
-                  <div className="flex gap-3 flex-wrap">
-                    <Button variant="outline" className="gap-2" onClick={() => toast.info("Aperçu du contrat bientôt disponible")}><FileText className="h-4 w-4" />Voir le contrat</Button>
-                    {!showPartnex && (<Button className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white" onClick={() => handleIntervention(dispute.id)}><Shield className="h-4 w-4 mr-2" />Faire intervenir Partnexx</Button>)}
-                    <Button variant="outline" className="flex-1" onClick={() => { setItems(items.filter(d => d.id !== dispute.id)); toast.success("Litige marqué comme résolu") }}><CheckCircle2 className="h-4 w-4 mr-2" />Marquer comme résolu</Button>
+                    {!resolved ? (
+                      <>
+                        {d.status === 'under_review' ? (
+                          <div className="flex items-center gap-3 rounded-xl border border-purple-500/20 bg-gradient-to-r from-purple-500/10 to-blue-500/10 p-4">
+                            <div className="h-10 w-10 rounded-full bg-white shadow-sm flex items-center justify-center flex-shrink-0"><img src="/logo.png" className="h-6 w-6 object-contain" alt="Partnexx" /></div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm flex items-center gap-1.5"><Zap className="h-4 w-4 text-purple-600" />Partnexx est sur le coup</p>
+                              <p className="text-xs text-muted-foreground">Notre équipe étudie ce litige. Le paiement reste gelé jusqu'à la résolution.</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-purple-500/20 bg-gradient-to-r from-purple-500/5 to-blue-500/5 p-4 space-y-3">
+                            <div className="flex items-start gap-3">
+                              <div className="h-10 w-10 rounded-full bg-white shadow-sm flex items-center justify-center flex-shrink-0"><img src="/logo.png" className="h-6 w-6 object-contain" alt="Partnexx" /></div>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-sm">Besoin d'un arbitre neutre ?</p>
+                                <p className="text-xs text-muted-foreground">Fais intervenir l'équipe Partnexx : on analyse les échanges, on tranche et on débloque le paiement vers la bonne personne.</p>
+                              </div>
+                            </div>
+                            <Button className="w-full gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white" onClick={() => requestIntervention(d.id)} disabled={acting}><Zap className="h-4 w-4" />Faire intervenir Partnexx</Button>
+                          </div>
+                        )}
+                        <Button variant="outline" className="w-full gap-2" onClick={() => markResolved(d.id)} disabled={acting}><CheckCircle2 className="h-4 w-4" />Marquer comme résolu</Button>
+                      </>
+                    ) : d.admin_note ? (
+                      <div className="rounded-lg bg-muted/40 p-3 text-sm">
+                        <p className="font-medium flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-green-600" />Litige résolu{d.resolved_at ? ` le ${new Date(d.resolved_at).toLocaleDateString('fr-FR')}` : ''}</p>
+                        <p className="text-muted-foreground mt-1">{d.admin_note}</p>
+                      </div>
+                    ) : null}
                   </div>
-                </CardContent>
-              )}
-            </Card>
-          )
-        })}
-      </div>
+                )}
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
-      {/* Modal nouveau litige (Dialog shadcn) */}
-      <Dialog open={showNewDispute} onOpenChange={setShowNewDispute}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <Card className="bg-blue-500/5 border-blue-500/20">
+        <CardContent className="p-5 flex gap-3">
+          <Shield className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-muted-foreground">
+            <p className="font-medium text-foreground mb-1">Comment ça marche</p>
+            <span className="font-medium">1.</span> Tu ouvres un litige et tu discutes avec la marque. <span className="font-medium">2.</span> Si pas d'accord, tu fais intervenir Partnexx (médiation). <span className="font-medium">3.</span> Sans réponse, le litige se résout automatiquement au bout de 7 jours.
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={showNew} onOpenChange={setShowNew}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <span className="h-8 w-8 rounded-full bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center"><AlertTriangle className="h-4 w-4 text-orange-600" /></span>
-              Ouvrir un litige
-            </DialogTitle>
-            <DialogDescription>Un litige sera ouvert sur un contrat actif. Une conversation dédiée sera créée automatiquement.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-orange-500" />Ouvrir un litige</DialogTitle>
+            <DialogDescription>Indique le type de problème puis, si besoin, la campagne concernée. L'équipe Partnexx arbitrera.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 mt-2">
+          <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Contrat concerné *</Label>
-              <select value={newDispute.contractTitle} onChange={(e) => setNewDispute({ ...newDispute, contractTitle: e.target.value })} className={selectCls}>
-                <option value="">Sélectionner un contrat</option>
-                <option>Contrat UGC Q3</option>
-                <option>Op Noël 2025</option>
+              <Label>Motif *</Label>
+              <select value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                <option value="">— Choisis un motif —</option>
+                {CATEGORIES.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Objet du litige *</Label>
-              <Input placeholder="Ex : Retard de livraison des contenus" value={newDispute.title} onChange={(e) => setNewDispute({ ...newDispute, title: e.target.value })} />
+              <Label>Lié à <span className="text-muted-foreground font-normal">(facultatif)</span></Label>
+              <div className="flex gap-2">
+                {[{ v: 'none', l: 'Rien' }, { v: 'campaign', l: 'Une campagne' }, { v: 'brand', l: 'Une entreprise' }].map(o => (
+                  <button key={o.v} type="button" onClick={() => setForm({ ...form, linkType: o.v, subjectKey: '', brandId: '' })} className={`flex-1 rounded-md border px-3 py-2 text-sm transition-colors ${form.linkType === o.v ? 'border-orange-500 bg-orange-500/10 text-orange-700 font-medium' : 'hover:bg-muted/50'}`}>{o.l}</button>
+                ))}
+              </div>
+              {form.linkType === 'campaign' && (
+                <select value={form.subjectKey} onChange={(e) => setForm({ ...form, subjectKey: e.target.value })} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-2">
+                  <option value="">— Choisis une campagne —</option>
+                  {subjects.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+              )}
+              {form.linkType === 'brand' && (
+                <select value={form.brandId} onChange={(e) => setForm({ ...form, brandId: e.target.value })} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-2">
+                  <option value="">— Choisis une entreprise —</option>
+                  {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Type de litige</Label>
-              <select value={newDispute.type} onChange={(e) => setNewDispute({ ...newDispute, type: e.target.value })} className={selectCls}>
-                <option value="">Sélectionner un type</option>
-                <option>Modification unilatérale des conditions</option>
-                <option>Usage non autorisé du contenu</option>
-                <option>Produit/service non conforme</option>
-                <option>Paiement</option>
-              </select>
+              <Label>Description du problème</Label>
+              <textarea rows={4} placeholder="Explique le problème, les faits, les dates et tes attentes…" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-y" />
             </div>
             <div className="space-y-1.5">
-              <Label>Description détaillée *</Label>
-              <textarea rows={4} placeholder="Expliquez la nature du problème, les faits et vos attentes..." value={newDispute.description} onChange={(e) => setNewDispute({ ...newDispute, description: e.target.value })} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-y" />
+              <Label>Pièces jointes <span className="text-muted-foreground font-normal">(captures, factures, contrats… max 5, 10 Mo)</span></Label>
+              <label className="flex items-center gap-2 rounded-md border border-dashed px-3 py-3 text-sm cursor-pointer hover:bg-muted/40">
+                <ImagePlus className="h-4 w-4" /> Ajouter un fichier
+                <input type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={handleAddFiles} />
+              </label>
+              {files.length > 0 && (
+                <div className="space-y-1.5">
+                  {files.map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs rounded-md border px-3 py-2">
+                      <FileText className="h-4 w-4 flex-shrink-0" /><span className="truncate flex-1">{f.name}</span>
+                      <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-foreground">✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
-              <CardContent className="pt-4 pb-4">
-                <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2 text-sm">Processus de résolution :</h4>
-                <ul className="space-y-1 text-sm text-blue-800 dark:text-blue-200">
-                  <li><span className="font-semibold">Étape 1 :</span> Discussion bilatérale entre vous et le partenaire</li>
-                  <li><span className="font-semibold">Étape 2 :</span> Médiation Partnexx si aucun accord après 72h</li>
-                  <li><span className="font-semibold">Étape 3 :</span> Décision finale et clôture du litige</li>
-                </ul>
-              </CardContent>
-            </Card>
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowNewDispute(false)}>Annuler</Button>
-              <Button className="flex-1 bg-orange-600 hover:bg-orange-700 text-white" onClick={handleCreate}>Ouvrir le litige</Button>
+            <div className="flex gap-3 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => setShowNew(false)}>Annuler</Button>
+              <Button className="flex-1 bg-orange-600 hover:bg-orange-700 text-white" onClick={handleCreate} disabled={creating}>{uploading ? 'Envoi des fichiers…' : creating ? 'Ouverture…' : 'Ouvrir le litige'}</Button>
             </div>
           </div>
         </DialogContent>
@@ -815,7 +983,7 @@ function ContratsSuivis({ contracts = [] }) {
 /* ════════════════════════════════════════════════════════════
    CÔTÉ CONTRATS : 4 sous-onglets
    ════════════════════════════════════════════════════════════ */
-function ContratsCote({ contracts = [], transactions = [] }) {
+function ContratsCote({ contracts = [], transactions = [], user }) {
   const subTabs = [
     { value: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { value: "actuels", label: "Contrats actuels", icon: FileText },
@@ -836,7 +1004,7 @@ function ContratsCote({ contracts = [], transactions = [] }) {
       </TabsList>
       <TabsContent value="dashboard" className="mt-2"><ContratsDashboard contracts={contracts} transactions={transactions} /></TabsContent>
       <TabsContent value="actuels" className="mt-2"><ContratsActuels contracts={contracts} /></TabsContent>
-      <TabsContent value="litiges" className="mt-2"><ContratsLitiges /></TabsContent>
+      <TabsContent value="litiges" className="mt-2"><ContratsLitiges user={user} transactions={transactions} contracts={contracts} /></TabsContent>
       <TabsContent value="suivis" className="mt-2"><ContratsSuivis contracts={contracts} /></TabsContent>
     </Tabs>
   )
@@ -2064,7 +2232,7 @@ function ContratsContent({ contracts = [], transactions = [], user }) {
         </TabsList>
 
         <TabsContent value="contrats" className="mt-6">
-          <ContratsCote contracts={contracts} transactions={transactions} />
+          <ContratsCote contracts={contracts} transactions={transactions} user={user} />
         </TabsContent>
         <TabsContent value="paiements" className="mt-6">
           <PaiementsTab transactions={transactions} contracts={contracts} user={user} />
