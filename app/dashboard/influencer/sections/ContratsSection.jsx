@@ -62,6 +62,16 @@ const getPaymentStatusLabel = (status) => {
 
 const tooltipStyle = { backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }
 
+// Helpers transactions partagés
+const MIN_TX_AMOUNT = 1 // on ignore les micro-transactions de test (ex. 0,85 €)
+const txAmount = (t) => parseFloat(t?.influencer_amount || t?.amount || 0)
+const isMicroTx = (t) => txAmount(t) < MIN_TX_AMOUNT
+const isRefundTx = (t) => {
+  const d = (t?.description || '').toLowerCase()
+  return t?.type === 'refund' || d.includes('rembours') || d.includes('refund')
+}
+const isRealTx = (t) => !isMicroTx(t) && !isRefundTx(t) // vraie transaction (ni test, ni remboursement)
+
 /* ════════════════════════════════════════════════════════════
    SOUS-ONGLET : CONTRATS ACTUELS  (= ton ancien ContratsTab, VRAIES DONNÉES, inchangé)
    ════════════════════════════════════════════════════════════ */
@@ -313,7 +323,7 @@ function ContratsActuels({ contracts = [] }) {
 }
 
 /* ════════════════════════════════════════════════════════════
-   SOUS-ONGLET : DASHBOARD (mock)
+   SOUS-ONGLET : DASHBOARD (vraies données)
    ════════════════════════════════════════════════════════════ */
 function ContratsDashboard({ contracts = [], transactions = [] }) {
   const now = new Date()
@@ -324,7 +334,18 @@ function ContratsDashboard({ contracts = [], transactions = [] }) {
   const totalCount = contracts.length
   const completionRate = totalCount ? Math.round((completedCount / totalCount) * 100) : 0
   const signatureRate = totalCount ? Math.round(((activeCount + completedCount) / totalCount) * 100) : 0
-  const revenueReceived = transactions.filter(t => t.status === 'released').reduce((s, t) => s + parseFloat(t.influencer_amount || 0), 0)
+  const revenueReceived = transactions.filter(t => t.status === 'released' && isRealTx(t)).reduce((s, t) => s + parseFloat(t.influencer_amount || 0), 0)
+
+  // Taux d'encaissement = part des gains déjà reçus sur le total facturé (reçu + escrow + en attente)
+  const billedTotal = transactions
+    .filter(t => isRealTx(t) && ['released', 'in_escrow', 'pending'].includes(t.status))
+    .reduce((s, t) => s + parseFloat(t.influencer_amount || 0), 0)
+  const cashedRate = billedTotal > 0 ? Math.round((revenueReceived / billedTotal) * 100) : 0
+
+  // Taux de fiabilité = contrats sans annulation ni litige
+  const cancelledCount = contracts.filter(c => c.status === 'cancelled').length
+  const disputedCount = contracts.filter(c => c.status === 'disputed').length
+  const reliabilityRate = totalCount ? Math.round(((totalCount - cancelledCount - disputedCount) / totalCount) * 100) : 0
 
   const stats = [
     { title: "Contrats actifs", value: activeCount, sub: "signés en cours", icon: FileText, color: "text-blue-500", bgColor: "bg-blue-500/10" },
@@ -336,8 +357,8 @@ function ContratsDashboard({ contracts = [], transactions = [] }) {
   const perf = [
     { category: "Taux de signature", value: signatureRate },
     { category: "Taux de complétion", value: completionRate },
-    { category: "Délais respectés", value: 0 },
-    { category: "Satisfaction client", value: 0 },
+    { category: "Taux d'encaissement", value: cashedRate },
+    { category: "Taux de fiabilité", value: reliabilityRate },
   ]
 
   const recent = [...contracts]
@@ -474,7 +495,7 @@ function ContratsDashboard({ contracts = [], transactions = [] }) {
 }
 
 /* ════════════════════════════════════════════════════════════
-   SOUS-ONGLET : LITIGES (mock)
+   SOUS-ONGLET : LITIGES (local, non persisté — à brancher sur la table disputes)
    ════════════════════════════════════════════════════════════ */
 function ContratsLitiges() {
   const [items, setItems] = useState([])
@@ -707,7 +728,7 @@ function ContratsLitiges() {
 }
 
 /* ════════════════════════════════════════════════════════════
-   SOUS-ONGLET : SUIVIS (mock)
+   SOUS-ONGLET : SUIVIS (vraies données)
    ════════════════════════════════════════════════════════════ */
 function ContratsSuivis({ contracts = [] }) {
   const now = new Date()
@@ -833,7 +854,6 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
   const [paySubTab, setPaySubTab] = useState('dashboard')
   const [enAttenteOpen, setEnAttenteOpen] = useState(false)
   const [search, setSearch] = useState("")
-  const [filterStatus, setFilterStatus] = useState("all")
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false)
   const [iban, setIban] = useState("")
   const [holderName, setHolderName] = useState("")
@@ -897,21 +917,16 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
     return { due, days }
   }
 
-  // On masque les micro-transactions de test (ex. 0,85 €) : on ne garde que les "vraies"
-  const MIN_TX_AMOUNT = 1
-  const txAmount = (t) => parseFloat(t.influencer_amount || t.amount || 0)
-  const isMicroTx = (t) => txAmount(t) < MIN_TX_AMOUNT
-
   const filtered = transactions.filter(t => {
-    if (isMicroTx(t)) return false
+    if (!isRealTx(t)) return false // ni micro-transaction de test (<1€), ni remboursement
     if (t.status === 'in_escrow' || t.status === 'pending') return false // affichés dans le bandeau "en attente"
+    if (search === "") return true
     const q = search.toLowerCase()
-    const matchSearch = search === "" ||
-      (t.description || "").toLowerCase().includes(q) ||
-      getCampaignLabel(t).toLowerCase().includes(q)
-    const matchStatus = filterStatus === "all" || t.status === filterStatus
-    return matchSearch && matchStatus
+    return (t.description || "").toLowerCase().includes(q) || getCampaignLabel(t).toLowerCase().includes(q)
   })
+
+  // Vraies transactions, base de tous les calculs de revenus (hors test/remboursement)
+  const realTransactions = transactions.filter(isRealTx)
 
   // Regroupement par campagne (onglet Transactions)
   const campaignGroups = (() => {
@@ -929,15 +944,9 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
     return Object.values(map).sort((a, b) => b.lastDate - a.lastDate)
   })()
 
-  // Factures & reçus regroupés par campagne (on exclut les remboursements)
-  const isRefundTx = (tx) => {
-    const d = (tx.description || '').toLowerCase()
-    return tx.type === 'refund' || d.includes('rembours') || d.includes('refund')
-  }
-
   // Fonds en attente : escrow + pending (hors micro-transactions de test)
   const enAttenteItems = transactions
-    .filter(t => (t.status === 'in_escrow' || t.status === 'pending') && !isMicroTx(t) && !isRefundTx(t))
+    .filter(t => (t.status === 'in_escrow' || t.status === 'pending') && isRealTx(t))
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   const enAttenteTotal = enAttenteItems.reduce((s, t) => s + parseFloat(t.influencer_amount || 0), 0)
   const docCampaignGroups = (() => {
@@ -1072,11 +1081,8 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
     })
   }
 
-  const escrowTx = transactions.filter(t => t.status === 'in_escrow')
-
-  const totalReceived = transactions.filter(t => t.status === 'released').reduce((sum, t) => sum + parseFloat(t.influencer_amount || 0), 0)
-  const totalPending = transactions.filter(t => t.status === 'in_escrow').reduce((sum, t) => sum + parseFloat(t.influencer_amount || 0), 0)
-  const totalAll = transactions.reduce((sum, t) => sum + parseFloat(t.influencer_amount || 0), 0)
+  const totalReceived = realTransactions.filter(t => t.status === 'released').reduce((sum, t) => sum + parseFloat(t.influencer_amount || 0), 0)
+  const totalAll = realTransactions.reduce((sum, t) => sum + parseFloat(t.influencer_amount || 0), 0)
 
   const availableForWithdraw = totalReceived
 
@@ -1086,7 +1092,7 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     const monthLabel = d.toLocaleDateString('fr-FR', { month: 'short' })
-    const total = transactions
+    const total = realTransactions
       .filter(t => {
         const txDate = new Date(t.created_at)
         return txDate.getFullYear() === d.getFullYear() && txDate.getMonth() === d.getMonth() && t.status === 'released'
@@ -1103,7 +1109,7 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
   const totalLast12 = last12Months.reduce((sum, m) => sum + m.revenue, 0)
 
   const byYear = {}
-  transactions.filter(t => t.status === 'released').forEach(t => {
+  realTransactions.filter(t => t.status === 'released').forEach(t => {
     const y = new Date(t.created_at).getFullYear()
     if (!byYear[y]) byYear[y] = { revenue: 0, count: 0 }
     byYear[y].revenue += parseFloat(t.influencer_amount || 0)
@@ -1113,7 +1119,7 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
   const currentYear = new Date().getFullYear()
 
   const monthsList = Array.from({ length: 12 }, (_, i) => {
-    const tx = transactions.filter(t => { const d = new Date(t.created_at); return d.getFullYear() === currentYear && d.getMonth() === i })
+    const tx = realTransactions.filter(t => { const d = new Date(t.created_at); return d.getFullYear() === currentYear && d.getMonth() === i })
     const total = tx.filter(t => t.status === 'released').reduce((s, t) => s + parseFloat(t.influencer_amount || 0), 0)
     return { i, label: new Date(currentYear, i, 1).toLocaleDateString('fr-FR', { month: 'long' }), total, count: tx.length }
   })
@@ -1291,62 +1297,6 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
     } finally {
       setDownloadingInvoiceId(null)
     }
-  }
-
-  // Carte paiement réutilisable (Transactions + Fonds en attente)
-  const renderPaymentCard = (tx) => {
-    const esc = tx.status === 'in_escrow' ? getEscrowRelease(tx) : null
-    const campaign = getCampaignLabel(tx)
-    return (
-    <Card key={tx.id} className="hover:shadow-md transition-all duration-200">
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 flex-1 min-w-0">
-            <div className={`p-3 rounded-full ${tx.status === "released" ? "bg-green-500/10" : "bg-orange-500/10"}`}>
-              <CreditCard className={`h-5 w-5 ${tx.status === "released" ? "text-green-600" : "text-orange-500"}`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <p className="font-semibold truncate">{campaign}</p>
-                <Badge variant="outline" className={getPaymentStatusColor(tx.status)}>{getPaymentStatusLabel(tx.status)}</Badge>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                <span>{tx.type || 'Paiement'}</span><span>•</span>
-                <span>{new Date(tx.created_at).toLocaleDateString('fr-FR')}</span>
-                {tx.description && tx.description !== campaign && (<><span>•</span><span className="truncate max-w-[180px]">{tx.description}</span></>)}
-              </div>
-              {tx.status === 'in_escrow' && (
-                <div className="mt-2 flex items-start gap-1.5 text-xs">
-                  <Clock className="h-3.5 w-3.5 text-orange-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-orange-600">
-                    {esc
-                      ? <>En attente de validation de la marque · libéré automatiquement le <span className="font-semibold">{esc.due.toLocaleDateString('fr-FR')}</span>{esc.days > 0 ? ` (${esc.days} j)` : ' (imminent)'}</>
-                      : <>En attente de validation du contenu par la marque (libéré sous {ESCROW_AUTO_DAYS} j)</>}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="text-right">
-              <p className={`text-xl font-bold ${tx.status === "released" ? "text-green-600" : "text-orange-500"}`}>{tx.status === "released" ? "+" : ""}{parseFloat(tx.influencer_amount || 0).toLocaleString()}€</p>
-              <p className="text-xs text-muted-foreground">{tx.currency || 'EUR'}</p>
-            </div>
-            {(tx.status === "released" || tx.status === "in_escrow") && (
-              <Button variant="outline" size="sm" className="gap-1.5 whitespace-nowrap" onClick={() => handleDownloadIssuedInvoice(tx.id)} disabled={downloadingInvoiceId === tx.id} title="Télécharger ma facture (envoyée à la marque)">
-                <FileText className="h-3.5 w-3.5" />{downloadingInvoiceId === tx.id ? '...' : 'Facture'}
-              </Button>
-            )}
-            {tx.status === "released" && (
-              <Button variant="outline" size="sm" className="gap-1.5 whitespace-nowrap" onClick={() => handleDownloadReceipt(tx.id)} disabled={downloadingReceiptId === tx.id} title="Télécharger le reçu de paiement">
-                <Receipt className="h-3.5 w-3.5" />{downloadingReceiptId === tx.id ? '...' : 'Reçu'}
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-    )
   }
 
   // Ligne paiement compacte (dans une campagne dépliée)
@@ -1683,10 +1633,10 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
               <CardContent className="p-6 relative">
                 <div className="flex items-start justify-between mb-2">
                   <div className="p-2 rounded-lg bg-orange-500/10"><Clock className="h-5 w-5 text-orange-500" /></div>
-                  <Badge variant="outline" className="bg-orange-500/5 text-orange-600 border-orange-500/20">En escrow</Badge>
+                  <Badge variant="outline" className="bg-orange-500/5 text-orange-600 border-orange-500/20">En attente</Badge>
                 </div>
-                <p className="text-2xl font-bold text-orange-500">{totalPending.toLocaleString()}€</p>
-                <p className="text-sm text-muted-foreground">En attente de libération</p>
+                <p className="text-2xl font-bold text-orange-500">{enAttenteTotal.toLocaleString()}€</p>
+                <p className="text-sm text-muted-foreground">Escrow + en attente de libération</p>
               </CardContent>
             </Card>
 
