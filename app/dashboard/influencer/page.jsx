@@ -7,6 +7,7 @@ import { useNotifications } from '@/lib/hook/useNotifications'
 import dynamic from 'next/dynamic'
 import { Bell, ChevronLeft, ChevronRight } from 'lucide-react'
 import LevelUpProvider from '@/components/LevelUpProvider'
+import PartnexxIntro from '@/components/PartnexxIntro'
 
 const AccueilSection = dynamic(() => import('./sections/AccueilSection'), { ssr: false })
 const OpportunitesSection = dynamic(() => import('./sections/OpportunitesSection'), { ssr: false })
@@ -47,7 +48,18 @@ export default function DashboardInfluencer() {
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return router.push('/login')
+      if (!user) {
+        // BYPASS DEV : en local, pas besoin de se connecter -> on charge le compte de dev.
+        // Verrouillé en développement : en prod (Vercel) ça redirige vers /login comme avant.
+        if (process.env.NODE_ENV === 'development') {
+          const DEV_ID = 'db9f7a27-6e37-43c4-91bd-4467ebd14611'
+          setUser({ id: DEV_ID, email: 'baudoinmathias@gmail.com' })
+          const { data: prof } = await supabase.from('profiles').select('*').eq('id', DEV_ID).single()
+          setProfile(prof)
+          return
+        }
+        return router.push('/login')
+      }
       setUser(user)
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       setProfile(prof)
@@ -87,6 +99,7 @@ export default function DashboardInfluencer() {
   return (
     <LevelUpProvider user={user}>
       <div className="min-h-screen bg-background flex w-screen">
+        <PartnexxIntro ready={!loading && !!user} />
         {/* SIDEBAR */}
         <aside className={`fixed left-0 top-0 h-screen bg-card border-r border-border transition-all duration-300 flex flex-col z-50 overflow-y-auto ${sidebarCollapsed ? 'w-16' : 'w-64'}`}>
           {/* Header */}

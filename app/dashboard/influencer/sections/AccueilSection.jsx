@@ -101,19 +101,7 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
   const [currentTime, setCurrentTime] = useState(new Date())
   const [myScore, setMyScore] = useState(0)
   const [tilt, setTilt] = useState({ rx: 0, ry: 0 })
-  const [showIntro, setShowIntro] = useState(false)
   const router = useRouter()
-
-  // Intro animée (logo + PARTNEXX) — une seule fois par session
-  useEffect(() => {
-    try {
-      if (sessionStorage.getItem('pnx_intro_seen')) return
-      sessionStorage.setItem('pnx_intro_seen', '1')
-      setShowIntro(true)
-      const t = setTimeout(() => setShowIntro(false), 3500)
-      return () => clearTimeout(t)
-    } catch { /* sessionStorage indisponible */ }
-  }, [])
   const [showNotifPanel, setShowNotifPanel] = useState(false)
   const [topCreators, setTopCreators] = useState([])
   const [topAvatarError, setTopAvatarError] = useState({})
@@ -301,54 +289,6 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
 
   return (
     <div className="space-y-6">
-      {/* INTRO ANIMÉE (une fois par session) */}
-      {showIntro && (
-        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden" style={{ backgroundImage: 'linear-gradient(125deg, #6d28d9, #9333ea, #db2777, #6d28d9)', backgroundSize: '300% 300%', animation: 'pnxBg 6s ease infinite alternate, pnxIntroOut 3.4s ease forwards' }}>
-          <style>{`
-            @keyframes pnxBg { 0%{background-position:0% 50%} 100%{background-position:100% 50%} }
-            @keyframes pnxLogoPop { 0%{transform:scale(0) rotate(-45deg);opacity:0} 55%{transform:scale(1.25) rotate(14deg);opacity:1} 78%{transform:scale(.92) rotate(-4deg)} 100%{transform:scale(1) rotate(0)} }
-            @keyframes pnxRing { 0%{transform:scale(.6);opacity:.6} 100%{transform:scale(2.2);opacity:0} }
-            @keyframes pnxFlip { 0%{transform:perspective(700px) rotateX(-90deg) translateY(24px);opacity:0} 60%{transform:perspective(700px) rotateX(18deg) translateY(0)} 100%{transform:perspective(700px) rotateX(0) translateY(0);opacity:1} }
-            @keyframes pnxGlowText { 0%,100%{text-shadow:0 0 16px rgba(255,255,255,.45)} 50%{text-shadow:0 0 32px rgba(255,255,255,.85), 0 0 64px rgba(236,72,153,.6)} }
-            @keyframes pnxSweep { 0%{transform:translateX(-140%) skewX(-18deg)} 100%{transform:translateX(360%) skewX(-18deg)} }
-            @keyframes pnxHeart { 0%{transform:scale(0) rotate(-20deg);opacity:0} 60%{transform:scale(1.35) rotate(8deg)} 80%{transform:scale(.9)} 100%{transform:scale(1) rotate(0);opacity:1} }
-            @keyframes pnxBeat { 0%,100%{transform:scale(1)} 28%{transform:scale(1.22)} 45%{transform:scale(1)} 62%{transform:scale(1.12)} 78%{transform:scale(1)} }
-            @keyframes pnxTag { 0%{opacity:0;transform:translateY(10px);letter-spacing:.05em} 100%{opacity:.9;transform:translateY(0);letter-spacing:.3em} }
-            @keyframes pnxTwinkle { 0%,100%{opacity:0;transform:scale(0)} 50%{opacity:1;transform:scale(1)} }
-            @keyframes pnxIntroOut { 0%,84%{opacity:1;visibility:visible} 100%{opacity:0;visibility:hidden} }
-          `}</style>
-
-          {/* étincelles */}
-          {[{ t: '22%', l: '24%', d: 0.6 }, { t: '70%', l: '20%', d: 1.1 }, { t: '30%', l: '78%', d: 0.9 }, { t: '74%', l: '74%', d: 1.4 }, { t: '18%', l: '54%', d: 1.6 }, { t: '80%', l: '48%', d: 1.2 }].map((s, i) => (
-            <span key={i} className="absolute w-2 h-2 rounded-full bg-white" style={{ top: s.t, left: s.l, animation: `pnxTwinkle 1.6s ease-in-out ${s.d}s infinite` }} />
-          ))}
-
-          <div className="relative flex items-center gap-4 sm:gap-5">
-            {/* logo + anneau qui pulse */}
-            <div className="relative flex items-center justify-center">
-              <span className="absolute w-24 h-24 sm:w-28 sm:h-28 rounded-full border-2 border-white/60" style={{ animation: 'pnxRing 1.8s ease-out .4s infinite' }} />
-              <img src="/logo.png" alt="Partnexx" className="relative w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-2xl" style={{ animation: 'pnxLogoPop 1.1s cubic-bezier(.2,.8,.2,1) both' }} />
-            </div>
-
-            {/* PARTNEXX lettre par lettre + reflet qui balaie */}
-            <div className="relative overflow-hidden" style={{ animation: 'pnxGlowText 2.2s ease-in-out 1.2s infinite' }}>
-              <div className="flex">
-                {'PARTNEXX'.split('').map((ch, i) => (
-                  <span key={i} className="text-5xl sm:text-7xl font-black text-white tracking-tight inline-block" style={{ animation: `pnxFlip .6s cubic-bezier(.2,.8,.2,1) ${(0.5 + i * 0.08).toFixed(2)}s both` }}>{ch}</span>
-                ))}
-              </div>
-              <span className="absolute top-0 left-0 h-full w-1/3 bg-gradient-to-r from-transparent via-white/70 to-transparent pointer-events-none" style={{ animation: 'pnxSweep 1.1s ease-in-out 1.5s' }} />
-            </div>
-
-            {/* cœur qui bat */}
-            <Heart className="w-10 h-10 sm:w-14 sm:h-14 text-pink-200 flex-shrink-0" style={{ fill: 'currentColor', animation: 'pnxHeart .6s cubic-bezier(.2,.8,.2,1) 1.5s both, pnxBeat 1s ease-in-out 2.2s infinite' }} />
-          </div>
-
-          {/* tagline */}
-          <p className="mt-6 text-white/90 text-sm sm:text-base font-medium uppercase" style={{ animation: 'pnxTag .8s ease 1.8s both' }}>La plateforme des créateurs</p>
-        </div>
-      )}
-
       {/* HERO (statique) */}
       <div className="relative">
         <div className="relative rounded-2xl p-6 sm:p-8 text-white shadow-xl bg-gradient-to-br from-purple-600 via-purple-500 to-pink-500">
