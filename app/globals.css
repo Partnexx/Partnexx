@@ -423,3 +423,64 @@ html.dark .bg-fuchsia-50, html.dark .bg-pink-50, html.dark .bg-rose-50,
 html.dark .bg-red-50, html.dark .bg-orange-50, html.dark .bg-amber-50,
 html.dark .bg-yellow-50, html.dark .bg-green-50, html.dark .bg-emerald-50,
 html.dark .bg-teal-50, html.dark .bg-cyan-50 { background-color: hsl(217 33% 15%) !important; }
+
+/* ====================================================
+   LOVABLE UTILITIES — pour les sections Ressources, etc.
+   À coller à la FIN de app/globals.css
+   ==================================================== */
+
+@theme {
+  /* Couleurs profile (fonds très clairs) */
+  --color-profile-blue:    hsl(210 100% 96%);
+  --color-profile-purple:  hsl(280 100% 96%);
+  --color-profile-orange:  hsl(30 100% 96%);
+  --color-profile-teal:    hsl(180 100% 96%);
+  --color-profile-emerald: hsl(160 100% 96%);
+  --color-profile-rose:    hsl(340 100% 96%);
+  --color-profile-pink:    hsl(330 100% 96%);
+  --color-profile-cyan:    hsl(190 100% 96%);
+}
+
+/* Variables CSS pour gradients & ombres */
+:root {
+  --gradient-surface: linear-gradient(180deg, hsl(0 0% 100%), hsl(210 40% 98%));
+  --shadow-elevated: 0 8px 24px -8px hsl(220 20% 20% / 0.08);
+
+  --gradient-blue:    linear-gradient(135deg, hsl(210 100% 60%), hsl(240 100% 65%));
+  --gradient-purple:  linear-gradient(135deg, hsl(280 100% 60%), hsl(320 100% 65%));
+  --gradient-orange:  linear-gradient(135deg, hsl(30 100% 60%),  hsl(50  100% 65%));
+  --gradient-teal:    linear-gradient(135deg, hsl(180 100% 50%), hsl(200 100% 60%));
+  --gradient-emerald: linear-gradient(135deg, hsl(160 100% 60%), hsl(180 100% 65%));
+  --gradient-rose:    linear-gradient(135deg, hsl(340 100% 60%), hsl(360 100% 65%));
+}
+
+/* Cartes surélevées */
+.card-elevated {
+  background-image: var(--gradient-surface);
+  box-shadow: var(--shadow-elevated);
+  border: 1px solid hsl(var(--border));
+}
+
+/* Sections profile : fond pastel + bordure gauche */
+.profile-section-blue    { background-color: hsl(210 100% 96%); border-left: 4px solid hsl(217 91% 60%); }
+.profile-section-purple  { background-color: hsl(280 100% 96%); border-left: 4px solid hsl(280 91% 60%); }
+.profile-section-orange  { background-color: hsl(30  100% 96%); border-left: 4px solid hsl(25  95% 53%); }
+.profile-section-teal    { background-color: hsl(180 100% 96%); border-left: 4px solid hsl(180 91% 40%); }
+.profile-section-emerald { background-color: hsl(160 100% 96%); border-left: 4px solid hsl(160 84% 39%); }
+.profile-section-rose    { background-color: hsl(340 100% 96%); border-left: 4px solid hsl(346 77% 50%); }
+
+/* Texte en dégradé */
+.text-gradient-blue    { background: var(--gradient-blue);    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: transparent; }
+.text-gradient-purple  { background: var(--gradient-purple);  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: transparent; }
+.text-gradient-orange  { background: var(--gradient-orange);  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: transparent; }
+.text-gradient-teal    { background: var(--gradient-teal);    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: transparent; }
+.text-gradient-emerald { background: var(--gradient-emerald); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: transparent; }
+.text-gradient-rose    { background: var(--gradient-rose);    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: transparent; }
+
+/* Fonds gradient utiles */
+.bg-gradient-blue    { background: var(--gradient-blue); }
+.bg-gradient-purple  { background: var(--gradient-purple); }
+.bg-gradient-orange  { background: var(--gradient-orange); }
+.bg-gradient-teal    { background: var(--gradient-teal); }
+.bg-gradient-emerald { background: var(--gradient-emerald); }
+.bg-gradient-rose    { background: var(--gradient-rose); }
