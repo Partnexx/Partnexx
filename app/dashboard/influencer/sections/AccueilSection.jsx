@@ -53,6 +53,22 @@ const RECO_STYLE = [
   { color: '#f59e0b', icon: Target },
 ]
 
+// Met en gras les chiffres-clés (€, %, points, abonnés) et les mots forts (réseaux, niveaux)
+const EMPH_RE = /(\d[\d.,\u202f\u00a0]*(?:\s?(?:€|%|pts|points|abonnés))?|Instagram|TikTok|YouTube|LinkedIn|Élite|Champion|Légende|Diamant|Platine|Argent|Bronze)/g
+function emphasize(text) {
+  const str = String(text || '')
+  const out = []
+  let last = 0, m, k = 0
+  EMPH_RE.lastIndex = 0
+  while ((m = EMPH_RE.exec(str)) !== null) {
+    if (m.index > last) out.push(str.slice(last, m.index))
+    out.push(<strong key={k++} className="font-bold text-gray-900">{m[0].trim()}</strong>)
+    last = m.index + m[0].length
+  }
+  if (last < str.length) out.push(str.slice(last))
+  return out
+}
+
 const newsUpdates = [
   { title: 'Nouvelle fonctionnalité IA pour optimiser vos posts', category: 'IA', time: 'Il y a 1 jour', type: 'feature', image: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400&h=250&fit=crop' },
   { title: 'TikTok lance son nouveau programme créateur', category: 'Platform', time: 'Il y a 2 jours', type: 'news', image: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=400&h=250&fit=crop' },
@@ -72,6 +88,7 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
   const [currentTime, setCurrentTime] = useState(new Date())
   const [showNotifPanel, setShowNotifPanel] = useState(false)
   const [topCreators, setTopCreators] = useState([])
+  const [topAvatarError, setTopAvatarError] = useState({})
   const [socialAccounts, setSocialAccounts] = useState([])
   const [aiData, setAiData] = useState(null)
   const [aiLoading, setAiLoading] = useState(false)
@@ -376,8 +393,8 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
                         {creator.rank === 1 && <div className="absolute -top-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center"><Crown className="h-3 w-3 text-yellow-500" /></div>}
                         <span className="text-2xl font-bold text-white">{creator.rank}</span>
                       </div>
-                      {creator.avatar ? (
-                        <img src={creator.avatar} alt={creator.name} className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md flex-shrink-0" />
+                      {creator.avatar && !topAvatarError[creator.rank] ? (
+                        <img src={creator.avatar} alt={creator.name} onError={() => setTopAvatarError(prev => ({ ...prev, [creator.rank]: true }))} className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md flex-shrink-0" />
                       ) : (
                         <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-purple-600 text-white font-bold flex items-center justify-center border-2 border-white shadow-md flex-shrink-0">{initials}</div>
                       )}
@@ -631,22 +648,27 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
                   <p className="text-sm">{aiData?.error ? 'Insights indisponibles pour le moment, réessaie plus tard' : 'Pas encore assez de données pour générer des insights'}</p>
                 </div>
               ) : aiData.insights.map((insight, i) => (
-                <div key={i} className={`rounded-2xl p-5 border-2 cursor-pointer hover:scale-[1.01] transition-transform relative overflow-hidden ${insight.impact === 'high' ? 'bg-gradient-to-br from-yellow-500/10 to-white border-yellow-500/30' : 'bg-gradient-to-br from-purple-500/10 to-white border-purple-500/30'}`}>
-                  <div className="relative flex items-start gap-4 mb-3">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0 ${insight.impact === 'high' ? 'bg-gradient-to-br from-yellow-500 to-orange-500' : 'bg-gradient-to-br from-purple-500 to-pink-500'}`}>
+                <div key={i} className={`group rounded-2xl p-5 border transition-all hover:-translate-y-0.5 hover:shadow-md relative overflow-hidden ${insight.impact === 'high' ? 'bg-gradient-to-br from-yellow-50 to-white border-yellow-200' : 'bg-gradient-to-br from-purple-50 to-white border-purple-200'}`}>
+                  <div className="flex items-start gap-4 mb-3">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 transition-transform group-hover:scale-110 ${insight.impact === 'high' ? 'bg-gradient-to-br from-yellow-400 to-orange-500' : 'bg-gradient-to-br from-purple-500 to-pink-500'}`}>
                       <Sparkles className="h-6 w-6 text-white" />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between mb-1">
-                        <h4 className="font-semibold">{insight.title}</h4>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${insight.impact === 'high' ? 'bg-yellow-100 text-yellow-700' : 'bg-purple-100 text-purple-700'}`}>{insight.confidence}%</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <h4 className="font-bold text-gray-900 leading-snug">{insight.title}</h4>
+                        <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${insight.impact === 'high' ? 'bg-yellow-100 text-yellow-700' : 'bg-purple-100 text-purple-700'}`}>{insight.confidence}%</span>
                       </div>
-                      <p className="text-sm text-gray-500">{insight.description}</p>
+                      <p className="text-sm text-gray-600 leading-relaxed">{emphasize(insight.description)}</p>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-gray-400"><span>Niveau de confiance</span><span>Impact {insight.impact === 'high' ? 'élevé' : 'moyen'}</span></div>
-                    <Progress value={insight.confidence} className="h-2" />
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-400">Niveau de confiance</span>
+                      <span className={`font-semibold inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${insight.impact === 'high' ? 'bg-yellow-100 text-yellow-700' : 'bg-purple-100 text-purple-700'}`}>{insight.impact === 'high' ? '⚡ Impact élevé' : '◆ Impact moyen'}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                      <div className={`h-full rounded-full ${insight.impact === 'high' ? 'bg-gradient-to-r from-yellow-400 to-orange-500' : 'bg-gradient-to-r from-purple-500 to-pink-500'}`} style={{ width: `${insight.confidence}%` }} />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -670,12 +692,15 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
                 const st = RECO_STYLE[i % RECO_STYLE.length]
                 const Icon = st.icon
                 return (
-                  <div key={i} className="rounded-2xl p-5 border-2 cursor-pointer hover:scale-[1.01] transition-transform relative overflow-hidden" style={{ background: st.color + '0a', borderColor: st.color + '40' }}>
-                    <div className="relative flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0" style={{ background: `linear-gradient(135deg, ${st.color}, ${st.color}99)` }}>
-                        <Icon className="h-6 w-6 text-white" />
+                  <div key={i} className="group rounded-2xl p-5 border transition-all hover:-translate-y-0.5 hover:shadow-md relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${st.color}0f, #ffffff)`, borderColor: st.color + '33' }}>
+                    <div className="flex items-start gap-4">
+                      <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 transition-transform group-hover:scale-110" style={{ background: `linear-gradient(135deg, ${st.color}, ${st.color}aa)` }}>
+                        <Icon className="h-5 w-5 text-white" />
                       </div>
-                      <div><h4 className="font-semibold mb-1" style={{ color: st.color }}>{rec.title}</h4><p className="text-sm text-gray-500">{rec.desc}</p></div>
+                      <div className="min-w-0">
+                        <h4 className="font-bold mb-1" style={{ color: st.color }}>{rec.title}</h4>
+                        <p className="text-sm text-gray-600 leading-relaxed">{emphasize(rec.desc)}</p>
+                      </div>
                     </div>
                   </div>
                 )
