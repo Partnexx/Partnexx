@@ -4,43 +4,47 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { TrendingUp, Eye, Heart, DollarSign, Users, Target, Zap, Bell, Trophy, Brain, Sparkles, ChevronRight, Clock, Globe, ArrowUp, Activity, Share2, MessageCircle, Briefcase, Rocket, Shield, Bookmark, Download, PlayCircle, Lightbulb, Crown, X } from 'lucide-react'
+import supabase from '@/lib/supabase'
 
-const performanceData = [
-  { name: 'Jan', revenue: 2400 },
-  { name: 'Fév', revenue: 1398 },
-  { name: 'Mar', revenue: 9800 },
-  { name: 'Avr', revenue: 3908 },
-  { name: 'Mai', revenue: 4800 },
-  { name: 'Jun', revenue: 3800 },
-  { name: 'Jul', revenue: 4300 },
-]
+// ===== Helpers =====
+const MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
 
-const platformData = [
-  { name: 'TikTok', value: 35, color: '#000000', followers: '850K', growth: '+12%' },
-  { name: 'Instagram', value: 28, color: '#E4405F', followers: '680K', growth: '+8%' },
-  { name: 'YouTube', value: 22, color: '#FF0000', followers: '530K', growth: '+15%' },
-  { name: 'LinkedIn', value: 15, color: '#0077B5', followers: '365K', growth: '+5%' },
-]
+const fmtFollowers = (n) => {
+  const v = Number(n) || 0
+  if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}K`
+  return String(v)
+}
 
-const podiumData = [
-  { rank: 2, name: 'TechPro', score: 820, followers: '1.8M', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face' },
-  { rank: 1, name: 'Emma Beauty', score: 950, followers: '2.1M', avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=80&h=80&fit=crop&crop=face' },
-  { rank: 3, name: 'Fashion', score: 785, followers: '1.5M', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=64&h=64&fit=crop&crop=center' },
-]
+const timeAgo = (date) => {
+  if (!date) return ''
+  const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+  if (s < 60) return "à l'instant"
+  const m = Math.floor(s / 60); if (m < 60) return `il y a ${m} min`
+  const h = Math.floor(m / 60); if (h < 24) return `il y a ${h} h`
+  const d = Math.floor(h / 24); if (d < 7) return `il y a ${d} j`
+  return new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
+}
 
-const campaigns = [
-  { id: 1, title: 'Nike Air Max Campaign', brand: 'Nike', status: 'active', budget: '5000€', deadline: '15 Déc', progress: 75 },
-  { id: 2, title: 'Samsung Galaxy Review', brand: 'Samsung', status: 'pending', budget: '3500€', deadline: '20 Déc', progress: 30 },
-  { id: 3, title: 'Spotify Premium Promo', brand: 'Spotify', status: 'completed', budget: '2000€', deadline: '10 Déc', progress: 100 },
-]
+// Transactions réellement perçues (released), hors tests (<1€) et remboursements
+const isRealReceived = (t) => {
+  const amt = Number(t?.influencer_amount ?? t?.amount ?? 0)
+  if (t?.status !== 'released') return false
+  if (amt < 1) return false
+  const desc = (t?.description || '').toLowerCase()
+  if (t?.type === 'refund' || desc.includes('rembours') || desc.includes('refund')) return false
+  return true
+}
 
-const recentActivity = [
-  { user: 'BrandX', action: 'a approuvé votre proposition', time: 'il y a 2min', type: 'approval' },
-  { user: 'TechGuru', action: 'a commencé à vous suivre', time: 'il y a 5min', type: 'follow' },
-  { user: 'Emma_Beauty', action: 'a commenté votre post', time: 'il y a 15min', type: 'comment' },
-  { user: 'Fashion_Pro', action: 'vous a mentionné dans une story', time: 'il y a 30min', type: 'mention' },
-  { user: 'SportBrand', action: 'a envoyé une nouvelle offre', time: 'il y a 1h', type: 'offer' },
-]
+// ⚠️ Données décoratives sans source réelle pour l'instant (à brancher plus tard)
+const PLATFORM_META = {
+  tiktok: { name: 'TikTok', color: '#000000' },
+  instagram: { name: 'Instagram', color: '#E4405F' },
+  youtube: { name: 'YouTube', color: '#FF0000' },
+  x: { name: 'X (Twitter)', color: '#000000' },
+  twitter: { name: 'X (Twitter)', color: '#000000' },
+  linkedin: { name: 'LinkedIn', color: '#0077B5' },
+}
 
 const aiInsights = [
   { title: 'Moment optimal de publication', description: "Publiez entre 14h-16h pour +32% d'engagement", confidence: 94, impact: 'high', type: 'timing' },
@@ -62,42 +66,127 @@ const TABS = [
   { id: 'actualites', label: 'Actualités & Ressources', icon: Globe, color: 'from-green-500 to-emerald-600' },
 ]
 
-export default function AccueilSection({ profile, metrics, collaborations, transactions, notifications, unreadCount, markAsRead, markAllAsRead }) {
+export default function AccueilSection({ user, profile, metrics, collaborations, transactions, contracts, notifications, unreadCount, markAsRead, markAllAsRead }) {
   const [activeTab, setActiveTab] = useState('vue-ensemble')
   const [currentTime, setCurrentTime] = useState(new Date())
   const [showNotifPanel, setShowNotifPanel] = useState(false)
-  const [liveStats, setLiveStats] = useState({ 
-    views: 1247382, 
-    engagement: 8.7, 
-    revenue: metrics?.totalGains || 0, 
-    campaigns: metrics?.collaborationsActives || 0 
-  })
+  const [topCreators, setTopCreators] = useState([])
+  const [socialAccounts, setSocialAccounts] = useState([])
 
-  // Mettre à jour quand metrics change
+  // Réseaux sociaux réels du créateur
   useEffect(() => {
-    if (metrics) {
-      setLiveStats(prev => ({
-        ...prev,
-        revenue: metrics.totalGains || 0,
-        campaigns: metrics.collaborationsActives || 0,
-      }))
-    }
-  }, [metrics])
+    if (!user?.id) return
+    let active = true
+    ;(async () => {
+      const { data: inf } = await supabase.from('influencers').select('id').eq('user_id', user.id).maybeSingle()
+      if (!inf?.id || !active) return
+      const { data } = await supabase.from('social_accounts').select('platform, followers_count, engagement_rate').eq('influencer_id', inf.id)
+      if (active) setSocialAccounts(data || [])
+    })()
+    return () => { active = false }
+  }, [user?.id])
+
+  // Vrai classement des créateurs (par ai_score) + avatars
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      const { data } = await supabase
+        .from('influencers')
+        .select('id, display_name, ai_score, user_id')
+        .order('ai_score', { ascending: false })
+        .limit(3)
+      if (!active || !data) return
+      const ids = data.map((c) => c.user_id).filter(Boolean)
+      let avatarById = {}
+      if (ids.length) {
+        const { data: profs } = await supabase.from('profiles').select('id, avatar_url').in('id', ids)
+        avatarById = Object.fromEntries((profs || []).map((p) => [p.id, p.avatar_url]))
+      }
+      setTopCreators(data.map((c, i) => ({
+        rank: i + 1,
+        name: c.display_name || 'Créateur',
+        score: c.ai_score || 0,
+        avatar: avatarById[c.user_id] || null,
+      })))
+    })()
+    return () => { active = false }
+  }, [])
 
   const firstName = profile?.full_name?.split(' ')[0] || 'toi'
+  const partnexxScore = metrics?.partnexxScore ?? metrics?.score ?? profile?.partnexx_score ?? profile?.score ?? null
 
+  // Horloge live (le reste des compteurs "live" bidons a été retiré)
   useEffect(() => {
     const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000)
-    const statsInterval = setInterval(() => {
-      setLiveStats(prev => ({
-        views: prev.views + Math.floor(Math.random() * 50) + 10,
-        engagement: Math.max(0, prev.engagement + (Math.random() - 0.5) * 0.2),
-        revenue: prev.revenue + Math.floor(Math.random() * 5),
-        campaigns: prev.campaigns
-      }))
-    }, 3000)
-    return () => { clearInterval(timeInterval); clearInterval(statsInterval) }
+    return () => clearInterval(timeInterval)
   }, [])
+
+  // ===== Revenus réels par mois (7 derniers mois) depuis les transactions =====
+  const performanceData = (() => {
+    const now = new Date()
+    const months = []
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      months.push({ key: `${d.getFullYear()}-${d.getMonth()}`, name: MONTHS_FR[d.getMonth()].replace('.', ''), label: `${MONTHS_FR[d.getMonth()]} ${d.getFullYear()}`, revenue: 0 })
+    }
+    ;(transactions || []).forEach((t) => {
+      if (!isRealReceived(t)) return
+      const dt = new Date(t.released_at || t.created_at)
+      const key = `${dt.getFullYear()}-${dt.getMonth()}`
+      const m = months.find((x) => x.key === key)
+      if (m) m.revenue += Number(t.influencer_amount ?? t.amount ?? 0)
+    })
+    return months.map((m) => ({ ...m, revenue: Math.round(m.revenue) }))
+  })()
+
+  const revTotal = performanceData.reduce((a, m) => a + m.revenue, 0)
+  const revAvg = performanceData.length ? Math.round(revTotal / performanceData.length) : 0
+  const revBest = performanceData.reduce((b, m) => (m.revenue > b.revenue ? m : b), { revenue: 0, label: '—' })
+
+  // ===== Campagnes réelles depuis les collaborations =====
+  const campaigns = (collaborations || []).slice(0, 6).map((c, idx) => {
+    const raw = (c.status || '').toLowerCase()
+    const status = raw === 'completed' || raw === 'terminee' ? 'completed'
+      : (raw === 'pending' || raw === 'proposed' || raw === 'draft' || raw === 'en_attente') ? 'pending'
+      : 'active'
+    const budget = Number(c.agreed_rate ?? c.amount ?? c.budget ?? 0)
+    return {
+      id: c.id || idx,
+      title: c.campaigns?.title || c.campaign?.title || c.title || c.campaign_title || 'Collaboration',
+      brand: c.brands?.company_name || c.brand?.company_name || c.brand_name || 'Marque',
+      status,
+      budget: budget ? `${budget.toLocaleString()}€` : '—',
+      deadline: c.deadline ? new Date(c.deadline).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '—',
+      progress: status === 'completed' ? 100 : status === 'pending' ? 15 : 60,
+    }
+  })
+
+  // ===== Activité récente réelle depuis les notifications =====
+  const recentActivity = (notifications || []).slice(0, 6).map((n) => {
+    const t = (n.title || '').toLowerCase()
+    let type = 'offer'
+    if (t.includes('paie') || t.includes('versement') || t.includes('reçu') || t.includes('validé')) type = 'approval'
+    else if (t.includes('contrat') || t.includes('signature')) type = 'mention'
+    else if (t.includes('litige') || t.includes('message') || t.includes('réponse')) type = 'comment'
+    else if (t.includes('abonné') || t.includes('suit') || t.includes('follow')) type = 'follow'
+    return { user: n.title || 'Partnexx', action: n.body || '', time: timeAgo(n.created_at), type }
+  })
+
+  // ===== Répartition par plateforme réelle =====
+  const totalSocialFollowers = socialAccounts.reduce((s, a) => s + (a.followers_count || 0), 0)
+  const platformData = socialAccounts
+    .slice()
+    .sort((a, b) => (b.followers_count || 0) - (a.followers_count || 0))
+    .map((a) => {
+      const meta = PLATFORM_META[a.platform] || { name: a.platform || 'Réseau', color: '#7C3AED' }
+      const f = a.followers_count || 0
+      return {
+        name: meta.name,
+        color: meta.color,
+        value: totalSocialFollowers > 0 ? Math.round((f / totalSocialFollowers) * 100) : 0,
+        followers: fmtFollowers(f),
+      }
+    })
 
   const statCards = [
   { label: 'Revenus ce mois', value: `${(metrics?.totalGains || 0).toFixed(0)}€`, change: '+18.5%', icon: DollarSign, color: '#f59e0b', bg: 'from-yellow-500/10 to-yellow-500/5', border: 'border-yellow-500/30' },
@@ -127,8 +216,10 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
             </p>
             <p className="text-white/80 text-base mb-4">Prêt à créer du contenu exceptionnel aujourd&apos;hui ? 🚀</p>
             <div className="flex items-center gap-3">
-              <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">💎 Abonnement Premium</span>
-              <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">🏆 Score: 850</span>
+              {partnexxScore != null && (
+                <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">🏆 Score : {partnexxScore}</span>
+              )}
+              <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">✨ {(metrics?.collaborationsTotal || 0)} collaboration{(metrics?.collaborationsTotal || 0) > 1 ? 's' : ''}</span>
             </div>
           </div>
           <div className="flex flex-col items-end gap-4">
@@ -244,7 +335,16 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {podiumData.sort((a, b) => a.rank - b.rank).map(creator => (
+                {topCreators.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400">
+                    <Trophy className="h-10 w-10 mx-auto mb-3 text-gray-200" />
+                    <p className="text-sm">Classement bientôt disponible</p>
+                  </div>
+                ) : topCreators.map(creator => {
+                  const maxScore = topCreators[0]?.score || 0
+                  const pct = maxScore > 0 ? Math.min(100, Math.round((creator.score / maxScore) * 100)) : 0
+                  const initials = creator.name.slice(0, 2).toUpperCase()
+                  return (
                   <div key={creator.rank} className={`relative rounded-2xl p-4 border-2 overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform ${creator.rank === 1 ? 'bg-gradient-to-br from-yellow-500/10 to-white border-yellow-400/40' : creator.rank === 2 ? 'bg-gradient-to-br from-gray-400/10 to-white border-gray-400/30' : 'bg-gradient-to-br from-orange-400/10 to-white border-orange-400/30'}`}>
                     <div className="absolute top-0 right-0 w-16 h-16 rounded-full -translate-y-6 translate-x-6 opacity-30" style={{ background: creator.rank === 1 ? '#fbbf24' : creator.rank === 2 ? '#9ca3af' : '#fb923c' }} />
                     <div className="relative flex items-center gap-3">
@@ -252,18 +352,23 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
                         {creator.rank === 1 && <div className="absolute -top-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center"><Crown className="h-3 w-3 text-yellow-500" /></div>}
                         <span className="text-2xl font-bold text-white">{creator.rank}</span>
                       </div>
-                      <img src={creator.avatar} alt={creator.name} className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md flex-shrink-0" />
+                      {creator.avatar ? (
+                        <img src={creator.avatar} alt={creator.name} className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md flex-shrink-0" />
+                      ) : (
+                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-purple-600 text-white font-bold flex items-center justify-center border-2 border-white shadow-md flex-shrink-0">{initials}</div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold truncate">{creator.name}</p>
-                        <p className="text-sm text-gray-500 flex items-center gap-1"><Users className="h-3 w-3" />{creator.followers}</p>
+                        <p className="text-sm text-gray-500 flex items-center gap-1"><Trophy className="h-3 w-3" />Partnexx Score</p>
                       </div>
                       <div className={`text-xl font-bold flex-shrink-0 ${creator.rank === 1 ? 'text-yellow-500' : creator.rank === 2 ? 'text-gray-500' : 'text-orange-500'}`}>{creator.score}</div>
                     </div>
                     <div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${creator.rank === 1 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600' : creator.rank === 2 ? 'bg-gradient-to-r from-gray-300 to-gray-500' : 'bg-gradient-to-r from-orange-400 to-orange-600'}`} style={{ width: `${(creator.score / 1000) * 100}%` }} />
+                      <div className={`h-full rounded-full ${creator.rank === 1 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600' : creator.rank === 2 ? 'bg-gradient-to-r from-gray-300 to-gray-500' : 'bg-gradient-to-r from-orange-400 to-orange-600'}`} style={{ width: `${pct}%` }} />
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </CardContent>
             </Card>
 
@@ -342,7 +447,13 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
                   </ResponsiveContainer>
                 </div>
                 <div className="space-y-3 mt-4">
-                  {platformData.map((p, i) => (
+                  {platformData.length === 0 ? (
+                    <div className="text-center py-6 text-gray-400 border border-dashed rounded-xl">
+                      <Share2 className="h-8 w-8 mx-auto mb-2 text-gray-200" />
+                      <p className="text-sm">Aucun réseau connecté</p>
+                      <p className="text-xs">Ajoute tes réseaux dans l&apos;onglet Profil</p>
+                    </div>
+                  ) : platformData.map((p, i) => (
                     <div key={i} className="flex items-center gap-3 cursor-pointer hover:scale-[1.01] transition-transform">
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-lg" style={{ background: p.color }}>{p.name[0]}</div>
                       <div className="flex-1">
@@ -351,14 +462,13 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
                       </div>
                       <div className="text-right flex-shrink-0">
                         <span className="font-bold text-lg" style={{ color: p.color }}>{p.value}%</span>
-                        <div><span className="text-xs text-green-600 border border-green-200 px-1 rounded">{p.growth}</span></div>
                       </div>
                     </div>
                   ))}
                 </div>
                 <div className="flex items-center justify-between mt-4 pt-4 border-t">
                   <div className="flex items-center gap-2 text-gray-500"><TrendingUp className="h-4 w-4" /><span className="text-sm">Total d&apos;abonnés</span></div>
-                  <p className="text-xl font-bold">2.4M</p>
+                  <p className="text-xl font-bold">{fmtFollowers(totalSocialFollowers)}</p>
                 </div>
               </CardContent>
             </Card>
@@ -370,7 +480,7 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
                 <CardTitle className="text-lg flex items-center gap-2"><DollarSign className="h-5 w-5 text-yellow-500" />Performance Financière Mensuelle</CardTitle>
                 <span className="text-xs text-green-600 border border-green-200 px-2 py-1 rounded-full">
                   <TrendingUp className="h-3 w-3 inline mr-1" />
-                  +{Math.round(performanceData.reduce((a, m) => a + m.revenue, 0) / performanceData.length).toLocaleString()}€/mois
+                  +{revAvg.toLocaleString()}€/mois
                 </span>
               </div>
             </CardHeader>
@@ -394,9 +504,9 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
               </div>
               <div className="grid grid-cols-3 gap-4">
                 {[
-                  { label: 'Revenu Total', value: `${performanceData.reduce((a, m) => a + m.revenue, 0).toLocaleString()}€`, sub: 'Sur 7 mois', color: '#22c55e', icon: DollarSign },
-{ label: 'Moyenne Mensuelle', value: `${Math.round(performanceData.reduce((a, m) => a + m.revenue, 0) / performanceData.length).toLocaleString()}€`, sub: 'Par mois', color: '#a855f7', icon: TrendingUp },
-{ label: 'Meilleur Mois', value: `${Math.max(...performanceData.map(d => d.revenue)).toLocaleString()}€`, sub: 'Mars 2024', color: '#f59e0b', icon: Trophy },
+                  { label: 'Revenu Total', value: `${revTotal.toLocaleString()}€`, sub: 'Sur 7 mois', color: '#22c55e', icon: DollarSign },
+                  { label: 'Moyenne Mensuelle', value: `${revAvg.toLocaleString()}€`, sub: 'Par mois', color: '#a855f7', icon: TrendingUp },
+                  { label: 'Meilleur Mois', value: `${revBest.revenue.toLocaleString()}€`, sub: revBest.revenue > 0 ? revBest.label : '—', color: '#f59e0b', icon: Trophy },
                 ].map((s, i) => {
                   const Icon = s.icon
                   return (
@@ -419,7 +529,12 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
           <Card className="shadow-lg">
             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Target className="h-5 w-5 text-pink-500" />Campagnes en Cours</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              {campaigns.map(campaign => (
+              {campaigns.length === 0 ? (
+                <div className="text-center py-10 text-gray-400">
+                  <Target className="h-10 w-10 mx-auto mb-3 text-gray-200" />
+                  <p className="text-sm">Aucune campagne pour l&apos;instant</p>
+                </div>
+              ) : campaigns.map(campaign => (
                 <div key={campaign.id} className={`rounded-2xl p-5 border-2 cursor-pointer hover:scale-[1.01] transition-transform relative overflow-hidden ${campaign.status === 'active' ? 'bg-gradient-to-br from-pink-500/10 to-white border-pink-500/30' : campaign.status === 'completed' ? 'bg-gradient-to-br from-green-500/10 to-white border-green-500/30' : 'bg-gradient-to-br from-orange-400/10 to-white border-orange-400/30'}`}>
                   <div className="relative">
                     <div className="flex justify-between items-start mb-4">
@@ -450,13 +565,18 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
           <Card className="shadow-lg">
             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Activity className="h-5 w-5 text-yellow-500" />Activité Récente</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              {recentActivity.map((activity, i) => (
+              {recentActivity.length === 0 ? (
+                <div className="text-center py-10 text-gray-400">
+                  <Activity className="h-10 w-10 mx-auto mb-3 text-gray-200" />
+                  <p className="text-sm">Aucune activité récente</p>
+                </div>
+              ) : recentActivity.map((activity, i) => (
                 <div key={i} className="flex items-center gap-3 p-4 rounded-xl border hover:scale-[1.01] transition-transform cursor-pointer" style={{ background: activity.type === 'approval' ? '#22c55e0a' : activity.type === 'follow' ? '#a855f70a' : activity.type === 'comment' ? '#ec48990a' : activity.type === 'mention' ? '#f59e0b0a' : '#3b82f60a' }}>
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white text-lg flex-shrink-0 shadow-lg ${activity.type === 'approval' ? 'bg-gradient-to-br from-green-500 to-green-600' : activity.type === 'follow' ? 'bg-gradient-to-br from-purple-500 to-purple-600' : activity.type === 'comment' ? 'bg-gradient-to-br from-pink-500 to-pink-600' : activity.type === 'mention' ? 'bg-gradient-to-br from-yellow-500 to-orange-500' : 'bg-gradient-to-br from-blue-500 to-blue-600'}`}>
                     {activity.type === 'approval' ? '✓' : activity.type === 'follow' ? '👤' : activity.type === 'comment' ? '💬' : activity.type === 'mention' ? '@' : '📧'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm"><span className="font-semibold">{activity.user}</span> <span className="text-gray-500">{activity.action}</span></p>
+                    <p className="text-sm"><span className="font-semibold">{activity.user}</span> {activity.action && <span className="text-gray-500">— {activity.action}</span>}</p>
                     <p className="text-xs text-gray-400 flex items-center gap-1 mt-1"><Clock className="h-3 w-3" />{activity.time}</p>
                   </div>
                   <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
