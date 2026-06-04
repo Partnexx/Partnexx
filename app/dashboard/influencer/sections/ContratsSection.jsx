@@ -831,6 +831,7 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
   const canAccessAdvancedHistory = canAccess('advancedRevenueHistory')
 
   const [paySubTab, setPaySubTab] = useState('dashboard')
+  const [enAttenteOpen, setEnAttenteOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false)
@@ -842,22 +843,49 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
   const [monthlyOpen, setMonthlyOpen] = useState(false)
   const [docsOpen, setDocsOpen] = useState(false)
   const [expandedCampaign, setExpandedCampaign] = useState(null)
+  const [expandedDocCampaign, setExpandedDocCampaign] = useState(null)
   const [chatOpen, setChatOpen] = useState(false)
   const [chatMessages, setChatMessages] = useState([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [pendingImage, setPendingImage] = useState(null)
   const [chatRemaining, setChatRemaining] = useState(null)
+  const [brandsById, setBrandsById] = useState({})
 
   // Lien transaction → campagne (via contract_id, en s'appuyant sur les contrats déjà chargés)
   const contractsById = {}
   contracts.forEach(c => { if (c?.id) contractsById[c.id] = c })
 
-  const getCampaignLabel = (tx) => {
+  // Résolution du nom de l'entreprise via brand_id (utile pour les transactions sans contract_id)
+  useEffect(() => {
+    const ids = [...new Set(transactions.map(t => t.brand_id).filter(Boolean))]
+    if (ids.length === 0) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase.from('brands').select('id, company_name').in('id', ids)
+      if (!cancelled && data) {
+        const map = {}
+        data.forEach(b => { if (b?.id) map[b.id] = b })
+        setBrandsById(map)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [transactions])
+
+  const getBrandName = (tx) => {
     const c = contractsById[tx.contract_id]
     if (c?.brands?.company_name) return c.brands.company_name
+    if (tx.brand_id && brandsById[tx.brand_id]?.company_name) return brandsById[tx.brand_id].company_name
+    return null
+  }
+
+  const getCampaignLabel = (tx) => {
+    const name = getBrandName(tx)
+    if (name) return name
     if (tx.description) return tx.description
-    return tx.contract_id ? `Campagne #${tx.contract_id.slice(0, 8)}` : `Transaction #${tx.id.slice(0, 8)}`
+    if (tx.contract_id) return `Campagne #${tx.contract_id.slice(0, 8)}`
+    if (tx.collaboration_id) return `Campagne #${tx.collaboration_id.slice(0, 8)}`
+    return `Paiement #${tx.id.slice(0, 8)}`
   }
 
   // Escrow : libération auto = escrow_held_at + 15 jours (ou validation marque avant)
@@ -869,7 +897,14 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
     return { due, days }
   }
 
+  // On masque les micro-transactions de test (ex. 0,85 €) : on ne garde que les "vraies"
+  const MIN_TX_AMOUNT = 1
+  const txAmount = (t) => parseFloat(t.influencer_amount || t.amount || 0)
+  const isMicroTx = (t) => txAmount(t) < MIN_TX_AMOUNT
+
   const filtered = transactions.filter(t => {
+    if (isMicroTx(t)) return false
+    if (t.status === 'in_escrow' || t.status === 'pending') return false // affichés dans le bandeau "en attente"
     const q = search.toLowerCase()
     const matchSearch = search === "" ||
       (t.description || "").toLowerCase().includes(q) ||
@@ -882,15 +917,44 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
   const campaignGroups = (() => {
     const map = {}
     filtered.forEach(tx => {
-      const key = tx.contract_id || `tx-${tx.id}`
-      if (!map[key]) map[key] = { key, label: getCampaignLabel(tx), txs: [], total: 0, received: 0, lastDate: 0 }
+      const key = tx.contract_id || tx.collaboration_id || `tx-${tx.id}`
+      if (!map[key]) map[key] = { key, label: getCampaignLabel(tx), txs: [], total: 0, received: 0, escrow: 0, lastDate: 0 }
       map[key].txs.push(tx)
       map[key].total += parseFloat(tx.influencer_amount || 0)
       if (tx.status === 'released') map[key].received += parseFloat(tx.influencer_amount || 0)
+      if (tx.status === 'in_escrow') map[key].escrow += parseFloat(tx.influencer_amount || 0)
       const d = new Date(tx.created_at).getTime()
       if (d > map[key].lastDate) map[key].lastDate = d
     })
     return Object.values(map).sort((a, b) => b.lastDate - a.lastDate)
+  })()
+
+  // Factures & reçus regroupés par campagne (on exclut les remboursements)
+  const isRefundTx = (tx) => {
+    const d = (tx.description || '').toLowerCase()
+    return tx.type === 'refund' || d.includes('rembours') || d.includes('refund')
+  }
+
+  // Fonds en attente : escrow + pending (hors micro-transactions de test)
+  const enAttenteItems = transactions
+    .filter(t => (t.status === 'in_escrow' || t.status === 'pending') && !isMicroTx(t) && !isRefundTx(t))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  const enAttenteTotal = enAttenteItems.reduce((s, t) => s + parseFloat(t.influencer_amount || 0), 0)
+  const docCampaignGroups = (() => {
+    const map = {}
+    transactions.filter(tx => !isRefundTx(tx) && !isMicroTx(tx) && (tx.status === 'released' || tx.status === 'in_escrow')).forEach(tx => {
+      const key = tx.contract_id || tx.collaboration_id || `tx-${tx.id}`
+      const company = getBrandName(tx)
+      const label = company || tx.description || (tx.contract_id || tx.collaboration_id ? `Campagne #${(tx.contract_id || tx.collaboration_id).slice(0, 8)}` : `Paiement #${tx.id.slice(0, 8)}`)
+      if (!map[key]) map[key] = { key, label, company, txs: [], years: new Set(), lastDate: 0 }
+      map[key].txs.push(tx)
+      map[key].years.add(new Date(tx.created_at).getFullYear())
+      const d = new Date(tx.created_at).getTime()
+      if (d > map[key].lastDate) map[key].lastDate = d
+    })
+    return Object.values(map)
+      .map(g => ({ ...g, yearsLabel: Array.from(g.years).sort().join(', ') }))
+      .sort((a, b) => b.lastDate - a.lastDate)
   })()
 
   // ===== Assistant fiscal IA =====
@@ -1304,9 +1368,6 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
           )}
         </div>
         <div className="flex gap-2 shrink-0">
-          {(tx.status === 'released' || tx.status === 'in_escrow') && (
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => handleDownloadIssuedInvoice(tx.id)} disabled={downloadingInvoiceId === tx.id}><FileText className="h-3.5 w-3.5" />{downloadingInvoiceId === tx.id ? '...' : 'Facture'}</Button>
-          )}
           {tx.status === 'released' && (
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => handleDownloadReceipt(tx.id)} disabled={downloadingReceiptId === tx.id}><Receipt className="h-3.5 w-3.5" />{downloadingReceiptId === tx.id ? '...' : 'Reçu'}</Button>
           )}
@@ -1318,7 +1379,6 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
   const paySubTabs = [
     { value: 'dashboard', label: 'Dashboard', icon: TrendingUp },
     { value: 'transactions', label: 'Transactions', icon: Receipt },
-    { value: 'escrow', label: 'Fonds en attente', icon: Lock },
     { value: 'retraits', label: 'Retraits', icon: Wallet },
     { value: 'fiscalite', label: 'Fiscalité', icon: FileText },
   ]
@@ -1399,21 +1459,87 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
       <Dialog open={docsOpen} onOpenChange={setDocsOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-purple-500" />Factures & reçus</DialogTitle>
-            <DialogDescription>Télécharge la facture et le reçu de chaque campagne.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-purple-500" />Mes factures</DialogTitle>
+            <DialogDescription>Clique sur une campagne pour télécharger ses factures (émises par PARTNEXX pour ton compte).</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 mt-2">
-            {transactions.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Aucune campagne pour l'instant.</p>
-            ) : transactions.map(tx => (
-              <div key={tx.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
-                <p className="font-medium truncate min-w-0">{tx.description || `Campagne #${tx.id.slice(0, 8)}`}</p>
-                <div className="flex gap-2 shrink-0">
-                  <Button variant="outline" size="sm" onClick={() => handleDownloadIssuedInvoice(tx.id)} disabled={downloadingInvoiceId === tx.id}><FileText className="h-3.5 w-3.5 mr-1" />{downloadingInvoiceId === tx.id ? '...' : 'Facture'}</Button>
-                  <Button variant="outline" size="sm" onClick={() => handleDownloadReceipt(tx.id)} disabled={downloadingReceiptId === tx.id}><Receipt className="h-3.5 w-3.5 mr-1" />{downloadingReceiptId === tx.id ? '...' : 'Reçu'}</Button>
+            {docCampaignGroups.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Aucune facture pour l'instant.</p>
+            ) : docCampaignGroups.map(g => {
+              const open = expandedDocCampaign === g.key
+              return (
+                <div key={g.key} className="border rounded-lg overflow-hidden">
+                  <button onClick={() => setExpandedDocCampaign(open ? null : g.key)} className="w-full flex items-center justify-between gap-3 p-3 hover:bg-muted/40 text-left">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-9 w-9 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0"><FileText className="h-4 w-4 text-purple-500" /></div>
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{g.label}</p>
+                        <p className="text-xs text-muted-foreground">{g.yearsLabel} · {g.txs.length} paiement{g.txs.length > 1 ? 's' : ''}</p>
+                      </div>
+                    </div>
+                    <ChevronRight className={`h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
+                  </button>
+                  {open && (
+                    <div className="border-t divide-y">
+                      {g.txs.map(tx => (
+                        <div key={tx.id} className="flex items-center justify-between gap-3 p-3 bg-muted/20">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium">{parseFloat(tx.influencer_amount || tx.amount || 0).toLocaleString()}€</p>
+                              <Badge variant="outline" className={getPaymentStatusColor(tx.status)}>{getPaymentStatusLabel(tx.status)}</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{new Date(tx.created_at).toLocaleDateString('fr-FR')}</p>
+                          </div>
+                          <Button variant="outline" size="sm" className="shrink-0" onClick={() => handleDownloadIssuedInvoice(tx.id)} disabled={downloadingInvoiceId === tx.id}><FileText className="h-3.5 w-3.5 mr-1" />{downloadingInvoiceId === tx.id ? '...' : 'Facture'}</Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ============ MODAL FONDS EN ATTENTE (escrow + pending) ============ */}
+      <Dialog open={enAttenteOpen} onOpenChange={setEnAttenteOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Lock className="h-5 w-5 text-orange-500" />Fonds en attente</DialogTitle>
+            <DialogDescription>Montants pas encore reçus — libérés à la validation de la marque (ou automatiquement sous 15 j).</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-4 mb-3">
+            <p className="text-sm text-muted-foreground">Total en attente</p>
+            <p className="text-2xl font-bold text-orange-600">{enAttenteTotal.toLocaleString()}€</p>
+          </div>
+          <div className="space-y-2">
+            {enAttenteItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">Aucun fonds en attente 🎉</p>
+            ) : enAttenteItems.map(tx => {
+              const esc = tx.status === 'in_escrow' ? getEscrowRelease(tx) : null
+              return (
+                <div key={tx.id} className="p-3 border rounded-lg">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{getCampaignLabel(tx)}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(tx.created_at).toLocaleDateString('fr-FR')}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-semibold">{parseFloat(tx.influencer_amount || 0).toLocaleString()}€</p>
+                      <Badge variant="outline" className={getPaymentStatusColor(tx.status)}>{getPaymentStatusLabel(tx.status)}</Badge>
+                    </div>
+                  </div>
+                  {esc && (
+                    <p className="text-xs text-orange-600 mt-2 flex items-center gap-1"><Clock className="h-3 w-3 flex-shrink-0" />Libéré auto le {esc.due.toLocaleDateString('fr-FR')}{esc.days > 0 ? ` (${esc.days} j)` : ' (imminent)'} · ou dès validation marque</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex gap-3 mt-3 p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
+            <Shield className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground">Les fonds sont sécurisés et libérés dès que la marque valide ton contenu, ou automatiquement au plus tard 15 jours après. Tu es protégé contre les impayés.</p>
           </div>
         </DialogContent>
       </Dialog>
@@ -1506,7 +1632,7 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
 
       {/* ============ SOUS-ONGLETS PAIEMENTS ============ */}
       <Tabs value={paySubTab} onValueChange={setPaySubTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 gap-2 bg-transparent p-0 h-auto mb-6">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-2 bg-transparent p-0 h-auto mb-6">
           {paySubTabs.map((t) => {
             const Icon = t.icon
             return (
@@ -1596,17 +1722,22 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
 
         {/* ─────────── TRANSACTIONS ─────────── */}
         <TabsContent value="transactions" className="mt-2 space-y-6">
+          {enAttenteTotal > 0 && (
+            <button onClick={() => setEnAttenteOpen(true)} className="w-full flex items-center justify-between gap-3 p-4 rounded-xl border border-orange-500/20 bg-orange-500/5 hover:bg-orange-500/10 transition-colors text-left">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center flex-shrink-0"><Lock className="h-5 w-5 text-orange-600" /></div>
+                <div>
+                  <p className="font-semibold text-orange-700">{enAttenteTotal.toLocaleString()}€ en attente</p>
+                  <p className="text-xs text-muted-foreground">Pas encore reçu — clique pour voir le détail</p>
+                </div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-orange-600 flex-shrink-0" />
+            </button>
+          )}
           <div className="flex flex-col md:flex-row gap-3">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder="Rechercher un paiement..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {["all", "released"].map((s) => (
-                <Button key={s} size="sm" variant={filterStatus === s ? "default" : "outline"} onClick={() => setFilterStatus(s)}>
-                  {s === "all" ? "Tous" : getPaymentStatusLabel(s)}
-                </Button>
-              ))}
             </div>
           </div>
 
@@ -1642,8 +1773,22 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
                         </div>
                         <div className="flex items-center gap-3">
                           <div className="text-right">
-                            <p className="text-lg font-bold text-green-600">+{camp.received.toLocaleString()}€</p>
-                            <p className="text-xs text-muted-foreground">reçu</p>
+                            {camp.received > 0 ? (
+                              <>
+                                <p className="text-lg font-bold text-green-600">+{camp.received.toLocaleString()}€</p>
+                                <p className="text-xs text-muted-foreground">reçu</p>
+                              </>
+                            ) : camp.escrow > 0 ? (
+                              <>
+                                <p className="text-lg font-bold text-orange-600">{camp.escrow.toLocaleString()}€</p>
+                                <p className="text-xs text-muted-foreground">en escrow</p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-lg font-bold text-muted-foreground">{camp.total.toLocaleString()}€</p>
+                                <p className="text-xs text-muted-foreground">en attente</p>
+                              </>
+                            )}
                           </div>
                           <ChevronRight className={`h-5 w-5 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
                         </div>
@@ -1655,43 +1800,6 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
               })
             )}
           </div>
-        </TabsContent>
-
-        {/* ─────────── FONDS EN ATTENTE (escrow) ─────────── */}
-        <TabsContent value="escrow" className="mt-2 space-y-6">
-          <Card className="border-orange-500/30 bg-gradient-to-br from-orange-500/5 to-amber-500/5">
-            <CardContent className="p-6 flex items-center gap-4">
-              <div className="h-14 w-14 rounded-2xl bg-orange-500/15 flex items-center justify-center"><Lock className="h-7 w-7 text-orange-500" /></div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total en attente (escrow)</p>
-                <p className="text-3xl font-bold text-orange-500">{totalPending.toLocaleString()}€</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="space-y-3">
-            {escrowTx.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <CheckCircle className="h-12 w-12 text-green-500 mb-3" />
-                  <p className="font-medium">Aucun fonds en attente</p>
-                  <p className="text-sm text-muted-foreground">Tous tes paiements sont libérés 🎉</p>
-                </CardContent>
-              </Card>
-            ) : (
-              escrowTx.map(renderPaymentCard)
-            )}
-          </div>
-
-          <Card className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-blue-500/30">
-            <CardContent className="p-6 flex items-start gap-4">
-              <div className="h-12 w-12 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0"><Shield className="h-6 w-6 text-blue-500" /></div>
-              <div>
-                <h4 className="font-semibold text-lg mb-1">Protection escrow</h4>
-                <p className="text-sm text-muted-foreground">Les fonds sont sécurisés dès la mise en escrow et libérés dès que la marque valide ton contenu — ou automatiquement au plus tard 15 jours après. Tu es protégé contre les impayés.</p>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* ─────────── RETRAITS ─────────── */}
@@ -1923,7 +2031,7 @@ function PaiementsTab({ transactions = [], contracts = [], user }) {
                 <Download className="h-4 w-4 text-muted-foreground" />
               </button>
               <button onClick={() => setDocsOpen(true)} className="w-full flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors text-left">
-                <div className="flex items-center gap-3"><div className="h-10 w-10 rounded bg-purple-500/10 flex items-center justify-center"><FileText className="h-5 w-5 text-purple-500" /></div><div><p className="font-medium">Factures et reçus</p><p className="text-sm text-muted-foreground">Facture + reçu par campagne</p></div></div>
+                <div className="flex items-center gap-3"><div className="h-10 w-10 rounded bg-purple-500/10 flex items-center justify-center"><FileText className="h-5 w-5 text-purple-500" /></div><div><p className="font-medium">Mes factures</p><p className="text-sm text-muted-foreground">Une facture par campagne</p></div></div>
                 <Download className="h-4 w-4 text-muted-foreground" />
               </button>
             </CardContent>
