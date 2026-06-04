@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -8,6 +9,18 @@ import supabase from '@/lib/supabase'
 
 // ===== Helpers =====
 const MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
+
+// Niveaux Partnexx (seuils + visuel) pour le médaillon du hero
+const HERO_LEVELS = [
+  { key: 'bronze', name: 'Bronze', emoji: '🥉', t: 0, grad: 'from-orange-400 to-amber-600' },
+  { key: 'argent', name: 'Argent', emoji: '🥈', t: 750, grad: 'from-slate-300 to-slate-500' },
+  { key: 'or', name: 'Or', emoji: '🥇', t: 2500, grad: 'from-yellow-400 to-amber-500' },
+  { key: 'platine', name: 'Platine', emoji: '💠', t: 6000, grad: 'from-cyan-400 to-sky-500' },
+  { key: 'diamant', name: 'Diamant', emoji: '🔥', t: 12500, grad: 'from-teal-400 to-cyan-500' },
+  { key: 'elite', name: 'Élite', emoji: '⭐', t: 30000, grad: 'from-fuchsia-400 to-pink-500' },
+  { key: 'champion', name: 'Champion', emoji: '🚀', t: 60000, grad: 'from-orange-400 to-red-500' },
+  { key: 'legende', name: 'Légende', emoji: '🏆', t: 100000, grad: 'from-yellow-300 to-orange-500' },
+]
 
 const fmtFollowers = (n) => {
   const v = Number(n) || 0
@@ -86,6 +99,21 @@ const TABS = [
 export default function AccueilSection({ user, profile, metrics, collaborations, transactions, contracts, notifications, unreadCount, markAsRead, markAllAsRead }) {
   const [activeTab, setActiveTab] = useState('vue-ensemble')
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [myScore, setMyScore] = useState(0)
+  const [tilt, setTilt] = useState({ rx: 0, ry: 0 })
+  const [showIntro, setShowIntro] = useState(false)
+  const router = useRouter()
+
+  // Intro animée (logo + PARTNEXX) — une seule fois par session
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('pnx_intro_seen')) return
+      sessionStorage.setItem('pnx_intro_seen', '1')
+      setShowIntro(true)
+      const t = setTimeout(() => setShowIntro(false), 3500)
+      return () => clearTimeout(t)
+    } catch { /* sessionStorage indisponible */ }
+  }, [])
   const [showNotifPanel, setShowNotifPanel] = useState(false)
   const [topCreators, setTopCreators] = useState([])
   const [topAvatarError, setTopAvatarError] = useState({})
@@ -119,8 +147,9 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
     if (!user?.id) return
     let active = true
     ;(async () => {
-      const { data: inf } = await supabase.from('influencers').select('id').eq('user_id', user.id).maybeSingle()
+      const { data: inf } = await supabase.from('influencers').select('id, ai_score').eq('user_id', user.id).maybeSingle()
       if (!inf?.id || !active) return
+      setMyScore(inf.ai_score || 0)
       const { data } = await supabase.from('social_accounts').select('platform, followers_count, engagement_rate').eq('influencer_id', inf.id)
       if (active) setSocialAccounts(data || [])
     })()
@@ -184,6 +213,36 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
   const revAvg = performanceData.length ? Math.round(revTotal / performanceData.length) : 0
   const revBest = performanceData.reduce((b, m) => (m.revenue > b.revenue ? m : b), { revenue: 0, label: '—' })
 
+  // ===== Données du hero =====
+  const hour = currentTime.getHours()
+  const greeting = hour < 6 ? 'Bonne nuit' : hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir'
+
+  // Niveau réel d'après le score
+  let heroLevelIdx = 0
+  for (let i = 0; i < HERO_LEVELS.length; i++) { if (myScore >= HERO_LEVELS[i].t) heroLevelIdx = i; else break }
+  const heroLevel = HERO_LEVELS[heroLevelIdx]
+  const heroNextLevel = HERO_LEVELS[heroLevelIdx + 1] || null
+  const levelProgress = heroNextLevel
+    ? Math.min(100, Math.round(((myScore - heroLevel.t) / (heroNextLevel.t - heroLevel.t)) * 100))
+    : 100
+  const pointsToNext = heroNextLevel ? Math.max(0, heroNextLevel.t - myScore) : 0
+
+  // Revenus du mois + tendance vs mois précédent
+  const revThisMonth = performanceData.length ? performanceData[performanceData.length - 1].revenue : 0
+  const revLastMonth = performanceData.length > 1 ? performanceData[performanceData.length - 2].revenue : 0
+  const revTrendPct = revLastMonth > 0 ? Math.round(((revThisMonth - revLastMonth) / revLastMonth) * 100) : (revThisMonth > 0 ? 100 : 0)
+
+  // Inclinaison 3D au survol de la souris
+  const handleTilt = (e) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const px = (e.clientX - r.left) / r.width - 0.5
+    const py = (e.clientY - r.top) / r.height - 0.5
+    setTilt({ rx: +(-py * 6).toFixed(2), ry: +(px * 6).toFixed(2) })
+  }
+  const resetTilt = () => setTilt({ rx: 0, ry: 0 })
+  const goTo = (section) => router.push(`/dashboard/influencer?section=${section}`)
+
+
   // ===== Campagnes réelles depuis les collaborations =====
   const campaigns = (collaborations || []).slice(0, 6).map((c, idx) => {
     const raw = (c.status || '').toLowerCase()
@@ -242,105 +301,176 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
 
   return (
     <div className="space-y-6">
-      {/* HERO */}
-      <div className="bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 rounded-xl p-6 text-white relative overflow-visible shadow-xl">
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-8 translate-x-8" />
-        <div className="relative z-10 flex justify-between items-start">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="text-3xl">👋</div>
-              <h1 className="text-3xl font-bold">Bonjour {firstName} !</h1>
-            </div>
-            <p className="text-white/90 text-lg mb-2">
-              {currentTime.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} • {currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-            </p>
-            <p className="text-white/80 text-base mb-4">Prêt à créer du contenu exceptionnel aujourd&apos;hui ? 🚀</p>
-            <div className="flex items-center gap-3">
-              {partnexxScore != null && (
-                <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">🏆 Score : {partnexxScore}</span>
-              )}
-              <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">✨ {(metrics?.collaborationsTotal || 0)} collaboration{(metrics?.collaborationsTotal || 0) > 1 ? 's' : ''}</span>
-            </div>
-          </div>
-          <div className="flex flex-col items-end gap-4">
-            {/* CLOCHE NOTIFICATIONS */}
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifPanel(!showNotifPanel)}
-                className="relative bg-white/20 backdrop-blur-sm rounded-full p-3 hover:bg-white/30 transition-colors"
-              >
-                <Bell className="h-7 w-7 text-white" />
-                {unreadCount > 0 && (
-                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                    <span className="text-xs text-white font-bold">{unreadCount}</span>
-                  </div>
-                )}
-              </button>
+      {/* INTRO ANIMÉE (une fois par session) */}
+      {showIntro && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden" style={{ backgroundImage: 'linear-gradient(125deg, #6d28d9, #9333ea, #db2777, #6d28d9)', backgroundSize: '300% 300%', animation: 'pnxBg 6s ease infinite alternate, pnxIntroOut 3.4s ease forwards' }}>
+          <style>{`
+            @keyframes pnxBg { 0%{background-position:0% 50%} 100%{background-position:100% 50%} }
+            @keyframes pnxLogoPop { 0%{transform:scale(0) rotate(-45deg);opacity:0} 55%{transform:scale(1.25) rotate(14deg);opacity:1} 78%{transform:scale(.92) rotate(-4deg)} 100%{transform:scale(1) rotate(0)} }
+            @keyframes pnxRing { 0%{transform:scale(.6);opacity:.6} 100%{transform:scale(2.2);opacity:0} }
+            @keyframes pnxFlip { 0%{transform:perspective(700px) rotateX(-90deg) translateY(24px);opacity:0} 60%{transform:perspective(700px) rotateX(18deg) translateY(0)} 100%{transform:perspective(700px) rotateX(0) translateY(0);opacity:1} }
+            @keyframes pnxGlowText { 0%,100%{text-shadow:0 0 16px rgba(255,255,255,.45)} 50%{text-shadow:0 0 32px rgba(255,255,255,.85), 0 0 64px rgba(236,72,153,.6)} }
+            @keyframes pnxSweep { 0%{transform:translateX(-140%) skewX(-18deg)} 100%{transform:translateX(360%) skewX(-18deg)} }
+            @keyframes pnxHeart { 0%{transform:scale(0) rotate(-20deg);opacity:0} 60%{transform:scale(1.35) rotate(8deg)} 80%{transform:scale(.9)} 100%{transform:scale(1) rotate(0);opacity:1} }
+            @keyframes pnxBeat { 0%,100%{transform:scale(1)} 28%{transform:scale(1.22)} 45%{transform:scale(1)} 62%{transform:scale(1.12)} 78%{transform:scale(1)} }
+            @keyframes pnxTag { 0%{opacity:0;transform:translateY(10px);letter-spacing:.05em} 100%{opacity:.9;transform:translateY(0);letter-spacing:.3em} }
+            @keyframes pnxTwinkle { 0%,100%{opacity:0;transform:scale(0)} 50%{opacity:1;transform:scale(1)} }
+            @keyframes pnxIntroOut { 0%,84%{opacity:1;visibility:visible} 100%{opacity:0;visibility:hidden} }
+          `}</style>
 
-              {/* PANEL NOTIFICATIONS */}
-              {showNotifPanel && (
-                <div className="absolute right-0 top-14 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
-                  <div className="flex items-center justify-between p-4 border-b bg-gray-50">
-                    <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                      <Bell className="h-4 w-4 text-primary" />
-                      Notifications
-                      {unreadCount > 0 && (
-                        <span className="bg-primary text-white text-xs px-2 py-0.5 rounded-full">{unreadCount}</span>
-                      )}
-                    </h3>
-                    <div className="flex items-center gap-2">
-                      {unreadCount > 0 && (
-                        <button onClick={markAllAsRead} className="text-xs text-primary hover:underline">
-                          Tout lu
-                        </button>
-                      )}
-                      <button onClick={() => setShowNotifPanel(false)} className="text-gray-400 hover:text-gray-600">
-                        <X className="h-4 w-4" />
-                      </button>
+          {/* étincelles */}
+          {[{ t: '22%', l: '24%', d: 0.6 }, { t: '70%', l: '20%', d: 1.1 }, { t: '30%', l: '78%', d: 0.9 }, { t: '74%', l: '74%', d: 1.4 }, { t: '18%', l: '54%', d: 1.6 }, { t: '80%', l: '48%', d: 1.2 }].map((s, i) => (
+            <span key={i} className="absolute w-2 h-2 rounded-full bg-white" style={{ top: s.t, left: s.l, animation: `pnxTwinkle 1.6s ease-in-out ${s.d}s infinite` }} />
+          ))}
+
+          <div className="relative flex items-center gap-4 sm:gap-5">
+            {/* logo + anneau qui pulse */}
+            <div className="relative flex items-center justify-center">
+              <span className="absolute w-24 h-24 sm:w-28 sm:h-28 rounded-full border-2 border-white/60" style={{ animation: 'pnxRing 1.8s ease-out .4s infinite' }} />
+              <img src="/logo.png" alt="Partnexx" className="relative w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-2xl" style={{ animation: 'pnxLogoPop 1.1s cubic-bezier(.2,.8,.2,1) both' }} />
+            </div>
+
+            {/* PARTNEXX lettre par lettre + reflet qui balaie */}
+            <div className="relative overflow-hidden" style={{ animation: 'pnxGlowText 2.2s ease-in-out 1.2s infinite' }}>
+              <div className="flex">
+                {'PARTNEXX'.split('').map((ch, i) => (
+                  <span key={i} className="text-5xl sm:text-7xl font-black text-white tracking-tight inline-block" style={{ animation: `pnxFlip .6s cubic-bezier(.2,.8,.2,1) ${(0.5 + i * 0.08).toFixed(2)}s both` }}>{ch}</span>
+                ))}
+              </div>
+              <span className="absolute top-0 left-0 h-full w-1/3 bg-gradient-to-r from-transparent via-white/70 to-transparent pointer-events-none" style={{ animation: 'pnxSweep 1.1s ease-in-out 1.5s' }} />
+            </div>
+
+            {/* cœur qui bat */}
+            <Heart className="w-10 h-10 sm:w-14 sm:h-14 text-pink-200 flex-shrink-0" style={{ fill: 'currentColor', animation: 'pnxHeart .6s cubic-bezier(.2,.8,.2,1) 1.5s both, pnxBeat 1s ease-in-out 2.2s infinite' }} />
+          </div>
+
+          {/* tagline */}
+          <p className="mt-6 text-white/90 text-sm sm:text-base font-medium uppercase" style={{ animation: 'pnxTag .8s ease 1.8s both' }}>La plateforme des créateurs</p>
+        </div>
+      )}
+
+      {/* HERO (statique) */}
+      <div className="relative">
+        <div className="relative rounded-2xl p-6 sm:p-8 text-white shadow-xl bg-gradient-to-br from-purple-600 via-purple-500 to-pink-500">
+          {/* Décor statique léger (ne bouge pas) */}
+          <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-12 translate-x-12" />
+            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
+          </div>
+
+          <div className="relative z-10 flex flex-col lg:flex-row lg:justify-between gap-6">
+            {/* GAUCHE */}
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="text-3xl">👋</div>
+                <h1 className="text-3xl font-bold">{greeting} {firstName} !</h1>
+              </div>
+              <p className="text-white/90 text-base mb-1">
+                {currentTime.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} • {currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+              <p className="text-white/75 text-sm mb-4">Ton espace créateur, en un coup d&apos;œil ✨</p>
+              <div className="flex flex-wrap items-center gap-2 mb-5">
+                <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">{heroLevel.emoji} Niveau {heroLevel.name}</span>
+                <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">✨ {(metrics?.collaborationsTotal || 0)} collaboration{(metrics?.collaborationsTotal || 0) > 1 ? 's' : ''}</span>
+                <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">🏆 {myScore.toLocaleString('fr-FR')} pts</span>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button onClick={() => goTo('opportunites')} className="inline-flex items-center gap-2 bg-white text-purple-700 font-semibold px-4 py-2 rounded-full hover:bg-white/90 transition shadow-lg">
+                  <Rocket className="h-4 w-4" />Voir les opportunités
+                </button>
+                <button onClick={() => goTo('contrats')} className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm text-white font-semibold px-4 py-2 rounded-full hover:bg-white/25 transition border border-white/30">
+                  <Briefcase className="h-4 w-4" />Mes contrats
+                </button>
+              </div>
+            </div>
+
+            {/* DROITE */}
+            <div className="flex flex-col items-start lg:items-end gap-5">
+              {/* CLOCHE NOTIFICATIONS */}
+              <div className="relative self-end">
+                <button onClick={() => setShowNotifPanel(!showNotifPanel)} className="relative bg-white/20 backdrop-blur-sm rounded-full p-3 hover:bg-white/30 transition-colors">
+                  <Bell className="h-7 w-7 text-white" />
+                  {unreadCount > 0 && (
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                      <span className="text-xs text-white font-bold">{unreadCount}</span>
                     </div>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {!notifications?.length ? (
-                      <div className="text-center py-10">
-                        <Bell className="h-10 w-10 text-gray-200 mx-auto mb-3" />
-                        <p className="text-gray-400 text-sm">Aucune notification</p>
+                  )}
+                </button>
+
+                {/* PANEL NOTIFICATIONS */}
+                {showNotifPanel && (
+                  <div className="absolute right-0 top-14 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden text-left">
+                    <div className="flex items-center justify-between p-4 border-b bg-gray-50">
+                      <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                        <Bell className="h-4 w-4 text-primary" />
+                        Notifications
+                        {unreadCount > 0 && (<span className="bg-primary text-white text-xs px-2 py-0.5 rounded-full">{unreadCount}</span>)}
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        {unreadCount > 0 && (<button onClick={markAllAsRead} className="text-xs text-primary hover:underline">Tout lu</button>)}
+                        <button onClick={() => setShowNotifPanel(false)} className="text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
                       </div>
-                    ) : (
-                      notifications.map((notif) => (
-                        <div
-                          key={notif.id}
-                          onClick={() => markAsRead(notif.id)}
-                          className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${!notif.is_read ? 'bg-primary/5 border-l-2 border-l-primary' : ''}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!notif.is_read ? 'bg-primary' : 'bg-gray-300'}`} />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-800">{notif.title}</p>
-                              <p className="text-xs text-gray-500 mt-0.5">{notif.body}</p>
-                              <p className="text-xs text-gray-400 mt-1">
-                                {new Date(notif.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                              </p>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {!notifications?.length ? (
+                        <div className="text-center py-10">
+                          <Bell className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+                          <p className="text-gray-400 text-sm">Aucune notification</p>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => (
+                          <div key={notif.id} onClick={() => markAsRead(notif.id)} className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${!notif.is_read ? 'bg-primary/5 border-l-2 border-l-primary' : ''}`}>
+                            <div className="flex items-start gap-3">
+                              <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!notif.is_read ? 'bg-primary' : 'bg-gray-300'}`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-800">{notif.title}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">{notif.body}</p>
+                                <p className="text-xs text-gray-400 mt-1">{new Date(notif.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))
-                    )}
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* MÉDAILLON DE NIVEAU + ANNEAU + STATS */}
+              <div className="flex items-center gap-6">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="relative w-28 h-28">
+                    <svg viewBox="0 0 100 100" className="w-28 h-28" style={{ transform: 'rotate(-90deg)' }}>
+                      <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="6" />
+                      <circle cx="50" cy="50" r="44" fill="none" stroke="white" strokeWidth="6" strokeLinecap="round" strokeDasharray="276.46" strokeDashoffset={276.46 * (1 - levelProgress / 100)} style={{ transition: 'stroke-dashoffset 1s ease' }} />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className={`w-20 h-20 rounded-full bg-gradient-to-br ${heroLevel.grad} flex items-center justify-center text-4xl shadow-xl`}>{heroLevel.emoji}</div>
+                    </div>
+                  </div>
+                  <div className="text-center leading-tight">
+                    <div className="font-bold">{heroLevel.name}</div>
+                    <div className="text-white/70 text-xs">{heroNextLevel ? `${pointsToNext.toLocaleString('fr-FR')} pts vers ${heroNextLevel.name}` : 'Niveau max 🎉'}</div>
                   </div>
                 </div>
-              )}
-            </div>
 
-            <div className="flex gap-4">
-  <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 text-right">
-    <div className="text-white font-bold text-lg">{metrics?.collaborationsActives || 0}</div>
-    <div className="text-white/70 text-sm">Campagnes</div>
-  </div>
-  <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 text-right">
-    <div className="text-white font-bold text-lg">€{((metrics?.totalGains || 0) / 1000).toFixed(1)}K</div>
-    <div className="text-white/70 text-sm">Ce mois</div>
-  </div>
-</div>
+                <div className="flex gap-3">
+                  <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 text-right min-w-[112px]">
+                    <div className="text-white font-bold text-xl">€{revThisMonth >= 1000 ? `${(revThisMonth / 1000).toFixed(1)}K` : revThisMonth}</div>
+                    <div className="text-white/70 text-sm">Ce mois</div>
+                    {revTrendPct !== 0 && (
+                      <div className={`mt-1.5 inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${revTrendPct > 0 ? 'bg-green-400/30 text-green-50' : 'bg-red-400/30 text-red-50'}`}>
+                        <ArrowUp className={`h-3 w-3 ${revTrendPct < 0 ? 'rotate-180' : ''}`} />{Math.abs(revTrendPct)}%
+                      </div>
+                    )}
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 text-right min-w-[112px]">
+                    <div className="text-white font-bold text-xl">{metrics?.collaborationsActives || 0}</div>
+                    <div className="text-white/70 text-sm">Campagnes actives</div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
