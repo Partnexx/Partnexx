@@ -34,6 +34,7 @@ function CollaborationsContent({ user }) {
   const [collaborations, setCollaborations] = useState([])
   const [contracts, setContracts] = useState([])
   const [contentPosts, setContentPosts] = useState([])
+  const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -57,7 +58,7 @@ function CollaborationsContent({ user }) {
         return
       }
 
-      const [collabRes, appRes, contractRes, postsRes] = await Promise.allSettled([
+      const [collabRes, appRes, contractRes, postsRes, txRes] = await Promise.allSettled([
         supabase
           .from('collaborations')
           .select('*, campaigns(id, title, description, cover_url), brands(id, company_name, logo_url)')
@@ -80,12 +81,19 @@ function CollaborationsContent({ user }) {
           .from('content_posts')
           .select('*')
           .eq('influencer_id', influencer.id),
+
+        supabase
+          .from('transactions')
+          .select('*')
+          .eq('influencer_id', influencer.id)
+          .order('created_at', { ascending: false }),
       ])
 
       setCollaborations(collabRes.status === 'fulfilled' ? collabRes.value.data || [] : [])
       setApplications(appRes.status === 'fulfilled' ? appRes.value.data || [] : [])
       setContracts(contractRes.status === 'fulfilled' ? contractRes.value.data || [] : [])
       setContentPosts(postsRes.status === 'fulfilled' ? postsRes.value.data || [] : [])
+      setTransactions(txRes.status === 'fulfilled' ? txRes.value.data || [] : [])
     } catch (err) {
       console.warn('CollaborationsSection fetch error', err)
     } finally {
@@ -119,6 +127,24 @@ function CollaborationsContent({ user }) {
 
   const getContractForCollab = (collab) => contracts.find(c => c.collaboration_id === collab.id)
   const getPostsForCollab = (collab) => contentPosts.filter(p => p.collaboration_id === collab.id)
+  const getTransactionForCollab = (collab) => transactions.find(t => t.collaboration_id === collab?.id) || null
+
+  // Statut de paiement -> libellé + style + icône
+  const PAYMENT_STATUS = {
+    released: { label: 'Versé', cls: 'bg-green-500/10 text-green-600 border-green-500/20', icon: CheckCircle },
+    in_escrow: { label: 'Sous séquestre', cls: 'bg-blue-500/10 text-blue-600 border-blue-500/20', icon: Lock },
+    pending: { label: 'En attente', cls: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20', icon: Clock },
+    disputed: { label: 'En litige', cls: 'bg-red-500/10 text-red-600 border-red-500/20', icon: AlertCircle },
+    refunded: { label: 'Remboursé', cls: 'bg-muted text-muted-foreground border-border', icon: Package },
+  }
+
+  // Jours restants avant une échéance (négatif = dépassé)
+  const daysUntil = (dateStr) => {
+    if (!dateStr) return null
+    return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000)
+  }
+
+  const fmtMoney = (n) => `${Number(n || 0).toLocaleString('fr-FR')}€`
 
   const handleDownloadPDF = (contract) => {
     if (contract?.pdf_url) {
@@ -603,93 +629,222 @@ function CollaborationsContent({ user }) {
         </TabsContent>
       </Tabs>
 
-      {/* Dialog Détails (Or only) */}
+      {/* Dialog Détails — vue complète */}
       <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl flex items-center gap-3">
-              {selectedCollab?.campaigns?.title || 'Collaboration'}
-              <Badge className={selectedCollab?.status === "in_progress" ? "bg-green-500" : "bg-blue-500"}>
-                {getStatusLabel(selectedCollab?.status)}
-              </Badge>
-            </DialogTitle>
-            <DialogDescription>Collaboration avec {selectedCollab?.brands?.company_name}</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-h-[92vh] overflow-y-auto overflow-x-hidden p-0" style={{ width: '880px', maxWidth: '92vw' }}>
+          {selectedCollab && (() => {
+            const c = selectedCollab
+            const contract = c.contract
+            const posts = c.posts || []
+            const tx = getTransactionForCollab(c)
+            const gross = tx?.amount ?? contract?.amount ?? c.agreed_rate ?? null
+            const pay = tx ? (PAYMENT_STATUS[tx.status] || PAYMENT_STATUS.pending) : null
+            const PayIcon = pay?.icon || Clock
+            const deadline = c.deadline || contract?.deadline || null
+            const dLeft = daysUntil(deadline)
+            const deliverables = Array.isArray(c.deliverables) ? c.deliverables
+              : (Array.isArray(contract?.deliverables) ? contract.deliverables : [])
+            const totalViews = posts.reduce((s, p) => s + (p.views || 0), 0)
+            const totalLikes = posts.reduce((s, p) => s + (p.likes || 0), 0)
+            const avgEng = posts.length > 0
+              ? (posts.reduce((s, p) => s + parseFloat(p.engagement_rate || 0), 0) / posts.length).toFixed(1)
+              : '0.0'
 
-          {selectedCollab && (
-            <div className="space-y-6 mt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader><CardTitle className="text-sm flex items-center gap-2"><DollarSign className="h-4 w-4" />Montant</CardTitle></CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold text-green-600">
-                      {selectedCollab.contract ? `${parseFloat(selectedCollab.contract.amount).toLocaleString()}€` : 'Non défini'}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader><CardTitle className="text-sm flex items-center gap-2"><Calendar className="h-4 w-4" />Date</CardTitle></CardHeader>
-                  <CardContent><p className="font-medium">{formatDate(selectedCollab.created_at)}</p></CardContent>
-                </Card>
-              </div>
-
-              {selectedCollab.posts && selectedCollab.posts.length > 0 && (
-                <Card>
-                  <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" />Performance des contenus</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-3 gap-4 mb-4 text-center">
-                      <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold text-blue-600">{selectedCollab.posts.reduce((s, p) => s + (p.views || 0), 0).toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">Vues totales</p>
+            return (
+              <>
+                {/* En-tête avec bannière */}
+                <DialogHeader className="p-0 space-y-0 text-left">
+                  <div className="relative h-24 sm:h-28 bg-gradient-to-r from-primary via-accent to-secondary">
+                    {c.campaigns?.cover_url && (
+                      <img src={c.campaigns.cover_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                  </div>
+                  <div className="px-6 pb-2">
+                    <Avatar className="h-16 w-16 sm:h-20 sm:w-20 -mt-8 sm:-mt-10 border-4 border-background shadow-xl relative z-10">
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white font-bold text-xl sm:text-2xl">
+                        {c.brands?.company_name?.slice(0, 2).toUpperCase() || 'MA'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="mt-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div className="min-w-0">
+                        <DialogTitle className="text-lg sm:text-2xl font-bold leading-tight">{c.campaigns?.title || 'Collaboration'}</DialogTitle>
+                        <DialogDescription className="mt-0.5">avec {c.brands?.company_name || 'Marque'}</DialogDescription>
                       </div>
-                      <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold text-pink-600">{selectedCollab.posts.reduce((s, p) => s + (p.likes || 0), 0).toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">Likes totaux</p>
-                      </div>
-                      <div className="p-3 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold text-green-600">
-                          {selectedCollab.posts.length > 0
-                            ? (selectedCollab.posts.reduce((s, p) => s + parseFloat(p.engagement_rate || 0), 0) / selectedCollab.posts.length).toFixed(1)
-                            : 0}%
-                        </p>
-                        <p className="text-xs text-muted-foreground">Engagement moyen</p>
+                      <div className="flex flex-wrap gap-2 shrink-0">
+                        <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20"><CheckCircle className="h-3 w-3 mr-1" />Vérifié</Badge>
+                        <Badge variant="outline" className={c.status === 'completed' ? 'bg-muted text-muted-foreground' : 'bg-green-500/10 text-green-600 border-green-500/20'}>
+                          <Clock className="h-3 w-3 mr-1" />{getStatusLabel(c.status)}
+                        </Badge>
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      {selectedCollab.posts.map((post) => (
-                        <div key={post.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <Badge variant="outline" className="capitalize">{post.platform}</Badge>
-                            <Badge variant="outline" className="capitalize">{post.content_type}</Badge>
-                            <span className="text-sm text-muted-foreground">{formatDate(post.published_at)}</span>
+                  </div>
+                </DialogHeader>
+
+                <div className="px-6 pb-6 space-y-6">
+                  {/* Description campagne */}
+                  {c.campaigns?.description && (
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><FileText className="h-4 w-4 text-primary" />À propos de la campagne</CardTitle></CardHeader>
+                      <CardContent><p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{c.campaigns.description}</p></CardContent>
+                    </Card>
+                  )}
+
+                  {/* Infos clés */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="p-4 rounded-xl border bg-green-500/5">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1"><DollarSign className="h-4 w-4 text-green-600" /><span className="text-xs">Montant</span></div>
+                      <p className="text-lg font-bold text-green-600">{gross != null ? fmtMoney(gross) : 'Non défini'}</p>
+                    </div>
+                    <div className="p-4 rounded-xl border bg-muted/40">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1"><Calendar className="h-4 w-4" /><span className="text-xs">Créée le</span></div>
+                      <p className="text-sm font-semibold">{formatDate(c.created_at)}</p>
+                    </div>
+                    <div className="p-4 rounded-xl border bg-muted/40">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1"><Clock className="h-4 w-4" /><span className="text-xs">Deadline</span></div>
+                      <p className="text-sm font-semibold">{deadline ? formatDate(deadline) : 'Non défini'}</p>
+                      {dLeft != null && (
+                        <p className={`text-xs mt-0.5 ${dLeft < 0 ? 'text-red-600' : dLeft <= 7 ? 'text-orange-600' : 'text-muted-foreground'}`}>
+                          {dLeft < 0 ? `Dépassée de ${Math.abs(dLeft)} j` : dLeft === 0 ? "Aujourd'hui" : `Dans ${dLeft} j`}
+                        </p>
+                      )}
+                    </div>
+                    <div className="p-4 rounded-xl border bg-muted/40">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-1"><PayIcon className="h-4 w-4" /><span className="text-xs">Paiement</span></div>
+                      {pay ? (
+                        <Badge variant="outline" className={pay.cls}>{pay.label}</Badge>
+                      ) : (
+                        <p className="text-sm font-semibold text-muted-foreground">Non initié</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Détail financier (si transaction) */}
+                  {tx && (
+                    <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" />Détail du paiement</CardTitle></CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-3 gap-3 text-center">
+                          <div className="p-3 rounded-lg bg-muted/50">
+                            <p className="text-lg font-bold">{fmtMoney(tx.amount)}</p>
+                            <p className="text-xs text-muted-foreground">Montant brut</p>
                           </div>
-                          <div className="flex items-center gap-4 text-sm">
-                            <span className="text-blue-600">{(post.views || 0).toLocaleString()} vues</span>
-                            <span className="text-pink-600">{post.likes || 0} likes</span>
-                            {post.post_url && (
-                              <Button size="sm" variant="outline" onClick={() => window.open(post.post_url, '_blank')}>Voir</Button>
-                            )}
+                          <div className="p-3 rounded-lg bg-muted/50">
+                            <p className="text-lg font-bold text-orange-600">- {fmtMoney(tx.platform_fee)}</p>
+                            <p className="text-xs text-muted-foreground">Commission Partnexx</p>
+                          </div>
+                          <div className="p-3 rounded-lg bg-green-500/10">
+                            <p className="text-lg font-bold text-green-600">{fmtMoney(tx.influencer_amount)}</p>
+                            <p className="text-xs text-muted-foreground">Net pour toi</p>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                        {tx.released_at && (
+                          <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1"><CheckCircle className="h-3 w-3 text-green-600" />Versé le {formatDate(tx.released_at)}</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
 
-              {selectedCollab.contract && (
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    className="flex-1 gap-2"
-                    onClick={() => handleDownloadPDF(selectedCollab.contract)}
-                  >
-                    <Download className="h-4 w-4" />Télécharger PDF
-                  </Button>
+                  {/* Contrat */}
+                  <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><FileText className="h-4 w-4 text-primary" />Contrat</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                      {contract ? (
+                        <>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            <div><p className="text-xs text-muted-foreground mb-1">N° de contrat</p><p className="text-sm font-semibold">{contract.contract_number || contract.number || '—'}</p></div>
+                            <div><p className="text-xs text-muted-foreground mb-1">Statut</p><p className="text-sm font-semibold capitalize">{contract.status || '—'}</p></div>
+                            <div><p className="text-xs text-muted-foreground mb-1">Deadline</p><p className="text-sm font-semibold">{contract.deadline ? formatDate(contract.deadline) : 'Non défini'}</p></div>
+                          </div>
+                          <div className="flex gap-3">
+                            <Button variant="outline" className="flex-1 gap-2" onClick={() => handleDownloadPDF(contract)}><Download className="h-4 w-4" />Télécharger le PDF</Button>
+                            {contract.pdf_url && (
+                              <Button className="flex-1 gap-2" onClick={() => window.open(contract.pdf_url, '_blank')}><Eye className="h-4 w-4" />Voir le PDF</Button>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Aucun contrat associé pour le moment.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                  {/* Livrables */}
+                  <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Package className="h-4 w-4 text-primary" />Livrables{deliverables.length > 0 ? ` (${deliverables.length})` : ''}</CardTitle></CardHeader>
+                    <CardContent>
+                      {deliverables.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Aucun livrable défini pour cette collaboration.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {deliverables.map((d, i) => {
+                            const label = typeof d === 'string' ? d : (d?.label || d?.name || `Livrable ${i + 1}`)
+                            return (
+                              <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"><FileText className="h-4 w-4 text-primary" /></div>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium truncate">{label}</p>
+                                    <Badge variant="outline" className="mt-1 bg-yellow-500/10 text-yellow-600 border-yellow-500/20 text-[10px]">À livrer</Badge>
+                                  </div>
+                                </div>
+                                <Button size="sm" className="gap-1 shrink-0" onClick={() => toast('Envoi de livrable bientôt disponible')}><Upload className="h-3 w-3" />Envoyer</Button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Performance des contenus */}
+                  <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" />Performance des contenus</CardTitle></CardHeader>
+                    <CardContent>
+                      {posts.length === 0 ? (
+                        <div className="text-center py-6 text-muted-foreground">
+                          <Eye className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                          <p className="text-sm">Aucun contenu publié pour cette collaboration</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-3 gap-3 mb-4 text-center">
+                            <div className="p-3 bg-muted/50 rounded-lg"><p className="text-xl font-bold text-blue-600">{totalViews.toLocaleString()}</p><p className="text-xs text-muted-foreground">Vues</p></div>
+                            <div className="p-3 bg-muted/50 rounded-lg"><p className="text-xl font-bold text-pink-600">{totalLikes.toLocaleString()}</p><p className="text-xs text-muted-foreground">Likes</p></div>
+                            <div className="p-3 bg-muted/50 rounded-lg"><p className="text-xl font-bold text-green-600">{avgEng}%</p><p className="text-xs text-muted-foreground">Engagement</p></div>
+                          </div>
+                          <div className="space-y-2">
+                            {posts.map((post) => (
+                              <div key={post.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge variant="outline" className="capitalize">{post.platform}</Badge>
+                                  <Badge variant="outline" className="capitalize">{post.content_type}</Badge>
+                                  {post.published_at && <span className="text-xs text-muted-foreground">{formatDate(post.published_at)}</span>}
+                                </div>
+                                <div className="flex items-center gap-3 text-sm">
+                                  <span className="text-blue-600">{(post.views || 0).toLocaleString()} vues</span>
+                                  <span className="text-pink-600">{post.likes || 0} likes</span>
+                                  {post.post_url && (<Button size="sm" variant="outline" onClick={() => window.open(post.post_url, '_blank')}>Voir</Button>)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-3 pt-2">
+                    <Button variant="outline" className="flex-1 gap-2" onClick={() => { setIsDetailsDialogOpen(false); setIsContractDialogOpen(true) }}><FileText className="h-4 w-4" />Contrat</Button>
+                    <Button variant="outline" className="flex-1 gap-2"><MessageSquare className="h-4 w-4" />Messagerie</Button>
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
+              </>
+            )
+          })()}
         </DialogContent>
       </Dialog>
 

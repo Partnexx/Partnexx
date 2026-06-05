@@ -197,10 +197,6 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
     return months.map((m) => ({ ...m, revenue: Math.round(m.revenue) }))
   })()
 
-  const revTotal = performanceData.reduce((a, m) => a + m.revenue, 0)
-  const revAvg = performanceData.length ? Math.round(revTotal / performanceData.length) : 0
-  const revBest = performanceData.reduce((b, m) => (m.revenue > b.revenue ? m : b), { revenue: 0, label: '—' })
-
   // ===== Données du hero =====
   const hour = currentTime.getHours()
   const greeting = hour < 6 ? 'Bonne nuit' : hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir'
@@ -584,53 +580,6 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
               </CardContent>
             </Card>
           </div>
-
-          <Card className="shadow-lg">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-lg flex items-center gap-2"><DollarSign className="h-5 w-5 text-yellow-500" />Performance Financière Mensuelle</CardTitle>
-                <span className="text-xs text-green-600 border border-green-200 px-2 py-1 rounded-full">
-                  <TrendingUp className="h-3 w-3 inline mr-1" />
-                  +{revAvg.toLocaleString()}€/mois
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64 mb-6">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                  <BarChart data={performanceData}>
-                    <defs>
-                      <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.8} />
-                        <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.3} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis dataKey="name" fontSize={12} />
-                    <YAxis fontSize={12} tickFormatter={v => `${v}€`} />
-                    <Tooltip formatter={(v) => [`${v}€`, 'Revenus']} />
-                    <Bar dataKey="revenue" fill="url(#revenueGrad)" radius={[8, 8, 0, 0]} maxBarSize={60} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                {[
-                  { label: 'Revenu Total', value: `${revTotal.toLocaleString()}€`, sub: 'Sur 7 mois', color: '#22c55e', icon: DollarSign },
-                  { label: 'Moyenne Mensuelle', value: `${revAvg.toLocaleString()}€`, sub: 'Par mois', color: '#a855f7', icon: TrendingUp },
-                  { label: 'Meilleur Mois', value: `${revBest.revenue.toLocaleString()}€`, sub: revBest.revenue > 0 ? revBest.label : '—', color: '#f59e0b', icon: Trophy },
-                ].map((s, i) => {
-                  const Icon = s.icon
-                  return (
-                    <div key={i} className="text-center p-4 rounded-xl border cursor-pointer hover:scale-[1.02] transition-transform" style={{ background: s.color + '10', borderColor: s.color + '30' }}>
-                      <div className="flex items-center justify-center gap-2 mb-2"><Icon className="h-4 w-4" style={{ color: s.color }} /><p className="text-xs font-medium text-gray-500">{s.label}</p></div>
-                      <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
-                      <p className="text-xs text-gray-400 mt-1">{s.sub}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
         </div>
       )}
 
