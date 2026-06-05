@@ -126,6 +126,7 @@ function CollaborationsContent({ user }) {
   }
 
   const getContractForCollab = (collab) => contracts.find(c => c.collaboration_id === collab.id)
+  const contractStatusLabel = (s) => ({ signed: 'Signé', completed: 'Terminé', draft: 'Brouillon', sent: 'Envoyé', disputed: 'Litige', cancelled: 'Annulé' }[s] || s || '—')
   const getPostsForCollab = (collab) => contentPosts.filter(p => p.collaboration_id === collab.id)
   const getTransactionForCollab = (collab) => transactions.find(t => t.collaboration_id === collab?.id) || null
 
@@ -146,11 +147,41 @@ function CollaborationsContent({ user }) {
 
   const fmtMoney = (n) => `${Number(n || 0).toLocaleString('fr-FR')}€`
 
-  const handleDownloadPDF = (contract) => {
-    if (contract?.pdf_url) {
-      window.open(contract.pdf_url, '_blank')
-    } else {
-      toast.error('PDF non disponible pour ce contrat')
+  // Normalise un livrable (string OU objet) -> { name, echeance, st{label,dot,badge,done} }
+  const normalizeDeliverable = (d, i) => {
+    const name = typeof d === 'string' ? d : (d?.name || d?.label || d?.title || `Livrable ${i + 1}`)
+    const rawDate = (d && typeof d === 'object') ? (d.deadline || d.echeance || d.due_date || d.date || null) : null
+    const echeance = rawDate ? new Date(rawDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : null
+    const s = ((d && typeof d === 'object') ? (d.status || d.state || '') : '').toString().toLowerCase()
+    let st
+    if (['approved', 'approuve', 'approuvé', 'validated', 'valide', 'validé'].includes(s))
+      st = { label: 'Approuvé', dot: 'bg-green-500', badge: 'bg-green-500/10 text-green-600 border-green-500/20', done: true }
+    else if (['delivered', 'livre', 'livré', 'submitted', 'soumis', 'sent', 'envoye', 'envoyé'].includes(s))
+      st = { label: 'Livré', dot: 'bg-blue-500', badge: 'bg-blue-500/10 text-blue-600 border-blue-500/20', done: true }
+    else
+      st = { label: 'En attente', dot: 'bg-gray-400', badge: 'bg-muted text-muted-foreground border-border', done: false }
+    return { name, echeance, st }
+  }
+
+  const handleDownloadPDF = async (contract) => {
+    if (!contract?.id) { toast.error('Aucun contrat à télécharger'); return }
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) { toast.error('Session expirée, reconnecte-toi'); return }
+      toast.loading('Génération du contrat…', { id: 'dl-contract' })
+      const res = await fetch(`/api/influencer/contract-pdf?contractId=${contract.id}`, { headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); toast.error(e.error || 'Impossible de générer le contrat', { id: 'dl-contract' }); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `contrat-${(contract.brands?.company_name || 'partnexx').replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+      toast.success('Contrat téléchargé', { id: 'dl-contract' })
+    } catch {
+      toast.error('Erreur réseau', { id: 'dl-contract' })
     }
   }
 
@@ -414,24 +445,46 @@ function CollaborationsContent({ user }) {
                       </Card>
                     </div>
 
-                    {deliverables.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                          <FileText className="h-4 w-4 text-primary" />Livrables ({deliverables.length})
-                        </h4>
-                        <div className="space-y-2">
-                          {deliverables.map((deliverable, i) => (
-                            <div key={i} className="flex items-center justify-between p-3 rounded-lg border bg-card">
-                              <div className="flex items-center gap-3">
-                                <div className="w-2 h-2 rounded-full bg-gray-400" />
-                                <p className="text-sm font-medium">{deliverable}</p>
+                    {deliverables.length > 0 && (() => {
+                      const items = deliverables.map(normalizeDeliverable)
+                      const approved = items.filter((x) => x.st.label === 'Approuvé').length
+                      return (
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-semibold flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-primary" />Livrables ({items.length})
+                            </h4>
+                            <Badge variant="outline" className="text-xs">{approved} approuvé{approved > 1 ? 's' : ''}</Badge>
+                          </div>
+                          <div className="space-y-2">
+                            {items.map((it, i) => (
+                              <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${it.st.dot}`} />
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium truncate">{it.name}</p>
+                                    {it.echeance && (
+                                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5"><Calendar className="h-3 w-3" />Échéance : {it.echeance}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Badge variant="outline" className={`text-xs ${it.st.badge}`}>
+                                    {it.st.label === 'Approuvé' && <CheckCircle className="h-3 w-3 mr-1" />}
+                                    {it.st.label === 'Livré' && <Upload className="h-3 w-3 mr-1" />}
+                                    {it.st.label === 'En attente' && <Clock className="h-3 w-3 mr-1" />}
+                                    {it.st.label}
+                                  </Badge>
+                                  {!it.st.done && (
+                                    <Button size="sm" className="gap-1" onClick={() => toast('Envoi de livrable bientôt disponible')}><Upload className="h-3 w-3" />Envoyer</Button>
+                                  )}
+                                </div>
                               </div>
-                              <Button size="sm" className="gap-1"><Upload className="h-3 w-3" />Envoyer</Button>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )
+                    })()}
 
                     {posts.length > 0 && (
                       <div>
@@ -461,22 +514,12 @@ function CollaborationsContent({ user }) {
                       </div>
                     )}
 
-                    <div className="flex gap-3 pt-4 border-t">
+                    <div className="pt-4 border-t">
                       <Button
-                        variant="outline"
-                        className="flex-1 gap-2"
-                        onClick={() => { setSelectedCollab({ ...collab, contract }); setIsContractDialogOpen(true) }}
-                      >
-                        <FileText className="h-4 w-4" />Contrat
-                      </Button>
-                      <Button variant="outline" className="flex-1 gap-2">
-                        <MessageSquare className="h-4 w-4" />Messagerie
-                      </Button>
-                      <Button
-                        className="flex-1 gap-2"
+                        className="w-full gap-2 h-12 text-base"
                         onClick={() => { setSelectedCollab({ ...collab, contract, posts }); setIsDetailsDialogOpen(true) }}
                       >
-                        <Eye className="h-4 w-4" />Détails
+                        <Eye className="h-5 w-5" />Voir les détails
                       </Button>
                     </div>
                   </CardContent>
@@ -752,16 +795,11 @@ function CollaborationsContent({ user }) {
                       {contract ? (
                         <>
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            <div><p className="text-xs text-muted-foreground mb-1">N° de contrat</p><p className="text-sm font-semibold">{contract.contract_number || contract.number || '—'}</p></div>
-                            <div><p className="text-xs text-muted-foreground mb-1">Statut</p><p className="text-sm font-semibold capitalize">{contract.status || '—'}</p></div>
+                            <div><p className="text-xs text-muted-foreground mb-1">N° de contrat</p><p className="text-sm font-semibold">#{contract.id.slice(0, 8)}</p></div>
+                            <div><p className="text-xs text-muted-foreground mb-1">Statut</p><p className="text-sm font-semibold">{contractStatusLabel(contract.status)}</p></div>
                             <div><p className="text-xs text-muted-foreground mb-1">Deadline</p><p className="text-sm font-semibold">{contract.deadline ? formatDate(contract.deadline) : 'Non défini'}</p></div>
                           </div>
-                          <div className="flex gap-3">
-                            <Button variant="outline" className="flex-1 gap-2" onClick={() => handleDownloadPDF(contract)}><Download className="h-4 w-4" />Télécharger le PDF</Button>
-                            {contract.pdf_url && (
-                              <Button className="flex-1 gap-2" onClick={() => window.open(contract.pdf_url, '_blank')}><Eye className="h-4 w-4" />Voir le PDF</Button>
-                            )}
-                          </div>
+                          <Button variant="outline" className="w-full gap-2" onClick={() => handleDownloadPDF(contract)}><Download className="h-4 w-4" />Télécharger le PDF</Button>
                         </>
                       ) : (
                         <p className="text-sm text-muted-foreground">Aucun contrat associé pour le moment.</p>
@@ -834,12 +872,6 @@ function CollaborationsContent({ user }) {
                       )}
                     </CardContent>
                   </Card>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-3 pt-2">
-                    <Button variant="outline" className="flex-1 gap-2" onClick={() => { setIsDetailsDialogOpen(false); setIsContractDialogOpen(true) }}><FileText className="h-4 w-4" />Contrat</Button>
-                    <Button variant="outline" className="flex-1 gap-2"><MessageSquare className="h-4 w-4" />Messagerie</Button>
                   </div>
                 </div>
               </>
