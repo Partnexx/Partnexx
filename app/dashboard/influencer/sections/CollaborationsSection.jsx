@@ -130,6 +130,21 @@ function CollaborationsContent({ user }) {
   const getPostsForCollab = (collab) => contentPosts.filter(p => p.collaboration_id === collab.id)
   const getTransactionForCollab = (collab) => transactions.find(t => t.collaboration_id === collab?.id) || null
 
+  // ===== Pipeline d'une candidature : Postulé -> Acceptée -> Négociation -> Contrat -> Signé =====
+  const APP_STAGES = ['Postulé', 'Acceptée', 'Négociation', 'Contrat', 'Signé']
+  // Relie une candidature à sa collab + son contrat (via application_id, sinon via la campagne)
+  const getCollabForApp = (app) => collaborations.find(c => c.application_id === app.id) || collaborations.find(c => c.campaigns?.id === app.campaign_id) || null
+  const getAppStageIndex = (app, collab, contract) => {
+    if (app.status === 'rejected' || app.status === 'withdrawn') return -1 // refusée (hors pipeline)
+    const cs = (contract?.status || '').toLowerCase()
+    const ls = (collab?.status || '').toLowerCase()
+    if (cs === 'signed' || cs === 'completed' || ls === 'in_progress' || ls === 'completed') return 4 // signé / actif
+    if (contract && ['sent', 'draft', 'disputed'].includes(cs)) return 3 // contrat à signer
+    if (app.status === 'accepted' && app.proposed_rate != null) return 2 // négociation (tarif proposé)
+    if (app.status === 'accepted') return 1 // acceptée
+    return 0 // en attente
+  }
+
   // Statut de paiement -> libellé + style + icône
   const PAYMENT_STATUS = {
     released: { label: 'Versé', cls: 'bg-green-500/10 text-green-600 border-green-500/20', icon: CheckCircle },
@@ -633,41 +648,110 @@ function CollaborationsContent({ user }) {
               </CardContent>
             </Card>
           ) : (
-            applications.map((app) => (
-              <Card key={app.id} className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg">
-                        {app.cover_letter?.match(/^\[(.+?)\]/)?.[1] || app.campaigns?.title || 'Campagne'}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                        {app.cover_letter?.replace(/^\[.+?\]\s*/, '') || ''}
-                      </p>
+            applications.map((app) => {
+              const collab = getCollabForApp(app)
+              const contract = collab ? getContractForCollab(collab) : null
+              const stageIdx = getAppStageIndex(app, collab, contract)
+              const rejected = stageIdx === -1
+              const title = app.cover_letter?.match(/^\[(.+?)\]/)?.[1] || app.campaigns?.title || 'Campagne'
+              const note = app.cover_letter?.replace(/^\[.+?\]\s*/, '') || ''
+              return (
+                <Card key={app.id} className="hover:shadow-lg transition-all duration-300">
+                  <CardContent className="p-6 space-y-5">
+                    {/* En-tête */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-lg truncate">{title}</h3>
+                        {note && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{note}</p>}
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2 flex-wrap">
+                          <span className="flex items-center gap-1"><Calendar className="h-4 w-4" />Postulé le {new Date(app.applied_at).toLocaleDateString('fr-FR')}</span>
+                          {app.campaigns?.budget_per_influencer_min && (
+                            <span className="flex items-center gap-1"><DollarSign className="h-4 w-4" />{app.campaigns.budget_per_influencer_min} - {app.campaigns.budget_per_influencer_max}€</span>
+                          )}
+                        </div>
+                      </div>
+                      <Badge className={
+                        rejected ? 'bg-red-500/10 text-red-600 border-red-500/20 shrink-0' :
+                        stageIdx >= 4 ? 'bg-green-500/10 text-green-600 border-green-500/20 shrink-0' :
+                        stageIdx >= 1 ? 'bg-blue-500/10 text-blue-600 border-blue-500/20 shrink-0' :
+                        'bg-yellow-500/10 text-yellow-600 border-yellow-500/20 shrink-0'
+                      }>
+                        {rejected ? 'Refusée' :
+                         stageIdx >= 4 ? <><CheckCircle className="h-3 w-3 mr-1" />Signé</> :
+                         stageIdx === 3 ? <><FileText className="h-3 w-3 mr-1" />Contrat</> :
+                         stageIdx === 2 ? <><MessageSquare className="h-3 w-3 mr-1" />Négociation</> :
+                         stageIdx === 1 ? <><CheckCircle className="h-3 w-3 mr-1" />Acceptée</> :
+                         <><Clock className="h-3 w-3 mr-1" />En attente</>}
+                      </Badge>
                     </div>
-                    <Badge className={
-                      app.status === 'accepted' ? 'bg-green-500/10 text-green-600 border-green-500/20 ml-4' :
-                      app.status === 'rejected' ? 'bg-red-500/10 text-red-600 border-red-500/20 ml-4' :
-                      'bg-yellow-500/10 text-yellow-600 border-yellow-500/20 ml-4'
-                    }>
-                      {app.status === 'accepted' ? <><CheckCircle className="h-3 w-3 mr-1" />Acceptée</> :
-                       app.status === 'rejected' ? 'Refusée' :
-                       <><Clock className="h-3 w-3 mr-1" />En attente</>}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-4 w-4" />Postulé le {new Date(app.applied_at).toLocaleDateString('fr-FR')}
-                    </span>
-                    {app.campaigns?.budget_per_influencer_min && (
-                      <span className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4" />{app.campaigns.budget_per_influencer_min} - {app.campaigns.budget_per_influencer_max}€
-                      </span>
+
+                    {rejected ? (
+                      <div className="p-4 rounded-xl border border-red-500/20 bg-red-500/5 text-sm text-muted-foreground">
+                        Cette candidature n&apos;a pas été retenue par la marque. Ne te décourage pas, postule à d&apos;autres campagnes ! 💪
+                      </div>
+                    ) : (
+                      <>
+                        {/* Pipeline / étapes */}
+                        <div className="flex items-start gap-0.5 overflow-x-auto pb-1">
+                          {APP_STAGES.map((label, i) => {
+                            const done = i < stageIdx
+                            const current = i === stageIdx
+                            return (
+                              <div key={i} className="flex items-start shrink-0">
+                                <div className="flex flex-col items-center gap-1.5 w-[62px]">
+                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                                    done ? 'bg-green-500 text-white'
+                                    : current ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white ring-4 ring-purple-500/15'
+                                    : 'bg-muted text-muted-foreground'
+                                  }`}>
+                                    {done ? <CheckCircle className="h-4 w-4" /> : i + 1}
+                                  </div>
+                                  <span className={`text-[10px] text-center leading-tight ${current ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{label}</span>
+                                </div>
+                                {i < APP_STAGES.length - 1 && (
+                                  <div className={`h-0.5 w-4 sm:w-7 mt-3.5 ${done ? 'bg-green-500' : 'bg-muted'}`} />
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        {/* Zone contextuelle selon l'étape */}
+                        <div className="rounded-xl border bg-muted/30 p-4">
+                          {stageIdx === 0 && (
+                            <p className="text-sm text-muted-foreground flex items-center gap-2"><Clock className="h-4 w-4 text-yellow-600 shrink-0" />En attente de la réponse de la marque.</p>
+                          )}
+                          {stageIdx === 1 && (
+                            <p className="text-sm text-muted-foreground flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-600 shrink-0" />Candidature acceptée 🎉 La marque va passer à la suite.</p>
+                          )}
+                          {stageIdx === 2 && (
+                            <div className="flex items-center justify-between gap-3 flex-wrap">
+                              <p className="text-sm text-muted-foreground">Phase de négociation : propose ton tarif à la marque.</p>
+                              <Button size="sm" className="gap-2" onClick={() => toast('Négociation bientôt disponible')}><MessageSquare className="h-4 w-4" />Proposer un tarif</Button>
+                            </div>
+                          )}
+                          {stageIdx === 3 && (
+                            <div className="flex items-center justify-between gap-3 flex-wrap">
+                              <p className="text-sm text-muted-foreground">La marque a rédigé le contrat. Consulte-le puis signe-le.</p>
+                              <div className="flex gap-2">
+                                {contract && <Button size="sm" variant="outline" className="gap-2" onClick={() => handleDownloadPDF(contract)}><Download className="h-4 w-4" />Voir le contrat</Button>}
+                                <Button size="sm" className="gap-2" onClick={() => toast('Signature électronique bientôt disponible')}><FileText className="h-4 w-4" />Signer</Button>
+                              </div>
+                            </div>
+                          )}
+                          {stageIdx >= 4 && (
+                            <div className="flex items-center justify-between gap-3 flex-wrap">
+                              <p className="text-sm text-green-600 font-medium flex items-center gap-2"><CheckCircle className="h-4 w-4 shrink-0" />Contrat signé — la collaboration est active.</p>
+                              <Button size="sm" variant="outline" className="gap-2" onClick={() => setActiveTab('active')}><Zap className="h-4 w-4" />Voir dans « En cours »</Button>
+                            </div>
+                          )}
+                        </div>
+                      </>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                  </CardContent>
+                </Card>
+              )
+            })
           )}
         </TabsContent>
       </Tabs>

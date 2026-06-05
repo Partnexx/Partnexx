@@ -216,6 +216,30 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
   const revLastMonth = performanceData.length > 1 ? performanceData[performanceData.length - 2].revenue : 0
   const revTrendPct = revLastMonth > 0 ? Math.round(((revThisMonth - revLastMonth) / revLastMonth) * 100) : (revThisMonth > 0 ? 100 : 0)
 
+  // ===== "À venir" : prochaines échéances (rendus de livrables, signatures) — vraies données =====
+  const upcoming = (() => {
+    const now = Date.now()
+    const items = []
+    ;(collaborations || []).forEach((c) => {
+      const raw = (c.status || '').toLowerCase()
+      const active = !['completed', 'terminee', 'cancelled', 'annulee'].includes(raw)
+      if (active && c.deadline) {
+        const days = Math.ceil((new Date(c.deadline).getTime() - now) / 86400000)
+        if (days >= 0) items.push({ type: 'deliverable', label: c.campaigns?.title || c.brands?.company_name || 'Livrable', days, date: new Date(c.deadline) })
+      }
+    })
+    ;(contracts || []).forEach((ct) => {
+      const raw = (ct.status || '').toLowerCase()
+      if (['draft', 'sent'].includes(raw)) items.push({ type: 'signature', label: ct.brands?.company_name || 'Contrat', days: null, date: null })
+      if (ct.deadline && !['completed', 'cancelled'].includes(raw)) {
+        const days = Math.ceil((new Date(ct.deadline).getTime() - now) / 86400000)
+        if (days >= 0) items.push({ type: 'contract_deadline', label: ct.brands?.company_name || 'Contrat', days, date: new Date(ct.deadline) })
+      }
+    })
+    items.sort((a, b) => (a.date && b.date) ? a.date - b.date : a.date ? -1 : b.date ? 1 : 0)
+    return items.slice(0, 2)
+  })()
+
   // Inclinaison 3D au survol de la souris
   const handleTilt = (e) => {
     const r = e.currentTarget.getBoundingClientRect()
@@ -372,38 +396,29 @@ export default function AccueilSection({ user, profile, metrics, collaborations,
                 )}
               </div>
 
-              {/* MÉDAILLON DE NIVEAU + ANNEAU + STATS */}
+              {/* À VENIR */}
               <div className="flex items-center gap-6">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="relative w-28 h-28">
-                    <svg viewBox="0 0 100 100" className="w-28 h-28" style={{ transform: 'rotate(-90deg)' }}>
-                      <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="6" />
-                      <circle cx="50" cy="50" r="44" fill="none" stroke="white" strokeWidth="6" strokeLinecap="round" strokeDasharray="276.46" strokeDashoffset={276.46 * (1 - levelProgress / 100)} style={{ transition: 'stroke-dashoffset 1s ease' }} />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className={`w-20 h-20 rounded-full bg-gradient-to-br ${heroLevel.grad} flex items-center justify-center text-4xl shadow-xl`}>{heroLevel.emoji}</div>
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 min-w-[210px] max-w-[280px]">
+                  <div className="flex items-center gap-1.5 text-white/70 text-xs font-semibold uppercase mb-2">
+                    <Clock className="h-3.5 w-3.5" />À venir
+                  </div>
+                  {upcoming.length === 0 ? (
+                    <p className="text-white/85 text-sm">Rien de prévu pour l&apos;instant 🎉</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {upcoming.map((it, i) => {
+                        const when = it.days == null ? 'à faire' : it.days <= 0 ? "aujourd'hui" : it.days === 1 ? 'demain' : `dans ${it.days} j`
+                        const verb = it.type === 'signature' ? 'Signature' : it.type === 'contract_deadline' ? 'Échéance' : 'Rendu'
+                        const urgent = it.days != null && it.days <= 1
+                        return (
+                          <div key={i} className="flex items-center justify-between gap-2">
+                            <p className="text-white text-sm font-semibold truncate">{verb} · {it.label}</p>
+                            <span className={`shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full ${urgent ? 'bg-red-400/30 text-red-50' : 'bg-white/20 text-white'}`}>{when}</span>
+                          </div>
+                        )
+                      })}
                     </div>
-                  </div>
-                  <div className="text-center leading-tight">
-                    <div className="font-bold">{heroLevel.name}</div>
-                    <div className="text-white/70 text-xs">{heroNextLevel ? `${pointsToNext.toLocaleString('fr-FR')} pts vers ${heroNextLevel.name}` : 'Niveau max 🎉'}</div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 text-right min-w-[112px]">
-                    <div className="text-white font-bold text-xl">€{revThisMonth >= 1000 ? `${(revThisMonth / 1000).toFixed(1)}K` : revThisMonth}</div>
-                    <div className="text-white/70 text-sm">Ce mois</div>
-                    {revTrendPct !== 0 && (
-                      <div className={`mt-1.5 inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${revTrendPct > 0 ? 'bg-green-400/30 text-green-50' : 'bg-red-400/30 text-red-50'}`}>
-                        <ArrowUp className={`h-3 w-3 ${revTrendPct < 0 ? 'rotate-180' : ''}`} />{Math.abs(revTrendPct)}%
-                      </div>
-                    )}
-                  </div>
-                  <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 text-right min-w-[112px]">
-                    <div className="text-white font-bold text-xl">{metrics?.collaborationsActives || 0}</div>
-                    <div className="text-white/70 text-sm">Campagnes actives</div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>

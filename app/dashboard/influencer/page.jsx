@@ -108,7 +108,7 @@ export default function DashboardInfluencer() {
               <div className="flex items-center gap-2">
                 <img src="/logo.png" alt="Partnexx" className="w-9 h-9 object-contain shrink-0" />
                 <div className="flex flex-col">
-                  <span className="font-bold text-base bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Partnexx</span>
+                  <span className="font-bold text-base bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">PARTNEXX</span>
                   <span className="text-[10px] text-muted-foreground leading-tight">Where Partnerships Begin</span>
                 </div>
               </div>
