@@ -148,7 +148,12 @@ const Article = (num, title, body, opts) => React.createElement(View, { style: s
 )
 
 function ContractDocument({ d, logoUri }) {
-  const deliverables = Array.isArray(d.deliverables) ? d.deliverables.filter(Boolean) : []
+  // Les livrables peuvent être des textes ("1 Post Instagram") OU des objets ({ name: "1 Post Instagram", status: ... }).
+  // On normalise tout en texte pour le PDF, sinon @react-pdf plante.
+  const deliverables = (Array.isArray(d.deliverables) ? d.deliverables : [])
+    .filter(Boolean)
+    .map((x, i) => (typeof x === 'string' ? x : (x?.name || x?.label || x?.title || `Livrable ${i + 1}`)))
+    .filter((s) => typeof s === 'string' && s.trim().length > 0)
 
   const header = React.createElement(View, { style: styles.headerFixed, fixed: true },
     React.createElement(View, { style: styles.headerLeft },
