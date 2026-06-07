@@ -49,15 +49,6 @@ export default function DashboardInfluencer() {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        // BYPASS DEV : en local, pas besoin de se connecter -> on charge le compte de dev.
-        // Verrouillé en développement : en prod (Vercel) ça redirige vers /login comme avant.
-        if (process.env.NODE_ENV === 'development') {
-          const DEV_ID = 'db9f7a27-6e37-43c4-91bd-4467ebd14611'
-          setUser({ id: DEV_ID, email: 'baudoinmathias@gmail.com' })
-          const { data: prof } = await supabase.from('profiles').select('*').eq('id', DEV_ID).single()
-          setProfile(prof)
-          return
-        }
         return router.push('/login')
       }
       setUser(user)
