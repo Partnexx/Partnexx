@@ -24,6 +24,26 @@ function getSubscriptionPeriodEnd(subscription) {
   return ts ? new Date(ts * 1000).toISOString() : null
 }
 
+// ============================================================
+// Helper : déduit { plan, period } d'un abonnement.
+// 1) Via le Price ID de l'abonnement (source de vérité — suit les
+//    changements de plan faits via le portail Stripe)
+// 2) En secours : via les métadonnées posées à la création
+// ============================================================
+const PRICE_TO_PLAN = {
+  [process.env.NEXT_PUBLIC_STRIPE_PRICE_GROWTH_MONTHLY]: { plan: 'growth', period: 'monthly' },
+  [process.env.NEXT_PUBLIC_STRIPE_PRICE_GROWTH_YEARLY]: { plan: 'growth', period: 'yearly' },
+  [process.env.NEXT_PUBLIC_STRIPE_PRICE_SCALE_MONTHLY]: { plan: 'scale', period: 'monthly' },
+  [process.env.NEXT_PUBLIC_STRIPE_PRICE_SCALE_YEARLY]: { plan: 'scale', period: 'yearly' },
+}
+function resolvePlanFromSubscription(subscription) {
+  const priceId = subscription?.items?.data?.[0]?.price?.id || null
+  if (priceId && PRICE_TO_PLAN[priceId]) return PRICE_TO_PLAN[priceId]
+  const plan = subscription?.metadata?.plan || null
+  const period = subscription?.metadata?.period || null
+  return plan ? { plan, period } : { plan: null, period: null }
+}
+
 export async function POST(req) {
   const body = await req.text()
   const sig = req.headers.get('stripe-signature')
@@ -291,13 +311,13 @@ async function handleSubscriptionCheckoutCompleted(session) {
     return
   }
 
-  // === BRANCHE 2 : abonnement de PLAN marque (comportement existant) ===
-  const brandId = session.metadata?.brand_id || null
-  const plan = subscription.metadata?.plan || null
-  const period = subscription.metadata?.period || null
+  // === BRANCHE 2 : abonnement de PLAN marque ===
+  // Le plan/période est déduit du Price ID (secours : métadonnées)
+  const { plan, period } = resolvePlanFromSubscription(subscription)
   const periodEnd = getSubscriptionPeriodEnd(subscription)
 
-  let finalBrandId = brandId
+  // brand_id : metadata session, puis metadata subscription, puis customer
+  let finalBrandId = session.metadata?.brand_id || subscription.metadata?.brand_id || null
   if (!finalBrandId && session.customer) {
     const { data: b } = await supabase
       .from('brands')
@@ -335,15 +355,27 @@ async function handleSubscriptionUpdated(subscription) {
 
   const periodEnd = getSubscriptionPeriodEnd(subscription)
 
+  // Le plan a pu CHANGER (upgrade/downgrade via le portail Stripe) :
+  // on resynchronise subscription_plan/subscription_period si on sait les déduire.
+  const { plan, period } = resolvePlanFromSubscription(subscription)
+
+  const patch = {
+    subscription_status: subscription.status,
+    subscription_current_period_end: periodEnd,
+    subscription_cancel_at_period_end: subscription.cancel_at_period_end || false,
+    updated_at: new Date().toISOString(),
+  }
+  if (plan) {
+    patch.subscription_plan = plan
+    if (period) patch.subscription_period = period
+  }
+
   await supabase
     .from('brands')
-    .update({
-      subscription_status: subscription.status,
-      subscription_current_period_end: periodEnd,
-      subscription_cancel_at_period_end: subscription.cancel_at_period_end || false,
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq('stripe_subscription_id', subscription.id)
+
+  if (plan) console.log(`✅ Plan resynchronisé: ${plan} (${period || 'période inchangée'})`)
 }
 
 async function handleSubscriptionDeleted(subscription) {

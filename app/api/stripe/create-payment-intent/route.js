@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
-import { calculateCommission } from '@/lib/plans'
+import { calculateCommission, getBrandPlanKey } from '@/lib/plans'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -35,14 +35,16 @@ export async function POST(req) {
     // ===== Récupération du plan de la marque (+ pays/TVA pour autoliquidation) =====
     const { data: brand, error: brandError } = await supabaseAdmin
       .from('brands')
-      .select('subscription_plan')
+      .select('subscription_plan, subscription_status, subscription_current_period_end')
       .eq('id', brandId)
       .single()
 
     if (brandError || !brand) {
       return NextResponse.json({ error: 'Marque introuvable' }, { status: 404 })
     }
-    const brandPlan = (brand.subscription_plan || 'trial').toLowerCase()
+    // Plan EFFECTIF : si l'abonnement est annulé/impayé/expiré, la marque
+    // retombe sur 'trial' (18%) au lieu de garder son taux préférentiel.
+    const brandPlan = getBrandPlanKey(brand)
 
     // Autoliquidation : pour l'instant toujours false (marques FR).
     // Plus tard : true si marque UE hors France avec n° TVA intracommunautaire valide.
