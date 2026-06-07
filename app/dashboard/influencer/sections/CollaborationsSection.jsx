@@ -33,7 +33,11 @@ function CollaborationsContent({ user }) {
   // Pipeline "En discussion" : popups + actions réelles
   const [negoApp, setNegoApp] = useState(null)          // candidature en cours de négo (popup tarif)
   const [negoRate, setNegoRate] = useState('')
+  const [negoMsg, setNegoMsg] = useState('')
   const [negoSending, setNegoSending] = useState(false)
+  const [aiSug, setAiSug] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [showClosed, setShowClosed] = useState(false)
   const [signTarget, setSignTarget] = useState(null)    // { app, collab, contract } (popup signature)
   const [signSending, setSignSending] = useState(false)
   const [applications, setApplications] = useState([])
@@ -146,10 +150,31 @@ function CollaborationsContent({ user }) {
     const ls = (collab?.status || '').toLowerCase()
     if (cs === 'signed' || cs === 'completed' || ls === 'in_progress' || ls === 'completed') return 4 // signé / actif
     if (contract && ['sent', 'draft', 'disputed'].includes(cs)) return 3 // contrat à signer
+    // Accord trouvé sur le prix (offre acceptée) -> étape Contrat, en attente du document de la marque
+    const hist = Array.isArray(app.negotiation_history) ? app.negotiation_history : []
+    if (app.status === 'accepted' && hist.some(e => e?.type === 'accept')) return 3
     if (app.status === 'accepted' && app.proposed_rate != null) return 2 // négociation (tarif proposé)
     if (app.status === 'accepted') return 1 // acceptée
     return 0 // en attente
   }
+  // "il y a X" pour la fraîcheur des cartes
+  const timeAgo = (dateStr) => {
+    if (!dateStr) return null
+    const s = (Date.now() - new Date(dateStr).getTime()) / 1000
+    if (s < 3600) return `il y a ${Math.max(1, Math.floor(s / 60))} min`
+    if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`
+    return `il y a ${Math.floor(s / 86400)} j`
+  }
+  // Le créateur doit-il agir sur cette candidature ?
+  const isActionRequired = (app) => {
+    const collab = getCollabForApp(app)
+    const contract = collab ? getContractForCollab(collab) : null
+    const stage = getAppStageIndex(app, collab, contract)
+    return stage === 1 || (stage === 3 && !!contract) || (stage === 2 && app.brand_counter_rate != null)
+  }
+  const actionCount = applications.filter(isActionRequired).length
+  const openApps = applications.filter(a => !['rejected', 'withdrawn'].includes(a.status))
+  const closedApps = applications.filter(a => ['rejected', 'withdrawn'].includes(a.status))
 
   // Statut de paiement -> libellé + style + icône
   const PAYMENT_STATUS = {
@@ -212,16 +237,60 @@ function CollaborationsContent({ user }) {
   }
 
   // ===== Actions réelles du pipeline "En discussion" =====
+  const negoHist = (app) => (Array.isArray(app?.negotiation_history) ? app.negotiation_history : [])
+
   const handleProposeRate = async () => {
     const rate = parseFloat(String(negoRate).replace(',', '.'))
-    if (!rate || rate <= 0) { toast.error('Entre un montant valide'); return }
+    const msg = negoMsg.trim()
+    if ((!rate || rate <= 0) && !msg) { toast.error('Entre un montant ou un message'); return }
     setNegoSending(true)
-    const { error } = await supabase.from('applications').update({ proposed_rate: rate }).eq('id', negoApp.id)
+    const events = [...negoHist(negoApp)]
+    if (rate > 0) events.push({ by: 'creator', type: 'offer', amount: rate, at: new Date().toISOString() })
+    if (msg) events.push({ by: 'creator', type: 'message', text: msg, at: new Date().toISOString() })
+    const patch = { negotiation_history: events }
+    if (rate > 0) { patch.proposed_rate = rate; patch.brand_counter_rate = null }
+    const { error } = await supabase.from('applications').update(patch).eq('id', negoApp.id)
     setNegoSending(false)
-    if (error) { toast.error("Impossible d'envoyer la proposition"); return }
-    toast.success(`Proposition de ${rate.toLocaleString('fr-FR')}€ envoyée à la marque 🎉`)
-    setNegoApp(null); setNegoRate('')
+    if (error) { toast.error("Impossible d'envoyer"); return }
+    toast.success(rate > 0 ? `Proposition de ${rate.toLocaleString('fr-FR')}€ envoyée 🎉` : 'Message envoyé à la marque 💬')
+    setNegoApp(null); setNegoRate(''); setNegoMsg(''); setAiSug(null)
     fetchAll()
+  }
+
+  const handleAcceptCounter = async (app) => {
+    const rate = Number(app.brand_counter_rate)
+    if (!rate) return
+    const events = [...negoHist(app), { by: 'creator', type: 'accept', amount: rate, at: new Date().toISOString() }]
+    const { error } = await supabase.from('applications')
+      .update({ proposed_rate: rate, brand_counter_rate: null, negotiation_history: events })
+      .eq('id', app.id)
+    if (error) { toast.error('Impossible de valider'); return }
+    toast.success(`Offre de ${rate.toLocaleString('fr-FR')}€ acceptée 🤝 La marque va rédiger le contrat.`)
+    fetchAll()
+  }
+
+  const handleAiSuggestion = async () => {
+    if (!negoApp) return
+    setAiLoading(true); setAiSug(null)
+    try {
+      const res = await fetch('/api/influencer/nego-suggestion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: negoApp.cover_letter?.match(/^\[(.+?)\]/)?.[1] || negoApp.campaigns?.title || 'Campagne',
+          description: negoApp.campaigns?.description || '',
+          budgetMin: negoApp.campaigns?.budget_per_influencer_min || null,
+          budgetMax: negoApp.campaigns?.budget_per_influencer_max || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.suggestion) throw new Error()
+      setAiSug(data.suggestion)
+    } catch {
+      toast.error('Suggestion indisponible pour le moment')
+    } finally {
+      setAiLoading(false)
+    }
   }
 
   const handleSignContract = async () => {
@@ -397,8 +466,13 @@ function CollaborationsContent({ user }) {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3 gap-4 bg-transparent p-0 h-auto">
           <TabsTrigger value="candidatures" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-purple-500 data-[state=active]:to-pink-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:scale-[1.02] transition-all duration-300 rounded-2xl border-2 border-border/50 data-[state=active]:border-purple-400 bg-card h-auto py-4 px-6 flex items-center justify-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-500/20"><FileText className="h-5 w-5" /></div>
-            <div className="flex flex-col items-start"><span className="font-semibold">En discussion</span><span className="text-xs opacity-80">({applications.length})</span></div>
+            <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-purple-500/20">
+              <FileText className="h-5 w-5" />
+              {actionCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-card">{actionCount}</span>
+              )}
+            </div>
+            <div className="flex flex-col items-start"><span className="font-semibold">En discussion</span><span className="text-xs opacity-80">({applications.length}{actionCount > 0 ? ` • ${actionCount} action${actionCount > 1 ? 's' : ''} requise${actionCount > 1 ? 's' : ''}` : ''})</span></div>
           </TabsTrigger>
           <TabsTrigger value="active" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg hover:scale-[1.02] transition-all duration-300 rounded-2xl border-2 border-border/50 data-[state=active]:border-green-400 bg-card h-auto py-4 px-6 flex items-center justify-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-500/20"><Zap className="h-5 w-5" /></div>
@@ -683,7 +757,7 @@ function CollaborationsContent({ user }) {
 
         {/* Tab : Candidatures (toujours accessible) */}
         <TabsContent value="candidatures" className="space-y-4 mt-6">
-          {applications.length === 0 ? (
+          {openApps.length === 0 && closedApps.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -692,7 +766,7 @@ function CollaborationsContent({ user }) {
               </CardContent>
             </Card>
           ) : (
-            applications.map((app) => {
+            openApps.map((app) => {
               const collab = getCollabForApp(app)
               const contract = collab ? getContractForCollab(collab) : null
               const stageIdx = getAppStageIndex(app, collab, contract)
@@ -792,35 +866,75 @@ function CollaborationsContent({ user }) {
                             <div className="flex items-start gap-3">
                               <div className="w-9 h-9 rounded-lg bg-green-500/15 flex items-center justify-center shrink-0"><CheckCircle className="h-5 w-5 text-green-600" /></div>
                               <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-sm">Candidature acceptée 🎉 À toi de jouer !</p>
+                                <p className="font-semibold text-sm">Candidature acceptée 🎉 À toi de jouer !{app.reviewed_at && <span className="font-normal text-xs text-muted-foreground"> · {timeAgo(app.reviewed_at)}</span>}</p>
                                 <p className="text-sm text-muted-foreground mt-0.5">Propose ton tarif pour cette campagne{app.campaigns?.budget_per_influencer_min ? ` (budget indiqué : ${app.campaigns.budget_per_influencer_min} - ${app.campaigns.budget_per_influencer_max}€)` : ''} pour lancer la négociation.</p>
                               </div>
                             </div>
                             <div className="flex justify-end mt-3">
-                              <Button size="sm" className="gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600" onClick={() => { setNegoApp(app); setNegoRate('') }}><DollarSign className="h-4 w-4" />Proposer mon tarif</Button>
+                              <Button size="sm" className="gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600" onClick={() => { setNegoApp(app); setNegoRate(''); setNegoMsg(''); setAiSug(null) }}><DollarSign className="h-4 w-4" />Proposer mon tarif</Button>
                             </div>
                           </div>
                         )}
-                        {stageIdx === 2 && (
-                          <div className="rounded-xl border-2 border-blue-500/25 bg-blue-500/5 p-4">
-                            <div className="flex items-start gap-3">
-                              <div className="w-9 h-9 rounded-lg bg-blue-500/15 flex items-center justify-center shrink-0"><MessageSquare className="h-5 w-5 text-blue-600" /></div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-sm">Négociation en cours</p>
-                                <p className="text-sm text-muted-foreground mt-0.5">Tu as proposé <span className="font-bold text-blue-600">{Number(app.proposed_rate).toLocaleString('fr-FR')}€</span>. La marque va répondre : si elle accepte, elle rédigera le contrat.</p>
+                        {stageIdx === 2 && (() => {
+                          const hist = negoHist(app)
+                          const lastEvents = hist.slice(-4)
+                          const counter = app.brand_counter_rate != null ? Number(app.brand_counter_rate) : null
+                          return (
+                            <div className={`rounded-xl border-2 p-4 ${counter ? 'border-orange-500/30 bg-orange-500/5' : 'border-blue-500/25 bg-blue-500/5'}`}>
+                              <div className="flex items-start gap-3">
+                                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${counter ? 'bg-orange-500/15' : 'bg-blue-500/15'}`}><MessageSquare className={`h-5 w-5 ${counter ? 'text-orange-600' : 'text-blue-600'}`} /></div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-sm">{counter ? `La marque te propose ${counter.toLocaleString('fr-FR')}€ 👀` : 'Négociation en cours'}</p>
+                                  <p className="text-sm text-muted-foreground mt-0.5">
+                                    {counter
+                                      ? 'À toi de décider : accepte son offre, ou fais une contre-proposition.'
+                                      : <>Tu as proposé <span className="font-bold text-blue-600">{Number(app.proposed_rate).toLocaleString('fr-FR')}€</span>. La marque va répondre : si elle accepte, elle rédigera le contrat.</>}
+                                  </p>
+                                </div>
+                              </div>
+                              {lastEvents.length > 0 && (
+                                <div className="mt-3 space-y-1.5 border-l-2 border-muted pl-3">
+                                  {lastEvents.map((ev, i) => (
+                                    <p key={i} className="text-xs text-muted-foreground">
+                                      <span className="font-semibold">{ev.by === 'creator' ? 'Toi' : 'La marque'}</span>
+                                      {ev.type === 'offer' && <> — propose <span className="font-bold">{Number(ev.amount).toLocaleString('fr-FR')}€</span></>}
+                                      {ev.type === 'accept' && <> — accepte <span className="font-bold">{Number(ev.amount).toLocaleString('fr-FR')}€</span> 🤝</>}
+                                      {ev.type === 'message' && <> — 💬 « {ev.text} »</>}
+                                      {ev.at && <span className="opacity-70"> · {timeAgo(ev.at)}</span>}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="flex justify-end gap-2 mt-3 flex-wrap">
+                                {counter ? (
+                                  <>
+                                    <Button size="sm" variant="outline" className="gap-2" onClick={() => { setNegoApp(app); setNegoRate(''); setNegoMsg(''); setAiSug(null) }}><TrendingUp className="h-4 w-4" />Contre-proposer</Button>
+                                    <Button size="sm" className="gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700" onClick={() => handleAcceptCounter(app)}><CheckCircle className="h-4 w-4" />Accepter {counter.toLocaleString('fr-FR')}€</Button>
+                                  </>
+                                ) : (
+                                  <Button size="sm" variant="outline" className="gap-2" onClick={() => { setNegoApp(app); setNegoRate(String(app.proposed_rate ?? '')); setNegoMsg(''); setAiSug(null) }}><MessageSquare className="h-4 w-4" />Ouvrir la discussion</Button>
+                                )}
                               </div>
                             </div>
-                            <div className="flex justify-end mt-3">
-                              <Button size="sm" variant="outline" className="gap-2" onClick={() => { setNegoApp(app); setNegoRate(String(app.proposed_rate ?? '')) }}><TrendingUp className="h-4 w-4" />Modifier ma proposition</Button>
+                          )
+                        })()}
+                        {stageIdx === 3 && !contract && (
+                          <div className="rounded-xl border-2 border-purple-500/30 bg-gradient-to-r from-purple-500/5 to-pink-500/5 p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="w-9 h-9 rounded-lg bg-purple-500/15 flex items-center justify-center shrink-0"><Clock className="h-5 w-5 text-purple-600" /></div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm">Accord trouvé 🤝{app.proposed_rate != null && <> à <span className="text-purple-600">{Number(app.proposed_rate).toLocaleString('fr-FR')}€</span></>}</p>
+                                <p className="text-sm text-muted-foreground mt-0.5">La marque rédige le contrat : tu le recevras ici dans les jours à venir. Tu seras notifié dès qu&apos;il est prêt à signer — rien d&apos;autre à faire pour l&apos;instant.</p>
+                              </div>
                             </div>
                           </div>
                         )}
-                        {stageIdx === 3 && (
+                        {stageIdx === 3 && contract && (
                           <div className="rounded-xl border-2 border-purple-500/30 bg-gradient-to-r from-purple-500/5 to-pink-500/5 p-4">
                             <div className="flex items-start gap-3">
                               <div className="w-9 h-9 rounded-lg bg-purple-500/15 flex items-center justify-center shrink-0"><FileText className="h-5 w-5 text-purple-600" /></div>
                               <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-sm">Le contrat est prêt ✨</p>
+                                <p className="font-semibold text-sm">Le contrat est prêt ✨{contract?.created_at && <span className="font-normal text-xs text-muted-foreground"> · reçu {timeAgo(contract.created_at)}</span>}</p>
                                 <p className="text-sm text-muted-foreground mt-0.5">La marque a rédigé le contrat{contract?.amount ? <> pour <span className="font-bold text-foreground">{Number(contract.amount).toLocaleString('fr-FR')}€</span></> : ''}. Lis-le attentivement, puis signe-le pour démarrer la collaboration.</p>
                               </div>
                             </div>
@@ -850,6 +964,37 @@ function CollaborationsContent({ user }) {
                 </Card>
               )
             })
+          )}
+
+          {/* Refusées / retirées — repliées */}
+          {closedApps.length > 0 && (
+            <div className="pt-2">
+              <button
+                onClick={() => setShowClosed(!showClosed)}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl border bg-muted/30 text-sm font-medium text-muted-foreground hover:bg-muted/60 transition-colors"
+              >
+                <span>Refusées / retirées ({closedApps.length})</span>
+                <span className="text-xs">{showClosed ? 'Masquer ▲' : 'Afficher ▼'}</span>
+              </button>
+              {showClosed && (
+                <div className="space-y-2 mt-3">
+                  {closedApps.map((app) => {
+                    const title = app.cover_letter?.match(/^\[(.+?)\]/)?.[1] || app.campaigns?.title || 'Campagne'
+                    return (
+                      <div key={app.id} className="flex items-center justify-between gap-3 p-4 rounded-xl border bg-card opacity-75">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{title}</p>
+                          <p className="text-xs text-muted-foreground">Postulé le {new Date(app.applied_at).toLocaleDateString('fr-FR')}</p>
+                        </div>
+                        <Badge className={app.status === 'withdrawn' ? 'bg-muted text-muted-foreground shrink-0' : 'bg-red-500/10 text-red-600 border-red-500/20 shrink-0'}>
+                          {app.status === 'withdrawn' ? 'Retirée' : 'Refusée'}
+                        </Badge>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           )}
         </TabsContent>
       </Tabs>
@@ -1130,11 +1275,11 @@ function CollaborationsContent({ user }) {
         </DialogContent>
       </Dialog>
 
-      {/* Popup : Proposer / modifier mon tarif */}
-      <Dialog open={!!negoApp} onOpenChange={(o) => { if (!o) { setNegoApp(null); setNegoRate('') } }}>
-        <DialogContent style={{ width: '440px', maxWidth: '92vw' }}>
+      {/* Popup : Négociation (tarif + messages + IA) */}
+      <Dialog open={!!negoApp} onOpenChange={(o) => { if (!o) { setNegoApp(null); setNegoRate(''); setNegoMsg(''); setAiSug(null) } }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto" style={{ width: '480px', maxWidth: '92vw' }}>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5 text-green-600" />Proposer mon tarif</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5 text-green-600" />Négociation</DialogTitle>
             <DialogDescription>
               {negoApp?.cover_letter?.match(/^\[(.+?)\]/)?.[1] || negoApp?.campaigns?.title || 'Campagne'}
             </DialogDescription>
@@ -1146,8 +1291,30 @@ function CollaborationsContent({ user }) {
                 <span className="font-semibold">{negoApp.campaigns.budget_per_influencer_min} - {negoApp.campaigns.budget_per_influencer_max}€</span>
               </div>
             )}
+
+            {/* Fil de discussion */}
+            {negoApp && negoHist(negoApp).length > 0 && (
+              <div className="rounded-xl border p-3 max-h-44 overflow-y-auto space-y-2 bg-muted/20">
+                {negoHist(negoApp).map((ev, i) => (
+                  <div key={i} className={`flex ${ev.by === 'creator' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs ${ev.by === 'creator' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'bg-muted text-foreground'}`}>
+                      {ev.type === 'offer' && <p className="font-bold">{ev.by === 'creator' ? 'Ta proposition' : 'Offre de la marque'} : {Number(ev.amount).toLocaleString('fr-FR')}€</p>}
+                      {ev.type === 'accept' && <p className="font-bold">Offre acceptée : {Number(ev.amount).toLocaleString('fr-FR')}€ 🤝</p>}
+                      {ev.type === 'message' && <p>{ev.text}</p>}
+                      {ev.at && <p className={`text-[10px] mt-0.5 ${ev.by === 'creator' ? 'text-white/70' : 'text-muted-foreground'}`}>{timeAgo(ev.at)}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div>
-              <p className="text-sm font-medium mb-2">Ton tarif (€)</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium">Ton tarif (€)</p>
+                <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs text-purple-600 hover:text-purple-700" disabled={aiLoading} onClick={handleAiSuggestion}>
+                  <Brain className="h-3.5 w-3.5" />{aiLoading ? 'Analyse…' : 'Suggestion IA'}
+                </Button>
+              </div>
               <Input
                 type="number"
                 min="1"
@@ -1156,11 +1323,27 @@ function CollaborationsContent({ user }) {
                 onChange={(e) => setNegoRate(e.target.value)}
                 className="text-lg font-semibold"
               />
-              <p className="text-xs text-muted-foreground mt-2">💡 Conseil : reste dans la fourchette du budget pour maximiser tes chances, mais n&apos;hésite pas à valoriser ton travail.</p>
+              {aiSug && (
+                <div className="mt-2 p-3 rounded-lg bg-purple-500/5 border border-purple-500/20 text-xs text-muted-foreground">
+                  <p className="font-semibold text-purple-700 mb-1 flex items-center gap-1"><Brain className="h-3.5 w-3.5" />Suggestion IA</p>
+                  {aiSug}
+                </div>
+              )}
             </div>
+
+            <div>
+              <p className="text-sm font-medium mb-2">Message à la marque <span className="text-muted-foreground font-normal">(optionnel)</span></p>
+              <Input
+                placeholder="Ex : Je peux ajouter une story en bonus 😉"
+                value={negoMsg}
+                onChange={(e) => setNegoMsg(e.target.value)}
+              />
+            </div>
+
             <Button className="w-full gap-2 h-11 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600" disabled={negoSending} onClick={handleProposeRate}>
-              {negoSending ? 'Envoi…' : <><MessageSquare className="h-4 w-4" />Envoyer ma proposition</>}
+              {negoSending ? 'Envoi…' : <><MessageSquare className="h-4 w-4" />Envoyer</>}
             </Button>
+            <p className="text-[11px] text-muted-foreground text-center -mt-2">Montant + message, ou juste un message : à toi de voir.</p>
           </div>
         </DialogContent>
       </Dialog>
