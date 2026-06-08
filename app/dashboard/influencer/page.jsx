@@ -7,6 +7,7 @@ import { useNotifications } from '@/lib/hook/useNotifications'
 import dynamic from 'next/dynamic'
 import { Bell, ChevronLeft, ChevronRight } from 'lucide-react'
 import LevelUpProvider from '@/components/LevelUpProvider'
+import PartnexxIntro from '@/components/PartnexxIntro'
 
 const AccueilSection = dynamic(() => import('./sections/AccueilSection'), { ssr: false })
 const OpportunitesSection = dynamic(() => import('./sections/OpportunitesSection'), { ssr: false })
@@ -47,7 +48,9 @@ export default function DashboardInfluencer() {
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return router.push('/login')
+      if (!user) {
+        return router.push('/login')
+      }
       setUser(user)
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       setProfile(prof)
@@ -87,6 +90,7 @@ export default function DashboardInfluencer() {
   return (
     <LevelUpProvider user={user}>
       <div className="min-h-screen bg-background flex w-screen">
+        <PartnexxIntro ready={!loading && !!user} />
         {/* SIDEBAR */}
         <aside className={`fixed left-0 top-0 h-screen bg-card border-r border-border transition-all duration-300 flex flex-col z-50 overflow-y-auto ${sidebarCollapsed ? 'w-16' : 'w-64'}`}>
           {/* Header */}
@@ -95,7 +99,7 @@ export default function DashboardInfluencer() {
               <div className="flex items-center gap-2">
                 <img src="/logo.png" alt="Partnexx" className="w-9 h-9 object-contain shrink-0" />
                 <div className="flex flex-col">
-                  <span className="font-bold text-base bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Partnexx</span>
+                  <span className="font-bold text-base bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">PARTNEXX</span>
                   <span className="text-[10px] text-muted-foreground leading-tight">Where Partnerships Begin</span>
                 </div>
               </div>

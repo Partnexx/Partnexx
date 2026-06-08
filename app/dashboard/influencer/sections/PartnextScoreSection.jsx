@@ -377,7 +377,7 @@ export default function PartnextScoreSection({ user }) {
                     <CardContent className="p-8 relative z-10">
                       <div className="text-center space-y-6">
                         <div className="relative inline-block">
-                          <div className="text-9xl font-black bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent drop-shadow-2xl animate-pulse">{animatedScore.toLocaleString()}</div>
+                          <div className="text-6xl sm:text-7xl lg:text-8xl font-black bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent drop-shadow-2xl animate-pulse tabular-nums" style={{ whiteSpace: 'nowrap', lineHeight: 1.1 }}>{animatedScore.toLocaleString()}</div>
                           <div className="absolute -top-4 -right-4 flex gap-2"><Flame className="h-10 w-10 text-orange-500 animate-bounce" /><Crown className="h-10 w-10 text-yellow-500 animate-pulse" /></div>
                         </div>
                         <Badge className={`text-xl px-6 py-3 ${level ? `bg-gradient-to-r ${LEVEL_VISUALS[level.key].gradient}` : 'bg-gradient-to-r from-gray-400 to-gray-600'} text-white border-0 shadow-lg`}>{level ? `${level.emoji} ${level.name} Créateur • Rang #${userRank}` : '🔒 Profil incomplet'}</Badge>

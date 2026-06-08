@@ -7,39 +7,36 @@ const supabaseAdmin = createClient(
 )
 
 // POST — Ouvrir un litige
-// Body: { transactionId, collaborationId, openedBy, openedByRole, reason, description }
+// Body: { transactionId?, collaborationId?, openedBy, openedByRole, reason, description }
+// transactionId / collaborationId sont OPTIONNELS : un litige peut être général (non lié à une campagne).
 export async function POST(req) {
   try {
-    const { transactionId, collaborationId, openedBy, openedByRole, reason, description } = await req.json()
+    const { transactionId, collaborationId, brandId, attachments, openedBy, openedByRole, reason, description } = await req.json()
 
     if (!openedBy || !openedByRole || !reason) {
       return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 })
     }
 
-    if (!transactionId && !collaborationId) {
-      return NextResponse.json({ error: 'transactionId ou collaborationId requis' }, { status: 400 })
-    }
-
     // Envoie email notification litige
-try {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://partnexx-three.vercel.app'
-  await fetch(`${appUrl}/api/emails`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      type: 'dispute_opened',
-      to: 'perquindylan.fr@gmail.com', // remplacer par l'email réel
-      data: {
-        name: 'Utilisateur',
-        reason,
-        collaborationTitle: 'Collaboration Partnexx',
-        openedByRole,
-      }
-    })
-  })
-} catch (emailErr) {
-  console.error('❌ Erreur envoi email litige:', emailErr.message)
-}
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://partnexx-three.vercel.app'
+      await fetch(`${appUrl}/api/emails`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'dispute_opened',
+          to: 'perquindylan.fr@gmail.com', // remplacer par l'email réel
+          data: {
+            name: 'Utilisateur',
+            reason,
+            collaborationTitle: 'Collaboration Partnexx',
+            openedByRole,
+          }
+        })
+      })
+    } catch (emailErr) {
+      console.error('❌ Erreur envoi email litige:', emailErr.message)
+    }
 
     // Vérifie qu'il n'y a pas déjà un litige ouvert pour cette transaction
     if (transactionId) {
@@ -61,6 +58,8 @@ try {
       .insert({
         transaction_id: transactionId || null,
         collaboration_id: collaborationId || null,
+        brand_id: brandId || null,
+        attachments: Array.isArray(attachments) ? attachments : [],
         opened_by: openedBy,
         opened_by_role: openedByRole,
         reason,
@@ -86,6 +85,14 @@ try {
     }
 
     console.log(`✅ Litige ouvert: ${dispute.id} par ${openedByRole}`)
+
+    // Message auto (bannière système) visible par tous dès l'ouverture
+    await supabaseAdmin.from('dispute_messages').insert({
+      dispute_id: dispute.id,
+      sender_id: null,
+      sender_role: 'system',
+      content: "🔒 Litige ouvert. Tout paiement lié est gelé et la collaboration est suspendue le temps de la résolution. L'équipe Partnexx peut intervenir à tout moment.",
+    })
 
     return NextResponse.json({ success: true, dispute })
 

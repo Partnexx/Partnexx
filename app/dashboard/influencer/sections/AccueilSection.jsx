@@ -1,52 +1,86 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { TrendingUp, Eye, Heart, DollarSign, Users, Target, Zap, Bell, Trophy, Brain, Sparkles, ChevronRight, Clock, Globe, ArrowUp, Activity, Share2, MessageCircle, Briefcase, Rocket, Shield, Bookmark, Download, PlayCircle, Lightbulb, Crown, X } from 'lucide-react'
+import supabase from '@/lib/supabase'
 
-const performanceData = [
-  { name: 'Jan', revenue: 2400 },
-  { name: 'Fév', revenue: 1398 },
-  { name: 'Mar', revenue: 9800 },
-  { name: 'Avr', revenue: 3908 },
-  { name: 'Mai', revenue: 4800 },
-  { name: 'Jun', revenue: 3800 },
-  { name: 'Jul', revenue: 4300 },
+// ===== Helpers =====
+const MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
+
+// Niveaux Partnexx (seuils + visuel) pour le médaillon du hero
+const HERO_LEVELS = [
+  { key: 'bronze', name: 'Bronze', emoji: '🥉', t: 0, grad: 'from-orange-400 to-amber-600' },
+  { key: 'argent', name: 'Argent', emoji: '🥈', t: 750, grad: 'from-slate-300 to-slate-500' },
+  { key: 'or', name: 'Or', emoji: '🥇', t: 2500, grad: 'from-yellow-400 to-amber-500' },
+  { key: 'platine', name: 'Platine', emoji: '💠', t: 6000, grad: 'from-cyan-400 to-sky-500' },
+  { key: 'diamant', name: 'Diamant', emoji: '🔥', t: 12500, grad: 'from-teal-400 to-cyan-500' },
+  { key: 'elite', name: 'Élite', emoji: '⭐', t: 30000, grad: 'from-fuchsia-400 to-pink-500' },
+  { key: 'champion', name: 'Champion', emoji: '🚀', t: 60000, grad: 'from-orange-400 to-red-500' },
+  { key: 'legende', name: 'Légende', emoji: '🏆', t: 100000, grad: 'from-yellow-300 to-orange-500' },
 ]
 
-const platformData = [
-  { name: 'TikTok', value: 35, color: '#000000', followers: '850K', growth: '+12%' },
-  { name: 'Instagram', value: 28, color: '#E4405F', followers: '680K', growth: '+8%' },
-  { name: 'YouTube', value: 22, color: '#FF0000', followers: '530K', growth: '+15%' },
-  { name: 'LinkedIn', value: 15, color: '#0077B5', followers: '365K', growth: '+5%' },
+const fmtFollowers = (n) => {
+  const v = Number(n) || 0
+  if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}K`
+  return String(v)
+}
+
+const timeAgo = (date) => {
+  if (!date) return ''
+  const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+  if (s < 60) return "à l'instant"
+  const m = Math.floor(s / 60); if (m < 60) return `il y a ${m} min`
+  const h = Math.floor(m / 60); if (h < 24) return `il y a ${h} h`
+  const d = Math.floor(h / 24); if (d < 7) return `il y a ${d} j`
+  return new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
+}
+
+// Transactions réellement perçues (released), hors tests (<1€) et remboursements
+const isRealReceived = (t) => {
+  const amt = Number(t?.influencer_amount ?? t?.amount ?? 0)
+  if (t?.status !== 'released') return false
+  if (amt < 1) return false
+  const desc = (t?.description || '').toLowerCase()
+  if (t?.type === 'refund' || desc.includes('rembours') || desc.includes('refund')) return false
+  return true
+}
+
+// ⚠️ Données décoratives sans source réelle pour l'instant (à brancher plus tard)
+const PLATFORM_META = {
+  tiktok: { name: 'TikTok', color: '#000000' },
+  instagram: { name: 'Instagram', color: '#E4405F' },
+  youtube: { name: 'YouTube', color: '#FF0000' },
+  x: { name: 'X (Twitter)', color: '#000000' },
+  twitter: { name: 'X (Twitter)', color: '#000000' },
+  linkedin: { name: 'LinkedIn', color: '#0077B5' },
+}
+
+const RECO_STYLE = [
+  { color: '#22c55e', icon: Clock },
+  { color: '#a855f7', icon: TrendingUp },
+  { color: '#ec4899', icon: Users },
+  { color: '#f59e0b', icon: Target },
 ]
 
-const podiumData = [
-  { rank: 2, name: 'TechPro', score: 820, followers: '1.8M', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face' },
-  { rank: 1, name: 'Emma Beauty', score: 950, followers: '2.1M', avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=80&h=80&fit=crop&crop=face' },
-  { rank: 3, name: 'Fashion', score: 785, followers: '1.5M', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=64&h=64&fit=crop&crop=center' },
-]
-
-const campaigns = [
-  { id: 1, title: 'Nike Air Max Campaign', brand: 'Nike', status: 'active', budget: '5000€', deadline: '15 Déc', progress: 75 },
-  { id: 2, title: 'Samsung Galaxy Review', brand: 'Samsung', status: 'pending', budget: '3500€', deadline: '20 Déc', progress: 30 },
-  { id: 3, title: 'Spotify Premium Promo', brand: 'Spotify', status: 'completed', budget: '2000€', deadline: '10 Déc', progress: 100 },
-]
-
-const recentActivity = [
-  { user: 'BrandX', action: 'a approuvé votre proposition', time: 'il y a 2min', type: 'approval' },
-  { user: 'TechGuru', action: 'a commencé à vous suivre', time: 'il y a 5min', type: 'follow' },
-  { user: 'Emma_Beauty', action: 'a commenté votre post', time: 'il y a 15min', type: 'comment' },
-  { user: 'Fashion_Pro', action: 'vous a mentionné dans une story', time: 'il y a 30min', type: 'mention' },
-  { user: 'SportBrand', action: 'a envoyé une nouvelle offre', time: 'il y a 1h', type: 'offer' },
-]
-
-const aiInsights = [
-  { title: 'Moment optimal de publication', description: "Publiez entre 14h-16h pour +32% d'engagement", confidence: 94, impact: 'high', type: 'timing' },
-  { title: 'Hashtags tendance', description: '#TechInnovation et #LifestyleGoals performent +156%', confidence: 87, impact: 'medium', type: 'content' },
-  { title: 'Format vidéo recommandé', description: "Les vidéos courtes (15-30s) génèrent plus d'engagement", confidence: 91, impact: 'high', type: 'format' },
-]
+// Met en gras les chiffres-clés (€, %, points, abonnés) et les mots forts (réseaux, niveaux)
+const EMPH_RE = /(\d[\d.,\u202f\u00a0]*(?:\s?(?:€|%|pts|points|abonnés))?|Instagram|TikTok|YouTube|LinkedIn|Élite|Champion|Légende|Diamant|Platine|Argent|Bronze)/g
+function emphasize(text) {
+  const str = String(text || '')
+  const out = []
+  let last = 0, m, k = 0
+  EMPH_RE.lastIndex = 0
+  while ((m = EMPH_RE.exec(str)) !== null) {
+    if (m.index > last) out.push(str.slice(last, m.index))
+    out.push(<strong key={k++} className="font-bold text-gray-900">{m[0].trim()}</strong>)
+    last = m.index + m[0].length
+  }
+  if (last < str.length) out.push(str.slice(last))
+  return out
+}
 
 const newsUpdates = [
   { title: 'Nouvelle fonctionnalité IA pour optimiser vos posts', category: 'IA', time: 'Il y a 1 jour', type: 'feature', image: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400&h=250&fit=crop' },
@@ -62,42 +96,205 @@ const TABS = [
   { id: 'actualites', label: 'Actualités & Ressources', icon: Globe, color: 'from-green-500 to-emerald-600' },
 ]
 
-export default function AccueilSection({ profile, metrics, collaborations, transactions, notifications, unreadCount, markAsRead, markAllAsRead }) {
+export default function AccueilSection({ user, profile, metrics, collaborations, transactions, contracts, notifications, unreadCount, markAsRead, markAllAsRead }) {
   const [activeTab, setActiveTab] = useState('vue-ensemble')
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [myScore, setMyScore] = useState(0)
+  const [tilt, setTilt] = useState({ rx: 0, ry: 0 })
+  const router = useRouter()
   const [showNotifPanel, setShowNotifPanel] = useState(false)
-  const [liveStats, setLiveStats] = useState({ 
-    views: 1247382, 
-    engagement: 8.7, 
-    revenue: metrics?.totalGains || 0, 
-    campaigns: metrics?.collaborationsActives || 0 
-  })
+  const [topCreators, setTopCreators] = useState([])
+  const [topAvatarError, setTopAvatarError] = useState({})
+  const [socialAccounts, setSocialAccounts] = useState([])
+  const [aiData, setAiData] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const aiFetchedRef = useRef(false)
 
-  // Mettre à jour quand metrics change
+  // Insights IA — chargés à l'ouverture de l'onglet (une seule fois), cache serveur par semaine
   useEffect(() => {
-    if (metrics) {
-      setLiveStats(prev => ({
-        ...prev,
-        revenue: metrics.totalGains || 0,
-        campaigns: metrics.collaborationsActives || 0,
-      }))
-    }
-  }, [metrics])
+    if (activeTab !== 'insights' || aiFetchedRef.current) return
+    aiFetchedRef.current = true
+    setAiLoading(true)
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const tk = session?.access_token
+        const res = await fetch('/api/influencer/insights', { headers: { Authorization: `Bearer ${tk}` } })
+        const json = await res.json().catch(() => ({}))
+        setAiData(res.ok ? json : { insights: [], recommendations: [], error: true })
+      } catch {
+        setAiData({ insights: [], recommendations: [], error: true })
+      } finally {
+        setAiLoading(false)
+      }
+    })()
+  }, [activeTab])
+
+  // Réseaux sociaux réels du créateur
+  useEffect(() => {
+    if (!user?.id) return
+    let active = true
+    ;(async () => {
+      const { data: inf } = await supabase.from('influencers').select('id, ai_score').eq('user_id', user.id).maybeSingle()
+      if (!inf?.id || !active) return
+      setMyScore(inf.ai_score || 0)
+      const { data } = await supabase.from('social_accounts').select('platform, followers_count, engagement_rate').eq('influencer_id', inf.id)
+      if (active) setSocialAccounts(data || [])
+    })()
+    return () => { active = false }
+  }, [user?.id])
+
+  // Vrai classement des créateurs (par ai_score) + avatars
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      const { data } = await supabase
+        .from('influencers')
+        .select('id, display_name, ai_score, user_id')
+        .order('ai_score', { ascending: false })
+        .limit(3)
+      if (!active || !data) return
+      const ids = data.map((c) => c.user_id).filter(Boolean)
+      let avatarById = {}
+      if (ids.length) {
+        const { data: profs } = await supabase.from('profiles').select('id, avatar_url').in('id', ids)
+        avatarById = Object.fromEntries((profs || []).map((p) => [p.id, p.avatar_url]))
+      }
+      setTopCreators(data.map((c, i) => ({
+        rank: i + 1,
+        name: c.display_name || 'Créateur',
+        score: c.ai_score || 0,
+        avatar: avatarById[c.user_id] || null,
+      })))
+    })()
+    return () => { active = false }
+  }, [])
 
   const firstName = profile?.full_name?.split(' ')[0] || 'toi'
+  const partnexxScore = metrics?.partnexxScore ?? metrics?.score ?? profile?.partnexx_score ?? profile?.score ?? null
 
+  // Horloge live (le reste des compteurs "live" bidons a été retiré)
   useEffect(() => {
     const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000)
-    const statsInterval = setInterval(() => {
-      setLiveStats(prev => ({
-        views: prev.views + Math.floor(Math.random() * 50) + 10,
-        engagement: Math.max(0, prev.engagement + (Math.random() - 0.5) * 0.2),
-        revenue: prev.revenue + Math.floor(Math.random() * 5),
-        campaigns: prev.campaigns
-      }))
-    }, 3000)
-    return () => { clearInterval(timeInterval); clearInterval(statsInterval) }
+    return () => clearInterval(timeInterval)
   }, [])
+
+  // ===== Revenus réels par mois (7 derniers mois) depuis les transactions =====
+  const performanceData = (() => {
+    const now = new Date()
+    const months = []
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      months.push({ key: `${d.getFullYear()}-${d.getMonth()}`, name: MONTHS_FR[d.getMonth()].replace('.', ''), label: `${MONTHS_FR[d.getMonth()]} ${d.getFullYear()}`, revenue: 0 })
+    }
+    ;(transactions || []).forEach((t) => {
+      if (!isRealReceived(t)) return
+      const dt = new Date(t.released_at || t.created_at)
+      const key = `${dt.getFullYear()}-${dt.getMonth()}`
+      const m = months.find((x) => x.key === key)
+      if (m) m.revenue += Number(t.influencer_amount ?? t.amount ?? 0)
+    })
+    return months.map((m) => ({ ...m, revenue: Math.round(m.revenue) }))
+  })()
+
+  // ===== Données du hero =====
+  const hour = currentTime.getHours()
+  const greeting = hour < 6 ? 'Bonne nuit' : hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir'
+
+  // Niveau réel d'après le score
+  let heroLevelIdx = 0
+  for (let i = 0; i < HERO_LEVELS.length; i++) { if (myScore >= HERO_LEVELS[i].t) heroLevelIdx = i; else break }
+  const heroLevel = HERO_LEVELS[heroLevelIdx]
+  const heroNextLevel = HERO_LEVELS[heroLevelIdx + 1] || null
+  const levelProgress = heroNextLevel
+    ? Math.min(100, Math.round(((myScore - heroLevel.t) / (heroNextLevel.t - heroLevel.t)) * 100))
+    : 100
+  const pointsToNext = heroNextLevel ? Math.max(0, heroNextLevel.t - myScore) : 0
+
+  // Revenus du mois + tendance vs mois précédent
+  const revThisMonth = performanceData.length ? performanceData[performanceData.length - 1].revenue : 0
+  const revLastMonth = performanceData.length > 1 ? performanceData[performanceData.length - 2].revenue : 0
+  const revTrendPct = revLastMonth > 0 ? Math.round(((revThisMonth - revLastMonth) / revLastMonth) * 100) : (revThisMonth > 0 ? 100 : 0)
+
+  // ===== "À venir" : prochaines échéances (rendus de livrables, signatures) — vraies données =====
+  const upcoming = (() => {
+    const now = Date.now()
+    const items = []
+    ;(collaborations || []).forEach((c) => {
+      const raw = (c.status || '').toLowerCase()
+      const active = !['completed', 'terminee', 'cancelled', 'annulee'].includes(raw)
+      if (active && c.deadline) {
+        const days = Math.ceil((new Date(c.deadline).getTime() - now) / 86400000)
+        if (days >= 0) items.push({ type: 'deliverable', label: c.campaigns?.title || c.brands?.company_name || 'Livrable', days, date: new Date(c.deadline) })
+      }
+    })
+    ;(contracts || []).forEach((ct) => {
+      const raw = (ct.status || '').toLowerCase()
+      if (['draft', 'sent'].includes(raw)) items.push({ type: 'signature', label: ct.brands?.company_name || 'Contrat', days: null, date: null })
+      if (ct.deadline && !['completed', 'cancelled'].includes(raw)) {
+        const days = Math.ceil((new Date(ct.deadline).getTime() - now) / 86400000)
+        if (days >= 0) items.push({ type: 'contract_deadline', label: ct.brands?.company_name || 'Contrat', days, date: new Date(ct.deadline) })
+      }
+    })
+    items.sort((a, b) => (a.date && b.date) ? a.date - b.date : a.date ? -1 : b.date ? 1 : 0)
+    return items.slice(0, 2)
+  })()
+
+  // Inclinaison 3D au survol de la souris
+  const handleTilt = (e) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const px = (e.clientX - r.left) / r.width - 0.5
+    const py = (e.clientY - r.top) / r.height - 0.5
+    setTilt({ rx: +(-py * 6).toFixed(2), ry: +(px * 6).toFixed(2) })
+  }
+  const resetTilt = () => setTilt({ rx: 0, ry: 0 })
+  const goTo = (section) => router.push(`/dashboard/influencer?section=${section}`)
+
+
+  // ===== Campagnes réelles depuis les collaborations =====
+  const campaigns = (collaborations || []).slice(0, 6).map((c, idx) => {
+    const raw = (c.status || '').toLowerCase()
+    const status = raw === 'completed' || raw === 'terminee' ? 'completed'
+      : (raw === 'pending' || raw === 'proposed' || raw === 'draft' || raw === 'en_attente') ? 'pending'
+      : 'active'
+    const budget = Number(c.agreed_rate ?? c.amount ?? c.budget ?? 0)
+    return {
+      id: c.id || idx,
+      title: c.campaigns?.title || c.campaign?.title || c.title || c.campaign_title || 'Collaboration',
+      brand: c.brands?.company_name || c.brand?.company_name || c.brand_name || 'Marque',
+      status,
+      budget: budget ? `${budget.toLocaleString()}€` : '—',
+      deadline: c.deadline ? new Date(c.deadline).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '—',
+      progress: status === 'completed' ? 100 : status === 'pending' ? 15 : 60,
+    }
+  })
+
+  // ===== Activité récente réelle depuis les notifications =====
+  const recentActivity = (notifications || []).slice(0, 6).map((n) => {
+    const t = (n.title || '').toLowerCase()
+    let type = 'offer'
+    if (t.includes('paie') || t.includes('versement') || t.includes('reçu') || t.includes('validé')) type = 'approval'
+    else if (t.includes('contrat') || t.includes('signature')) type = 'mention'
+    else if (t.includes('litige') || t.includes('message') || t.includes('réponse')) type = 'comment'
+    else if (t.includes('abonné') || t.includes('suit') || t.includes('follow')) type = 'follow'
+    return { user: n.title || 'Partnexx', action: n.body || '', time: timeAgo(n.created_at), type }
+  })
+
+  // ===== Répartition par plateforme réelle =====
+  const totalSocialFollowers = socialAccounts.reduce((s, a) => s + (a.followers_count || 0), 0)
+  const platformData = socialAccounts
+    .slice()
+    .sort((a, b) => (b.followers_count || 0) - (a.followers_count || 0))
+    .map((a) => {
+      const meta = PLATFORM_META[a.platform] || { name: a.platform || 'Réseau', color: '#7C3AED' }
+      const f = a.followers_count || 0
+      return {
+        name: meta.name,
+        color: meta.color,
+        value: totalSocialFollowers > 0 ? Math.round((f / totalSocialFollowers) * 100) : 0,
+        followers: fmtFollowers(f),
+      }
+    })
 
   const statCards = [
   { label: 'Revenus ce mois', value: `${(metrics?.totalGains || 0).toFixed(0)}€`, change: '+18.5%', icon: DollarSign, color: '#f59e0b', bg: 'from-yellow-500/10 to-yellow-500/5', border: 'border-yellow-500/30' },
@@ -112,103 +309,119 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
 
   return (
     <div className="space-y-6">
-      {/* HERO */}
-      <div className="bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 rounded-xl p-6 text-white relative overflow-visible shadow-xl">
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-8 translate-x-8" />
-        <div className="relative z-10 flex justify-between items-start">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="text-3xl">👋</div>
-              <h1 className="text-3xl font-bold">Bonjour {firstName} !</h1>
-            </div>
-            <p className="text-white/90 text-lg mb-2">
-              {currentTime.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} • {currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-            </p>
-            <p className="text-white/80 text-base mb-4">Prêt à créer du contenu exceptionnel aujourd&apos;hui ? 🚀</p>
-            <div className="flex items-center gap-3">
-              <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">💎 Abonnement Premium</span>
-              <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">🏆 Score: 850</span>
-            </div>
+      {/* HERO (statique) */}
+      <div className="relative">
+        <div className="relative rounded-2xl p-6 sm:p-8 text-white shadow-xl bg-gradient-to-br from-purple-600 via-purple-500 to-pink-500">
+          {/* Décor statique léger (ne bouge pas) */}
+          <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-12 translate-x-12" />
+            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
           </div>
-          <div className="flex flex-col items-end gap-4">
-            {/* CLOCHE NOTIFICATIONS */}
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifPanel(!showNotifPanel)}
-                className="relative bg-white/20 backdrop-blur-sm rounded-full p-3 hover:bg-white/30 transition-colors"
-              >
-                <Bell className="h-7 w-7 text-white" />
-                {unreadCount > 0 && (
-                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                    <span className="text-xs text-white font-bold">{unreadCount}</span>
-                  </div>
-                )}
-              </button>
 
-              {/* PANEL NOTIFICATIONS */}
-              {showNotifPanel && (
-                <div className="absolute right-0 top-14 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
-                  <div className="flex items-center justify-between p-4 border-b bg-gray-50">
-                    <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                      <Bell className="h-4 w-4 text-primary" />
-                      Notifications
-                      {unreadCount > 0 && (
-                        <span className="bg-primary text-white text-xs px-2 py-0.5 rounded-full">{unreadCount}</span>
-                      )}
-                    </h3>
-                    <div className="flex items-center gap-2">
-                      {unreadCount > 0 && (
-                        <button onClick={markAllAsRead} className="text-xs text-primary hover:underline">
-                          Tout lu
-                        </button>
-                      )}
-                      <button onClick={() => setShowNotifPanel(false)} className="text-gray-400 hover:text-gray-600">
-                        <X className="h-4 w-4" />
-                      </button>
+          <div className="relative z-10 flex flex-col lg:flex-row lg:justify-between gap-6">
+            {/* GAUCHE */}
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="text-3xl">👋</div>
+                <h1 className="text-3xl font-bold">{greeting} {firstName} !</h1>
+              </div>
+              <p className="text-white/90 text-base mb-1">
+                {currentTime.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} • {currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+              <p className="text-white/75 text-sm mb-4">Ton espace créateur, en un coup d&apos;œil ✨</p>
+              <div className="flex flex-wrap items-center gap-2 mb-5">
+                <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">{heroLevel.emoji} Niveau {heroLevel.name}</span>
+                <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">✨ {(metrics?.collaborationsTotal || 0)} collaboration{(metrics?.collaborationsTotal || 0) > 1 ? 's' : ''}</span>
+                <span className="bg-white/20 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">🏆 {myScore.toLocaleString('fr-FR')} pts</span>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button onClick={() => goTo('opportunites')} className="inline-flex items-center gap-2 bg-white text-purple-700 font-semibold px-4 py-2 rounded-full hover:bg-white/90 transition shadow-lg">
+                  <Rocket className="h-4 w-4" />Voir les opportunités
+                </button>
+                <button onClick={() => goTo('contrats')} className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm text-white font-semibold px-4 py-2 rounded-full hover:bg-white/25 transition border border-white/30">
+                  <Briefcase className="h-4 w-4" />Mes contrats
+                </button>
+              </div>
+            </div>
+
+            {/* DROITE */}
+            <div className="flex flex-col items-start lg:items-end gap-5">
+              {/* CLOCHE NOTIFICATIONS */}
+              <div className="relative self-end">
+                <button onClick={() => setShowNotifPanel(!showNotifPanel)} className="relative bg-white/20 backdrop-blur-sm rounded-full p-3 hover:bg-white/30 transition-colors">
+                  <Bell className="h-7 w-7 text-white" />
+                  {unreadCount > 0 && (
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                      <span className="text-xs text-white font-bold">{unreadCount}</span>
                     </div>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {!notifications?.length ? (
-                      <div className="text-center py-10">
-                        <Bell className="h-10 w-10 text-gray-200 mx-auto mb-3" />
-                        <p className="text-gray-400 text-sm">Aucune notification</p>
+                  )}
+                </button>
+
+                {/* PANEL NOTIFICATIONS */}
+                {showNotifPanel && (
+                  <div className="absolute right-0 top-14 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden text-left">
+                    <div className="flex items-center justify-between p-4 border-b bg-gray-50">
+                      <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                        <Bell className="h-4 w-4 text-primary" />
+                        Notifications
+                        {unreadCount > 0 && (<span className="bg-primary text-white text-xs px-2 py-0.5 rounded-full">{unreadCount}</span>)}
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        {unreadCount > 0 && (<button onClick={markAllAsRead} className="text-xs text-primary hover:underline">Tout lu</button>)}
+                        <button onClick={() => setShowNotifPanel(false)} className="text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
                       </div>
-                    ) : (
-                      notifications.map((notif) => (
-                        <div
-                          key={notif.id}
-                          onClick={() => markAsRead(notif.id)}
-                          className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${!notif.is_read ? 'bg-primary/5 border-l-2 border-l-primary' : ''}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!notif.is_read ? 'bg-primary' : 'bg-gray-300'}`} />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-800">{notif.title}</p>
-                              <p className="text-xs text-gray-500 mt-0.5">{notif.body}</p>
-                              <p className="text-xs text-gray-400 mt-1">
-                                {new Date(notif.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                              </p>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {!notifications?.length ? (
+                        <div className="text-center py-10">
+                          <Bell className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+                          <p className="text-gray-400 text-sm">Aucune notification</p>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => (
+                          <div key={notif.id} onClick={() => markAsRead(notif.id)} className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${!notif.is_read ? 'bg-primary/5 border-l-2 border-l-primary' : ''}`}>
+                            <div className="flex items-start gap-3">
+                              <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!notif.is_read ? 'bg-primary' : 'bg-gray-300'}`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-800">{notif.title}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">{notif.body}</p>
+                                <p className="text-xs text-gray-400 mt-1">{new Date(notif.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))
-                    )}
+                        ))
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-            <div className="flex gap-4">
-  <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 text-right">
-    <div className="text-white font-bold text-lg">{metrics?.collaborationsActives || 0}</div>
-    <div className="text-white/70 text-sm">Campagnes</div>
-  </div>
-  <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 text-right">
-    <div className="text-white font-bold text-lg">€{((metrics?.totalGains || 0) / 1000).toFixed(1)}K</div>
-    <div className="text-white/70 text-sm">Ce mois</div>
-  </div>
-</div>
+              {/* À VENIR */}
+              <div className="flex items-center gap-6">
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 min-w-[210px] max-w-[280px]">
+                  <div className="flex items-center gap-1.5 text-white/70 text-xs font-semibold uppercase mb-2">
+                    <Clock className="h-3.5 w-3.5" />À venir
+                  </div>
+                  {upcoming.length === 0 ? (
+                    <p className="text-white/85 text-sm">Rien de prévu pour l&apos;instant 🎉</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {upcoming.map((it, i) => {
+                        const when = it.days == null ? 'à faire' : it.days <= 0 ? "aujourd'hui" : it.days === 1 ? 'demain' : `dans ${it.days} j`
+                        const verb = it.type === 'signature' ? 'Signature' : it.type === 'contract_deadline' ? 'Échéance' : 'Rendu'
+                        const urgent = it.days != null && it.days <= 1
+                        return (
+                          <div key={i} className="flex items-center justify-between gap-2">
+                            <p className="text-white text-sm font-semibold truncate">{verb} · {it.label}</p>
+                            <span className={`shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full ${urgent ? 'bg-red-400/30 text-red-50' : 'bg-white/20 text-white'}`}>{when}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -244,7 +457,16 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {podiumData.sort((a, b) => a.rank - b.rank).map(creator => (
+                {topCreators.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400">
+                    <Trophy className="h-10 w-10 mx-auto mb-3 text-gray-200" />
+                    <p className="text-sm">Classement bientôt disponible</p>
+                  </div>
+                ) : topCreators.map(creator => {
+                  const maxScore = topCreators[0]?.score || 0
+                  const pct = maxScore > 0 ? Math.min(100, Math.round((creator.score / maxScore) * 100)) : 0
+                  const initials = creator.name.slice(0, 2).toUpperCase()
+                  return (
                   <div key={creator.rank} className={`relative rounded-2xl p-4 border-2 overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform ${creator.rank === 1 ? 'bg-gradient-to-br from-yellow-500/10 to-white border-yellow-400/40' : creator.rank === 2 ? 'bg-gradient-to-br from-gray-400/10 to-white border-gray-400/30' : 'bg-gradient-to-br from-orange-400/10 to-white border-orange-400/30'}`}>
                     <div className="absolute top-0 right-0 w-16 h-16 rounded-full -translate-y-6 translate-x-6 opacity-30" style={{ background: creator.rank === 1 ? '#fbbf24' : creator.rank === 2 ? '#9ca3af' : '#fb923c' }} />
                     <div className="relative flex items-center gap-3">
@@ -252,18 +474,23 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
                         {creator.rank === 1 && <div className="absolute -top-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center"><Crown className="h-3 w-3 text-yellow-500" /></div>}
                         <span className="text-2xl font-bold text-white">{creator.rank}</span>
                       </div>
-                      <img src={creator.avatar} alt={creator.name} className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md flex-shrink-0" />
+                      {creator.avatar && !topAvatarError[creator.rank] ? (
+                        <img src={creator.avatar} alt={creator.name} onError={() => setTopAvatarError(prev => ({ ...prev, [creator.rank]: true }))} className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md flex-shrink-0" />
+                      ) : (
+                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-purple-600 text-white font-bold flex items-center justify-center border-2 border-white shadow-md flex-shrink-0">{initials}</div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold truncate">{creator.name}</p>
-                        <p className="text-sm text-gray-500 flex items-center gap-1"><Users className="h-3 w-3" />{creator.followers}</p>
+                        <p className="text-sm text-gray-500 flex items-center gap-1"><Trophy className="h-3 w-3" />Partnexx Score</p>
                       </div>
                       <div className={`text-xl font-bold flex-shrink-0 ${creator.rank === 1 ? 'text-yellow-500' : creator.rank === 2 ? 'text-gray-500' : 'text-orange-500'}`}>{creator.score}</div>
                     </div>
                     <div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${creator.rank === 1 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600' : creator.rank === 2 ? 'bg-gradient-to-r from-gray-300 to-gray-500' : 'bg-gradient-to-r from-orange-400 to-orange-600'}`} style={{ width: `${(creator.score / 1000) * 100}%` }} />
+                      <div className={`h-full rounded-full ${creator.rank === 1 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600' : creator.rank === 2 ? 'bg-gradient-to-r from-gray-300 to-gray-500' : 'bg-gradient-to-r from-orange-400 to-orange-600'}`} style={{ width: `${pct}%` }} />
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </CardContent>
             </Card>
 
@@ -342,7 +569,13 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
                   </ResponsiveContainer>
                 </div>
                 <div className="space-y-3 mt-4">
-                  {platformData.map((p, i) => (
+                  {platformData.length === 0 ? (
+                    <div className="text-center py-6 text-gray-400 border border-dashed rounded-xl">
+                      <Share2 className="h-8 w-8 mx-auto mb-2 text-gray-200" />
+                      <p className="text-sm">Aucun réseau connecté</p>
+                      <p className="text-xs">Ajoute tes réseaux dans l&apos;onglet Profil</p>
+                    </div>
+                  ) : platformData.map((p, i) => (
                     <div key={i} className="flex items-center gap-3 cursor-pointer hover:scale-[1.01] transition-transform">
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-lg" style={{ background: p.color }}>{p.name[0]}</div>
                       <div className="flex-1">
@@ -351,65 +584,17 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
                       </div>
                       <div className="text-right flex-shrink-0">
                         <span className="font-bold text-lg" style={{ color: p.color }}>{p.value}%</span>
-                        <div><span className="text-xs text-green-600 border border-green-200 px-1 rounded">{p.growth}</span></div>
                       </div>
                     </div>
                   ))}
                 </div>
                 <div className="flex items-center justify-between mt-4 pt-4 border-t">
                   <div className="flex items-center gap-2 text-gray-500"><TrendingUp className="h-4 w-4" /><span className="text-sm">Total d&apos;abonnés</span></div>
-                  <p className="text-xl font-bold">2.4M</p>
+                  <p className="text-xl font-bold">{fmtFollowers(totalSocialFollowers)}</p>
                 </div>
               </CardContent>
             </Card>
           </div>
-
-          <Card className="shadow-lg">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-lg flex items-center gap-2"><DollarSign className="h-5 w-5 text-yellow-500" />Performance Financière Mensuelle</CardTitle>
-                <span className="text-xs text-green-600 border border-green-200 px-2 py-1 rounded-full">
-                  <TrendingUp className="h-3 w-3 inline mr-1" />
-                  +{Math.round(performanceData.reduce((a, m) => a + m.revenue, 0) / performanceData.length).toLocaleString()}€/mois
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64 mb-6">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                  <BarChart data={performanceData}>
-                    <defs>
-                      <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.8} />
-                        <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.3} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis dataKey="name" fontSize={12} />
-                    <YAxis fontSize={12} tickFormatter={v => `${v}€`} />
-                    <Tooltip formatter={(v) => [`${v}€`, 'Revenus']} />
-                    <Bar dataKey="revenue" fill="url(#revenueGrad)" radius={[8, 8, 0, 0]} maxBarSize={60} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                {[
-                  { label: 'Revenu Total', value: `${performanceData.reduce((a, m) => a + m.revenue, 0).toLocaleString()}€`, sub: 'Sur 7 mois', color: '#22c55e', icon: DollarSign },
-{ label: 'Moyenne Mensuelle', value: `${Math.round(performanceData.reduce((a, m) => a + m.revenue, 0) / performanceData.length).toLocaleString()}€`, sub: 'Par mois', color: '#a855f7', icon: TrendingUp },
-{ label: 'Meilleur Mois', value: `${Math.max(...performanceData.map(d => d.revenue)).toLocaleString()}€`, sub: 'Mars 2024', color: '#f59e0b', icon: Trophy },
-                ].map((s, i) => {
-                  const Icon = s.icon
-                  return (
-                    <div key={i} className="text-center p-4 rounded-xl border cursor-pointer hover:scale-[1.02] transition-transform" style={{ background: s.color + '10', borderColor: s.color + '30' }}>
-                      <div className="flex items-center justify-center gap-2 mb-2"><Icon className="h-4 w-4" style={{ color: s.color }} /><p className="text-xs font-medium text-gray-500">{s.label}</p></div>
-                      <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
-                      <p className="text-xs text-gray-400 mt-1">{s.sub}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
         </div>
       )}
 
@@ -419,7 +604,12 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
           <Card className="shadow-lg">
             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Target className="h-5 w-5 text-pink-500" />Campagnes en Cours</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              {campaigns.map(campaign => (
+              {campaigns.length === 0 ? (
+                <div className="text-center py-10 text-gray-400">
+                  <Target className="h-10 w-10 mx-auto mb-3 text-gray-200" />
+                  <p className="text-sm">Aucune campagne pour l&apos;instant</p>
+                </div>
+              ) : campaigns.map(campaign => (
                 <div key={campaign.id} className={`rounded-2xl p-5 border-2 cursor-pointer hover:scale-[1.01] transition-transform relative overflow-hidden ${campaign.status === 'active' ? 'bg-gradient-to-br from-pink-500/10 to-white border-pink-500/30' : campaign.status === 'completed' ? 'bg-gradient-to-br from-green-500/10 to-white border-green-500/30' : 'bg-gradient-to-br from-orange-400/10 to-white border-orange-400/30'}`}>
                   <div className="relative">
                     <div className="flex justify-between items-start mb-4">
@@ -450,13 +640,18 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
           <Card className="shadow-lg">
             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Activity className="h-5 w-5 text-yellow-500" />Activité Récente</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              {recentActivity.map((activity, i) => (
+              {recentActivity.length === 0 ? (
+                <div className="text-center py-10 text-gray-400">
+                  <Activity className="h-10 w-10 mx-auto mb-3 text-gray-200" />
+                  <p className="text-sm">Aucune activité récente</p>
+                </div>
+              ) : recentActivity.map((activity, i) => (
                 <div key={i} className="flex items-center gap-3 p-4 rounded-xl border hover:scale-[1.01] transition-transform cursor-pointer" style={{ background: activity.type === 'approval' ? '#22c55e0a' : activity.type === 'follow' ? '#a855f70a' : activity.type === 'comment' ? '#ec48990a' : activity.type === 'mention' ? '#f59e0b0a' : '#3b82f60a' }}>
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white text-lg flex-shrink-0 shadow-lg ${activity.type === 'approval' ? 'bg-gradient-to-br from-green-500 to-green-600' : activity.type === 'follow' ? 'bg-gradient-to-br from-purple-500 to-purple-600' : activity.type === 'comment' ? 'bg-gradient-to-br from-pink-500 to-pink-600' : activity.type === 'mention' ? 'bg-gradient-to-br from-yellow-500 to-orange-500' : 'bg-gradient-to-br from-blue-500 to-blue-600'}`}>
                     {activity.type === 'approval' ? '✓' : activity.type === 'follow' ? '👤' : activity.type === 'comment' ? '💬' : activity.type === 'mention' ? '@' : '📧'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm"><span className="font-semibold">{activity.user}</span> <span className="text-gray-500">{activity.action}</span></p>
+                    <p className="text-sm"><span className="font-semibold">{activity.user}</span> {activity.action && <span className="text-gray-500">— {activity.action}</span>}</p>
                     <p className="text-xs text-gray-400 flex items-center gap-1 mt-1"><Clock className="h-3 w-3" />{activity.time}</p>
                   </div>
                   <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
@@ -471,25 +666,43 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
       {activeTab === 'insights' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="shadow-lg">
-            <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Brain className="h-5 w-5 text-yellow-500" />Insights IA</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2"><Brain className="h-5 w-5 text-yellow-500" />Insights IA</CardTitle>
+              <p className="text-xs text-gray-400 mt-1">Personnalisé d&apos;après tes données · recalculé chaque semaine</p>
+            </CardHeader>
             <CardContent className="space-y-4">
-              {aiInsights.map((insight, i) => (
-                <div key={i} className={`rounded-2xl p-5 border-2 cursor-pointer hover:scale-[1.01] transition-transform relative overflow-hidden ${insight.impact === 'high' ? 'bg-gradient-to-br from-yellow-500/10 to-white border-yellow-500/30' : 'bg-gradient-to-br from-purple-500/10 to-white border-purple-500/30'}`}>
-                  <div className="relative flex items-start gap-4 mb-3">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0 ${insight.impact === 'high' ? 'bg-gradient-to-br from-yellow-500 to-orange-500' : 'bg-gradient-to-br from-purple-500 to-pink-500'}`}>
+              {aiLoading ? (
+                <div className="text-center py-12 text-gray-400">
+                  <Brain className="h-10 w-10 mx-auto mb-3 text-gray-200 animate-pulse" />
+                  <p className="text-sm">Analyse de tes données en cours…</p>
+                </div>
+              ) : (aiData?.insights || []).length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <Sparkles className="h-10 w-10 mx-auto mb-3 text-gray-200" />
+                  <p className="text-sm">{aiData?.error ? 'Insights indisponibles pour le moment, réessaie plus tard' : 'Pas encore assez de données pour générer des insights'}</p>
+                </div>
+              ) : aiData.insights.map((insight, i) => (
+                <div key={i} className={`group rounded-2xl p-5 border transition-all hover:-translate-y-0.5 hover:shadow-md relative overflow-hidden ${insight.impact === 'high' ? 'bg-gradient-to-br from-yellow-50 to-white border-yellow-200' : 'bg-gradient-to-br from-purple-50 to-white border-purple-200'}`}>
+                  <div className="flex items-start gap-4 mb-3">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 transition-transform group-hover:scale-110 ${insight.impact === 'high' ? 'bg-gradient-to-br from-yellow-400 to-orange-500' : 'bg-gradient-to-br from-purple-500 to-pink-500'}`}>
                       <Sparkles className="h-6 w-6 text-white" />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between mb-1">
-                        <h4 className="font-semibold">{insight.title}</h4>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${insight.impact === 'high' ? 'bg-yellow-100 text-yellow-700' : 'bg-purple-100 text-purple-700'}`}>{insight.confidence}%</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <h4 className="font-bold text-gray-900 leading-snug">{insight.title}</h4>
+                        <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${insight.impact === 'high' ? 'bg-yellow-100 text-yellow-700' : 'bg-purple-100 text-purple-700'}`}>{insight.confidence}%</span>
                       </div>
-                      <p className="text-sm text-gray-500">{insight.description}</p>
+                      <p className="text-sm text-gray-600 leading-relaxed">{emphasize(insight.description)}</p>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-gray-400"><span>Niveau de confiance</span><span>Impact {insight.impact === 'high' ? 'élevé' : 'moyen'}</span></div>
-                    <Progress value={insight.confidence} className="h-2" />
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-400">Niveau de confiance</span>
+                      <span className={`font-semibold inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${insight.impact === 'high' ? 'bg-yellow-100 text-yellow-700' : 'bg-purple-100 text-purple-700'}`}>{insight.impact === 'high' ? '⚡ Impact élevé' : '◆ Impact moyen'}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                      <div className={`h-full rounded-full ${insight.impact === 'high' ? 'bg-gradient-to-r from-yellow-400 to-orange-500' : 'bg-gradient-to-r from-purple-500 to-pink-500'}`} style={{ width: `${insight.confidence}%` }} />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -499,20 +712,29 @@ export default function AccueilSection({ profile, metrics, collaborations, trans
           <Card className="shadow-lg">
             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Lightbulb className="h-5 w-5 text-yellow-500" />Recommandations</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              {[
-                { title: 'Timing Optimal', desc: "Publiez entre 14h-16h pour maximiser l'engagement", color: '#22c55e', icon: Clock },
-                { title: 'Contenu Tendance', desc: 'Focus sur les vidéos courtes et les tutoriels', color: '#a855f7', icon: TrendingUp },
-                { title: 'Collaborations', desc: '3 nouvelles opportunités de partenariat détectées', color: '#ec4899', icon: Users },
-                { title: 'Hashtags Optimaux', desc: '#TechReview #Innovation #Lifestyle pour plus de visibilité', color: '#f59e0b', icon: Target },
-              ].map((rec, i) => {
-                const Icon = rec.icon
+              {aiLoading ? (
+                <div className="text-center py-12 text-gray-400">
+                  <Lightbulb className="h-10 w-10 mx-auto mb-3 text-gray-200 animate-pulse" />
+                  <p className="text-sm">Génération de tes recommandations…</p>
+                </div>
+              ) : (aiData?.recommendations || []).length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <Lightbulb className="h-10 w-10 mx-auto mb-3 text-gray-200" />
+                  <p className="text-sm">{aiData?.error ? 'Recommandations indisponibles pour le moment' : 'Recommandations bientôt disponibles'}</p>
+                </div>
+              ) : (aiData?.recommendations || []).map((rec, i) => {
+                const st = RECO_STYLE[i % RECO_STYLE.length]
+                const Icon = st.icon
                 return (
-                  <div key={i} className="rounded-2xl p-5 border-2 cursor-pointer hover:scale-[1.01] transition-transform relative overflow-hidden" style={{ background: rec.color + '0a', borderColor: rec.color + '40' }}>
-                    <div className="relative flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0" style={{ background: `linear-gradient(135deg, ${rec.color}, ${rec.color}99)` }}>
-                        <Icon className="h-6 w-6 text-white" />
+                  <div key={i} className="group rounded-2xl p-5 border transition-all hover:-translate-y-0.5 hover:shadow-md relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${st.color}0f, #ffffff)`, borderColor: st.color + '33' }}>
+                    <div className="flex items-start gap-4">
+                      <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 transition-transform group-hover:scale-110" style={{ background: `linear-gradient(135deg, ${st.color}, ${st.color}aa)` }}>
+                        <Icon className="h-5 w-5 text-white" />
                       </div>
-                      <div><h4 className="font-semibold mb-1" style={{ color: rec.color }}>{rec.title}</h4><p className="text-sm text-gray-500">{rec.desc}</p></div>
+                      <div className="min-w-0">
+                        <h4 className="font-bold mb-1" style={{ color: st.color }}>{rec.title}</h4>
+                        <p className="text-sm text-gray-600 leading-relaxed">{emphasize(rec.desc)}</p>
+                      </div>
                     </div>
                   </div>
                 )
